@@ -1,19 +1,132 @@
 # booking-service
 
-booking-service: reservas, gestión de franjas horarias, reviews conductor/propietario
+**ParkLink** — TPP FIUBA — Equipo 198 / Grupo 14
 
-GET /parking-spots/{id}/availability: Consultar el calendario de franjas horarias libres y ocupadas de una cochera.
+`booking-service` owns parking spot availability and reservations: computing free time windows, listing a spot's bookings, and creating new bookings.
 
-GET /parking-spots/{id}/bookings: Listar las reservas recibidas por una cochera específica.
+---
 
-POST /bookings: Crear una intención de reserva para una cochera en un slot horario específico (inicia el estado PENDING_PAYMENT).
+## Endpoints
 
-GET /bookings/{id}: Obtener el detalle y estado actual de una reserva.
+### `GET /parking-spots/{id}/availability?from=YYYY-MM-DD&to=YYYY-MM-DD`
 
-POST /bookings/{id}/cancel: Cancelar una reserva.
+Effective free time windows per day, combining the published base (parking-service, mocked in this iteration) with active bookings. `from`/`to` are required, half-open range, max 14 days (`BOOKING_AVAILABILITY_MAX_DAYS`).
 
-GET /users/{id}/bookings/history: Listar el histórico de reservas del usuario.
+```json
+{
+  "days": [
+    {
+      "date": "2026-08-18",
+      "status": "available",
+      "free_windows": [
+        { "start": "2026-08-18T08:00:00-03:00", "end": "2026-08-18T10:00:00-03:00" },
+        { "start": "2026-08-18T11:00:00-03:00", "end": "2026-08-18T20:00:00-03:00" }
+      ]
+    }
+  ]
+}
+```
 
-POST /bookings/{id}/reviews: Registrar la calificación con estrellas y comentarios al finalizar la estadía (tanto para conductor como para propietario).
+### `GET /parking-spots/{id}/bookings?from=YYYY-MM-DD&to=YYYY-MM-DD&status=CONFIRMED`
 
-GET /parking-spots/{id}/reviews: Listar las calificaciones recibidas por una cochera (para mostrar rating y comentarios en el detalle que ve el conductor).
+Lists a spot's bookings grouped by day. `from`, `to`, and `status` are all optional; without `from`/`to` it returns the full history. Only days with at least one booking appear.
+
+```json
+{
+  "bookings": [
+    {
+      "date": "2026-08-18",
+      "bookings": [
+        { "start": "2026-08-18T10:00:00-03:00", "end": "2026-08-18T11:00:00-03:00", "status": "CONFIRMED" }
+      ]
+    }
+  ]
+}
+```
+
+### `POST /parking-spots/{id}/bookings`
+
+Creates a booking. Validates the range, checks it falls within the spot's published hours, and checks for overlap with existing active bookings (pre-check plus a DB-level `EXCLUDE` constraint as the race-condition safety net). Created as `PENDING_PAYMENT` with a hold that expires after `BOOKING_HOLD_MINUTES` (default 15).
+
+Request:
+```json
+{ "user_id": "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f", "start": "2026-08-24T10:00:00-03:00", "end": "2026-08-24T11:00:00-03:00", "amount": 5000 }
+```
+
+Response `201`:
+```json
+{
+  "id": "f5fef5a2-7316-4613-a811-4228eb5484c1",
+  "parking_spot_id": "99999999-9999-9999-9999-999999999999",
+  "user_id": "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f",
+  "start": "2026-08-24T10:00:00-03:00",
+  "end": "2026-08-24T11:00:00-03:00",
+  "status": "PENDING_PAYMENT",
+  "hold_expires_at": "2026-08-24T09:45:00-03:00",
+  "amount": 5000
+}
+```
+
+Error codes across the three endpoints: `INVALID_SPOT_ID`, `INVALID_DATE`, `INVALID_DATE_RANGE`, `RANGE_TOO_LARGE`, `INVALID_STATUS`, `INVALID_USER_ID`, `INVALID_TIME_RANGE`, `INVALID_AMOUNT`, `OUTSIDE_PUBLISHED_HOURS` (400), `BOOKING_CONFLICT` (409), `PARKING_SERVICE_ERROR` (502).
+
+### Not yet implemented
+
+Scoped in the original design but out of scope for this iteration: `GET /bookings/{id}`, `POST /bookings/{id}/cancel`, `GET /users/{id}/bookings/history`, `POST /bookings/{id}/reviews`, `GET /parking-spots/{id}/reviews`.
+
+---
+
+## Known technical debt
+
+- **No authentication.** All endpoints are public. `user_id` on creation is client-supplied and not verified against any identity system.
+- **No real pricing.** `amount` is client-supplied, not calculated from a rate.
+- **No payment integration.** Nothing ever transitions a booking from `PENDING_PAYMENT` to `CONFIRMED`.
+- **No hold-expiry job.** An expired `PENDING_PAYMENT` hold correctly stops occupying availability (the read queries already check `hold_expires_at`), but its row never physically flips to `EXPIRED` — there's no reconciler yet.
+- **parking-service is mocked.** Fixed Mon-Fri 08:00-20:00, closed weekends (`internal/repository/parkingservice`). It doesn't know about spot ownership, which is why bookings only reference `user_id` (the driver), not an owner.
+
+---
+
+## Architecture
+
+Five-layer Clean Architecture, dependencies flow inward only:
+
+```
+controller/   → HTTP handlers: parsing, validation, response mapping
+usecase/      → pure orchestration between services, one Execute() each, no business logic
+service/      → business logic; declares the repository/service interfaces it consumes
+repository/   → data access (Postgres, or the parking-service mock)
+domain/       → entities, enums, errors, constants — no external deps
+```
+
+Interfaces are declared in the consuming layer (never in a separate file), and a usecase never talks to a repository directly — it always goes through a service, even when that service is a pure pass-through (see `internal/service/parkingservice`).
+
+---
+
+## Running locally
+
+```bash
+docker compose up --build
+```
+
+Starts Postgres, RabbitMQ, and the app on `:8080`. Migrations run automatically on startup.
+
+Config (`.env.example`):
+
+| Variable | Default | Description |
+|---|---|---|
+| `HTTP_PORT` | `8080` | |
+| `DB_DSN` | — | PostgreSQL connection string |
+| `RABBITMQ_URL` | — | Kept wired per project requirements; no feature publishes to it yet |
+| `BOOKING_AVAILABILITY_MAX_DAYS` | `14` | Max range for the availability endpoint |
+| `BOOKING_HOLD_MINUTES` | `15` | How long a `PENDING_PAYMENT` hold lasts |
+
+## Testing
+
+```bash
+make test              # unit tests
+make race               # unit tests with -race
+BOOKING_TEST_DSN="postgres://appuser:apppassword@localhost:5432/cleanapi?sslmode=disable" go test ./internal/repository/booking/...
+```
+
+The last command runs the repository integration suite against a real PostgreSQL instance (skipped by default) — it's what actually exercises the `TSTZRANGE` overlap logic and the `EXCLUDE` constraint, which a mocked `*sql.DB` can't verify.
+
+See `docs/go-rules.md` for the full coding standards, and `spec.md` / `plan.md` for the original availability-endpoint design.

@@ -1,0 +1,18 @@
+# Go binaries
+bin/
+dist/
+
+# Test coverage
+coverage.out
+coverage.html
+*.coverprofile
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# pprof
+cpu.prof
+mem.prof
