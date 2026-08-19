@@ -27,28 +27,33 @@ type ListBookingsUseCase interface {
 	) ([]entity.DayBookings, error)
 }
 
-// Handler handles HTTP requests for listing and creating a parking spot's bookings.
+// Handler handles HTTP requests for listing and creating a parking spot's bookings, and
+// for checking which of a set of spots have no booking in a given time range.
 type Handler struct {
-	listBookingsUseCase  ListBookingsUseCase
-	createBookingUseCase CreateBookingUseCase
-	location             *time.Location
+	listBookingsUseCase     ListBookingsUseCase
+	createBookingUseCase    CreateBookingUseCase
+	getBookableSpotsUseCase GetBookableSpotsUseCase
+	location                *time.Location
 }
 
 func NewHandler(
 	listBookingsUseCase ListBookingsUseCase,
 	createBookingUseCase CreateBookingUseCase,
+	getBookableSpotsUseCase GetBookableSpotsUseCase,
 	location *time.Location,
 ) *Handler {
 	return &Handler{
-		listBookingsUseCase:  listBookingsUseCase,
-		createBookingUseCase: createBookingUseCase,
-		location:             location,
+		listBookingsUseCase:     listBookingsUseCase,
+		createBookingUseCase:    createBookingUseCase,
+		getBookableSpotsUseCase: getBookableSpotsUseCase,
+		location:                location,
 	}
 }
 
 func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Get(parkingSpotsBasePath+"/{id}/bookings", handler.ListBookingsEndpoint)
 	router.Post(parkingSpotsBasePath+"/{id}/bookings", handler.CreateBookingEndpoint)
+	router.Post(parkingSpotsBasePath+"/bookable", handler.GetBookableSpotsEndpoint)
 }
 
 func (handler *Handler) ListBookingsEndpoint(responseWriter http.ResponseWriter, request *http.Request) {

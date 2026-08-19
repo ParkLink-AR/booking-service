@@ -260,3 +260,70 @@ func (s *bookingRepositoryIntegrationSuite) TestCreateBooking_OverlapIsMappedToC
 	s.Require().Error(err)
 	s.True(errors.IsConflict(err))
 }
+
+func (s *bookingRepositoryIntegrationSuite) TestGetBookingsForSpotsInRange_ReturnsBookingsAcrossMultipleSpots() {
+	spotA := "dddddddd-dddd-dddd-dddd-dddddddddddd"
+	spotB := "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+	spotC := "ffffffff-ffff-ffff-ffff-ffffffffffff" // no bookings at all
+
+	s.insertBooking(spotA,
+		time.Date(2026, 8, 24, 10, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 24, 11, 0, 0, 0, time.UTC),
+		"CONFIRMED", nil,
+	)
+	s.insertBooking(spotB,
+		time.Date(2026, 8, 24, 10, 30, 0, 0, time.UTC),
+		time.Date(2026, 8, 24, 11, 30, 0, 0, time.UTC),
+		"CANCELLED", nil,
+	)
+
+	got, err := s.repository.GetBookingsForSpotsInRange(s.context, []string{spotA, spotB, spotC},
+		time.Date(2026, 8, 24, 10, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 24, 11, 0, 0, 0, time.UTC),
+	)
+
+	s.Require().NoError(err)
+	s.Require().Len(got, 2, "spotC has no bookings and must not appear")
+
+	bySpot := map[string]entity.SpotBooking{}
+	for _, booking := range got {
+		bySpot[booking.ParkingSpotID] = booking
+	}
+	s.Equal(enum.BookingStatusConfirmed, bySpot[spotA].Status)
+	s.Equal(enum.BookingStatusCancelled, bySpot[spotB].Status)
+}
+
+func (s *bookingRepositoryIntegrationSuite) TestGetBookingsForSpotsInRange_DoesNotFilterByStatus() {
+	spotID := "99999999-1111-1111-1111-111111111111"
+	s.insertBooking(spotID,
+		time.Date(2026, 8, 24, 10, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 24, 11, 0, 0, 0, time.UTC),
+		"EXPIRED", nil,
+	)
+
+	got, err := s.repository.GetBookingsForSpotsInRange(s.context, []string{spotID},
+		time.Date(2026, 8, 24, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 25, 0, 0, 0, 0, time.UTC),
+	)
+
+	s.Require().NoError(err)
+	s.Require().Len(got, 1, "the repository must not filter by status — that's the service's job")
+	s.Equal(enum.BookingStatusExpired, got[0].Status)
+}
+
+func (s *bookingRepositoryIntegrationSuite) TestGetBookingsForSpotsInRange_OutOfRangeIsExcluded() {
+	spotID := "99999999-2222-2222-2222-222222222222"
+	s.insertBooking(spotID,
+		time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC),
+		time.Date(2026, 9, 1, 11, 0, 0, 0, time.UTC),
+		"CONFIRMED", nil,
+	)
+
+	got, err := s.repository.GetBookingsForSpotsInRange(s.context, []string{spotID},
+		time.Date(2026, 8, 24, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 25, 0, 0, 0, 0, time.UTC),
+	)
+
+	s.Require().NoError(err)
+	s.Empty(got)
+}

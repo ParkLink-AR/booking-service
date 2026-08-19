@@ -25,11 +25,12 @@ func TestHandlerSuite(t *testing.T) {
 
 type handlerSuite struct {
 	suite.Suite
-	controller           *gomock.Controller
-	listBookingsUseCase  *mocks.MockListBookingsUseCase
-	createBookingUseCase *mocks.MockCreateBookingUseCase
-	router               chi.Router
-	location             *time.Location
+	controller              *gomock.Controller
+	listBookingsUseCase     *mocks.MockListBookingsUseCase
+	createBookingUseCase    *mocks.MockCreateBookingUseCase
+	getBookableSpotsUseCase *mocks.MockGetBookableSpotsUseCase
+	router                  chi.Router
+	location                *time.Location
 }
 
 const validParkingSpotID = "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"
@@ -38,13 +39,14 @@ func (s *handlerSuite) SetupTest() {
 	s.controller = gomock.NewController(s.T())
 	s.listBookingsUseCase = mocks.NewMockListBookingsUseCase(s.controller)
 	s.createBookingUseCase = mocks.NewMockCreateBookingUseCase(s.controller)
+	s.getBookableSpotsUseCase = mocks.NewMockGetBookableSpotsUseCase(s.controller)
 
 	location, err := time.LoadLocation("America/Argentina/Buenos_Aires")
 	s.Require().NoError(err)
 	s.location = location
 
 	s.router = chi.NewRouter()
-	booking.NewHandler(s.listBookingsUseCase, s.createBookingUseCase, s.location).RegisterRoutes(s.router)
+	booking.NewHandler(s.listBookingsUseCase, s.createBookingUseCase, s.getBookableSpotsUseCase, s.location).RegisterRoutes(s.router)
 }
 
 func (s *handlerSuite) TearDownTest() {

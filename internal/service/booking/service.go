@@ -20,6 +20,7 @@ type BookingRepository interface {
 	) ([]entity.BookingWindow, error)
 	GetActiveBookingsInRange(ctx context.Context, parkingSpotID string, from, to time.Time) ([]entity.TimeWindow, error)
 	CreateBooking(ctx context.Context, booking entity.Booking) (entity.Booking, error)
+	GetBookingsForSpotsInRange(ctx context.Context, parkingSpotIDs []string, start, end time.Time) ([]entity.SpotBooking, error)
 }
 
 // ParkingAvailability fetches the published availability base for a parking spot, used to

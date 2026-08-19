@@ -62,6 +62,7 @@ func main() {
 	getAvailabilityUseCase := ucavailability.NewGetAvailabilityUseCase(parkingService, availabilityService)
 	listBookingsUseCase := ucbooking.NewListBookingsUseCase(bookingService)
 	createBookingUseCase := ucbooking.NewCreateBookingUseCase(bookingService)
+	getBookableSpotsUseCase := ucbooking.NewGetBookableSpotsUseCase(bookingService)
 
 	// Router
 	router := chi.NewRouter()
@@ -69,7 +70,7 @@ func main() {
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
 
-	loadHandlers(router, getAvailabilityUseCase, listBookingsUseCase, createBookingUseCase, buenosAiresLocation)
+	loadHandlers(router, getAvailabilityUseCase, listBookingsUseCase, createBookingUseCase, getBookableSpotsUseCase, buenosAiresLocation)
 
 	// Start consumer in background
 	ctx, cancel := context.WithCancel(context.Background())
@@ -109,11 +110,12 @@ func loadHandlers(
 	getAvailabilityUseCase *ucavailability.GetAvailabilityUseCase,
 	listBookingsUseCase *ucbooking.ListBookingsUseCase,
 	createBookingUseCase *ucbooking.CreateBookingUseCase,
+	getBookableSpotsUseCase *ucbooking.GetBookableSpotsUseCase,
 	location *time.Location,
 ) {
 	handlers := []Handler{
 		availabilitycontroller.NewHandler(getAvailabilityUseCase, location),
-		bookingcontroller.NewHandler(listBookingsUseCase, createBookingUseCase, location),
+		bookingcontroller.NewHandler(listBookingsUseCase, createBookingUseCase, getBookableSpotsUseCase, location),
 	}
 	for _, handler := range handlers {
 		handler.RegisterRoutes(router)

@@ -72,6 +72,21 @@ func (mr *MockBookingRepositoryMockRecorder) GetActiveBookingsInRange(ctx, parki
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveBookingsInRange", reflect.TypeOf((*MockBookingRepository)(nil).GetActiveBookingsInRange), ctx, parkingSpotID, from, to)
 }
 
+// GetBookingsForSpotsInRange mocks base method.
+func (m *MockBookingRepository) GetBookingsForSpotsInRange(ctx context.Context, parkingSpotIDs []string, start, end time.Time) ([]entity.SpotBooking, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBookingsForSpotsInRange", ctx, parkingSpotIDs, start, end)
+	ret0, _ := ret[0].([]entity.SpotBooking)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBookingsForSpotsInRange indicates an expected call of GetBookingsForSpotsInRange.
+func (mr *MockBookingRepositoryMockRecorder) GetBookingsForSpotsInRange(ctx, parkingSpotIDs, start, end any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBookingsForSpotsInRange", reflect.TypeOf((*MockBookingRepository)(nil).GetBookingsForSpotsInRange), ctx, parkingSpotIDs, start, end)
+}
+
 // ListBookings mocks base method.
 func (m *MockBookingRepository) ListBookings(ctx context.Context, parkingSpotID string, from, to *time.Time, status *enum.BookingStatus) ([]entity.BookingWindow, error) {
 	m.ctrl.T.Helper()
