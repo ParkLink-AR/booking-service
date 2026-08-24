@@ -33,6 +33,7 @@ type ListBookingsUseCase interface {
 type Handler struct {
 	listBookingsUseCase     ListBookingsUseCase
 	createBookingUseCase    CreateBookingUseCase
+	confirmBookingUseCase   ConfirmBookingUseCase
 	getBookableSpotsUseCase GetBookableSpotsUseCase
 	location                *time.Location
 }
@@ -40,12 +41,14 @@ type Handler struct {
 func NewHandler(
 	listBookingsUseCase ListBookingsUseCase,
 	createBookingUseCase CreateBookingUseCase,
+	confirmBookingUseCase ConfirmBookingUseCase,
 	getBookableSpotsUseCase GetBookableSpotsUseCase,
 	location *time.Location,
 ) *Handler {
 	return &Handler{
 		listBookingsUseCase:     listBookingsUseCase,
 		createBookingUseCase:    createBookingUseCase,
+		confirmBookingUseCase:   confirmBookingUseCase,
 		getBookableSpotsUseCase: getBookableSpotsUseCase,
 		location:                location,
 	}
@@ -55,6 +58,7 @@ func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Get(parkingSpotsBasePath+"/{id}/bookings", handler.ListBookingsEndpoint)
 	router.Post(parkingSpotsBasePath+"/{id}/bookings", handler.CreateBookingEndpoint)
 	router.Post(parkingSpotsBasePath+"/bookable", handler.GetBookableSpotsEndpoint)
+	router.Post("/bookings/{id}/confirm", handler.ConfirmBookingEndpoint)
 }
 
 func (handler *Handler) ListBookingsEndpoint(responseWriter http.ResponseWriter, request *http.Request) {

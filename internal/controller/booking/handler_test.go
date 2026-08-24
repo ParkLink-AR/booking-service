@@ -28,6 +28,7 @@ type handlerSuite struct {
 	controller              *gomock.Controller
 	listBookingsUseCase     *mocks.MockListBookingsUseCase
 	createBookingUseCase    *mocks.MockCreateBookingUseCase
+	confirmBookingUseCase   *mocks.MockConfirmBookingUseCase
 	getBookableSpotsUseCase *mocks.MockGetBookableSpotsUseCase
 	router                  chi.Router
 	location                *time.Location
@@ -39,6 +40,7 @@ func (s *handlerSuite) SetupTest() {
 	s.controller = gomock.NewController(s.T())
 	s.listBookingsUseCase = mocks.NewMockListBookingsUseCase(s.controller)
 	s.createBookingUseCase = mocks.NewMockCreateBookingUseCase(s.controller)
+	s.confirmBookingUseCase = mocks.NewMockConfirmBookingUseCase(s.controller)
 	s.getBookableSpotsUseCase = mocks.NewMockGetBookableSpotsUseCase(s.controller)
 
 	location, err := time.LoadLocation("America/Argentina/Buenos_Aires")
@@ -46,7 +48,7 @@ func (s *handlerSuite) SetupTest() {
 	s.location = location
 
 	s.router = chi.NewRouter()
-	booking.NewHandler(s.listBookingsUseCase, s.createBookingUseCase, s.getBookableSpotsUseCase, s.location).RegisterRoutes(s.router)
+	booking.NewHandler(s.listBookingsUseCase, s.createBookingUseCase, s.confirmBookingUseCase, s.getBookableSpotsUseCase, s.location).RegisterRoutes(s.router)
 }
 
 func (s *handlerSuite) TearDownTest() {
