@@ -24,6 +24,7 @@ type ListBookingsUseCase interface {
 		parkingSpotID string,
 		from, to *time.Time,
 		status *enum.BookingStatus,
+		activeOnly bool,
 	) ([]entity.DayBookings, error)
 }
 
@@ -81,7 +82,9 @@ func (handler *Handler) ListBookingsEndpoint(responseWriter http.ResponseWriter,
 		return
 	}
 
-	days, err := handler.listBookingsUseCase.Execute(request.Context(), parkingSpotID, from, to, status)
+	activeOnly := request.URL.Query().Get("active") == "true"
+
+	days, err := handler.listBookingsUseCase.Execute(request.Context(), parkingSpotID, from, to, status, activeOnly)
 	if err != nil {
 		writeDomainError(responseWriter, err)
 		return

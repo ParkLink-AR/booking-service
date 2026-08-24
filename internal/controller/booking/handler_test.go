@@ -80,7 +80,7 @@ func (s *handlerSuite) TestListBookingsEndpoint_SuccessNoFilters() {
 		},
 	}
 	s.listBookingsUseCase.EXPECT().
-		Execute(gomock.Any(), validParkingSpotID, (*time.Time)(nil), (*time.Time)(nil), (*enum.BookingStatus)(nil)).
+		Execute(gomock.Any(), validParkingSpotID, (*time.Time)(nil), (*time.Time)(nil), (*enum.BookingStatus)(nil), false).
 		Return(days, nil)
 
 	recorder := s.doGet("/parking-spots/" + validParkingSpotID + "/bookings")
@@ -112,7 +112,7 @@ func (s *handlerSuite) TestListBookingsEndpoint_WithRangeAndStatusFilters() {
 	status := enum.BookingStatusConfirmed
 
 	s.listBookingsUseCase.EXPECT().
-		Execute(gomock.Any(), validParkingSpotID, &from, &to, &status).
+		Execute(gomock.Any(), validParkingSpotID, &from, &to, &status, false).
 		Return(nil, nil)
 
 	recorder := s.doGet("/parking-spots/" + validParkingSpotID + "/bookings?from=2026-08-18&to=2026-08-20&status=CONFIRMED")
@@ -143,7 +143,7 @@ func (s *handlerSuite) TestListBookingsEndpoint_InvalidStatus() {
 
 func (s *handlerSuite) TestListBookingsEndpoint_UsecaseInvalidDateRange() {
 	s.listBookingsUseCase.EXPECT().
-		Execute(gomock.Any(), validParkingSpotID, gomock.Any(), gomock.Any(), gomock.Any()).
+		Execute(gomock.Any(), validParkingSpotID, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, errors.NewInvalidInput("INVALID_DATE_RANGE", "from must be before to"))
 
 	recorder := s.doGet("/parking-spots/" + validParkingSpotID + "/bookings?from=2026-08-20&to=2026-08-18")

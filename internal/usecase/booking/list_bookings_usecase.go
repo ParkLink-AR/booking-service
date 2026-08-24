@@ -18,6 +18,7 @@ type BookingLister interface {
 		parkingSpotID string,
 		from, to *time.Time,
 		status *enum.BookingStatus,
+		activeOnly bool,
 	) ([]entity.DayBookings, error)
 }
 
@@ -37,6 +38,7 @@ func (useCase *ListBookingsUseCase) Execute(
 	parkingSpotID string,
 	from, to *time.Time,
 	status *enum.BookingStatus,
+	activeOnly bool,
 ) ([]entity.DayBookings, error) {
-	return useCase.bookingLister.ListBookings(ctx, parkingSpotID, from, to, status)
+	return useCase.bookingLister.ListBookings(ctx, parkingSpotID, from, to, status, activeOnly)
 }

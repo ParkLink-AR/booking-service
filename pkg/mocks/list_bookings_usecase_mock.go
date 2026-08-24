@@ -43,16 +43,16 @@ func (m *MockListBookingsUseCase) EXPECT() *MockListBookingsUseCaseMockRecorder 
 }
 
 // Execute mocks base method.
-func (m *MockListBookingsUseCase) Execute(ctx context.Context, parkingSpotID string, from, to *time.Time, status *enum.BookingStatus) ([]entity.DayBookings, error) {
+func (m *MockListBookingsUseCase) Execute(ctx context.Context, parkingSpotID string, from, to *time.Time, status *enum.BookingStatus, activeOnly bool) ([]entity.DayBookings, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Execute", ctx, parkingSpotID, from, to, status)
+	ret := m.ctrl.Call(m, "Execute", ctx, parkingSpotID, from, to, status, activeOnly)
 	ret0, _ := ret[0].([]entity.DayBookings)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Execute indicates an expected call of Execute.
-func (mr *MockListBookingsUseCaseMockRecorder) Execute(ctx, parkingSpotID, from, to, status any) *gomock.Call {
+func (mr *MockListBookingsUseCaseMockRecorder) Execute(ctx, parkingSpotID, from, to, status, activeOnly any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockListBookingsUseCase)(nil).Execute), ctx, parkingSpotID, from, to, status)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockListBookingsUseCase)(nil).Execute), ctx, parkingSpotID, from, to, status, activeOnly)
 }

@@ -14,7 +14,8 @@ import (
 // ListBookings returns bookings for parkingSpotID ordered by start time. from and to,
 // when both nil, apply no time filter; when either is set, only bookings overlapping the
 // half-open range are returned (a nil bound is unbounded on that side). status, when set,
-// restricts results to that single booking status.
+// restricts results to that single booking status. It does not decide which bookings are
+// active — the caller applies that business rule using Status and HoldExpiresAt.
 func (repository *Repository) ListBookings(
 	ctx context.Context,
 	parkingSpotID string,
@@ -22,7 +23,7 @@ func (repository *Repository) ListBookings(
 	status *enum.BookingStatus,
 ) ([]entity.BookingWindow, error) {
 	query := `
-		SELECT lower(time_range), upper(time_range), status
+		SELECT lower(time_range), upper(time_range), status, hold_expires_at
 		FROM ` + constants.BookingsTableName + `
 		WHERE parking_spot_id = $1
 	`
@@ -48,11 +49,14 @@ func (repository *Repository) ListBookings(
 	for rows.Next() {
 		var start, end time.Time
 		var statusLabel string
-		if err := rows.Scan(&start, &end, &statusLabel); err != nil {
+		var holdExpiresAt *time.Time
+		if err := rows.Scan(&start, &end, &statusLabel, &holdExpiresAt); err != nil {
 			return nil, errors.NewInternalError("booking.ListBookings", err)
 		}
 		bookingStatus, _ := enum.ParseBookingStatus(statusLabel)
-		bookingWindows = append(bookingWindows, entity.BookingWindow{Start: start, End: end, Status: bookingStatus})
+		bookingWindows = append(bookingWindows, entity.BookingWindow{
+			Start: start, End: end, Status: bookingStatus, HoldExpiresAt: holdExpiresAt,
+		})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, errors.NewInternalError("booking.ListBookings", err)

@@ -43,16 +43,16 @@ func (m *MockBookingLister) EXPECT() *MockBookingListerMockRecorder {
 }
 
 // ListBookings mocks base method.
-func (m *MockBookingLister) ListBookings(ctx context.Context, parkingSpotID string, from, to *time.Time, status *enum.BookingStatus) ([]entity.DayBookings, error) {
+func (m *MockBookingLister) ListBookings(ctx context.Context, parkingSpotID string, from, to *time.Time, status *enum.BookingStatus, activeOnly bool) ([]entity.DayBookings, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListBookings", ctx, parkingSpotID, from, to, status)
+	ret := m.ctrl.Call(m, "ListBookings", ctx, parkingSpotID, from, to, status, activeOnly)
 	ret0, _ := ret[0].([]entity.DayBookings)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListBookings indicates an expected call of ListBookings.
-func (mr *MockBookingListerMockRecorder) ListBookings(ctx, parkingSpotID, from, to, status any) *gomock.Call {
+func (mr *MockBookingListerMockRecorder) ListBookings(ctx, parkingSpotID, from, to, status, activeOnly any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBookings", reflect.TypeOf((*MockBookingLister)(nil).ListBookings), ctx, parkingSpotID, from, to, status)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBookings", reflect.TypeOf((*MockBookingLister)(nil).ListBookings), ctx, parkingSpotID, from, to, status, activeOnly)
 }

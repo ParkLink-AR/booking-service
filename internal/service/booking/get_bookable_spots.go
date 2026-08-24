@@ -39,7 +39,7 @@ func (service *Service) GetBookableSpots(
 func occupiedSpotIDs(bookings []entity.SpotBooking) []string {
 	occupied := make(map[string]struct{})
 	for _, booking := range bookings {
-		if isOccupying(booking) {
+		if isActive(booking.Status, booking.HoldExpiresAt) {
 			occupied[booking.ParkingSpotID] = struct{}{}
 		}
 	}
@@ -51,12 +51,14 @@ func occupiedSpotIDs(bookings []entity.SpotBooking) []string {
 	return ids
 }
 
-func isOccupying(booking entity.SpotBooking) bool {
-	switch booking.Status {
+// isActive reports whether a booking with the given status currently occupies its spot:
+// CONFIRMED, or PENDING_PAYMENT with an unexpired hold.
+func isActive(status enum.BookingStatus, holdExpiresAt *time.Time) bool {
+	switch status {
 	case enum.BookingStatusConfirmed:
 		return true
 	case enum.BookingStatusPendingPayment:
-		return booking.HoldExpiresAt != nil && booking.HoldExpiresAt.After(time.Now())
+		return holdExpiresAt != nil && holdExpiresAt.After(time.Now())
 	default:
 		return false
 	}

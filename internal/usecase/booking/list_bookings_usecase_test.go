@@ -46,10 +46,10 @@ func (s *listBookingsUseCaseSuite) TestExecute_DelegatesToBookingService() {
 	want := []entity.DayBookings{{Date: from}}
 
 	s.bookingLister.EXPECT().
-		ListBookings(gomock.Any(), s.parkingSpotID, &from, (*time.Time)(nil), &status).
+		ListBookings(gomock.Any(), s.parkingSpotID, &from, (*time.Time)(nil), &status, false).
 		Return(want, nil)
 
-	got, err := s.useCase.Execute(s.context, s.parkingSpotID, &from, nil, &status)
+	got, err := s.useCase.Execute(s.context, s.parkingSpotID, &from, nil, &status, false)
 
 	s.Require().NoError(err)
 	s.Equal(want, got)
@@ -57,10 +57,10 @@ func (s *listBookingsUseCaseSuite) TestExecute_DelegatesToBookingService() {
 
 func (s *listBookingsUseCaseSuite) TestExecute_ServiceErrorPropagates() {
 	s.bookingLister.EXPECT().
-		ListBookings(gomock.Any(), s.parkingSpotID, (*time.Time)(nil), (*time.Time)(nil), (*enum.BookingStatus)(nil)).
+		ListBookings(gomock.Any(), s.parkingSpotID, (*time.Time)(nil), (*time.Time)(nil), (*enum.BookingStatus)(nil), false).
 		Return(nil, errors.NewInvalidInput("INVALID_DATE_RANGE", "from must be before to"))
 
-	got, err := s.useCase.Execute(s.context, s.parkingSpotID, nil, nil, nil)
+	got, err := s.useCase.Execute(s.context, s.parkingSpotID, nil, nil, nil, false)
 
 	s.Nil(got)
 	s.True(errors.IsInvalidInput(err))

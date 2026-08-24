@@ -64,7 +64,7 @@ func (s *serviceSuite) TestListBookings_NoFiltersReturnsGroupedResult() {
 		ListBookings(gomock.Any(), s.parkingSpotID, (*time.Time)(nil), (*time.Time)(nil), (*enum.BookingStatus)(nil)).
 		Return([]entity.BookingWindow{window}, nil)
 
-	got, err := s.service.ListBookings(s.context, s.parkingSpotID, nil, nil, nil)
+	got, err := s.service.ListBookings(s.context, s.parkingSpotID, nil, nil, nil, false)
 
 	s.Require().NoError(err)
 	s.Require().Len(got, 1)
@@ -80,7 +80,7 @@ func (s *serviceSuite) TestListBookings_PassesRangeAndStatusThrough() {
 		ListBookings(gomock.Any(), s.parkingSpotID, &from, &to, &status).
 		Return(nil, nil)
 
-	got, err := s.service.ListBookings(s.context, s.parkingSpotID, &from, &to, &status)
+	got, err := s.service.ListBookings(s.context, s.parkingSpotID, &from, &to, &status, false)
 
 	s.Require().NoError(err)
 	s.Nil(got)
@@ -90,7 +90,7 @@ func (s *serviceSuite) TestListBookings_InvalidDateRange() {
 	from := s.localDate(19)
 	to := s.localDate(18)
 
-	got, err := s.service.ListBookings(s.context, s.parkingSpotID, &from, &to, nil)
+	got, err := s.service.ListBookings(s.context, s.parkingSpotID, &from, &to, nil, false)
 
 	s.Nil(got)
 	s.True(errors.IsInvalidInput(err))
@@ -104,7 +104,7 @@ func (s *serviceSuite) TestListBookings_OnlyFromGivenSkipsRangeValidation() {
 		ListBookings(gomock.Any(), s.parkingSpotID, &from, (*time.Time)(nil), (*enum.BookingStatus)(nil)).
 		Return(nil, nil)
 
-	got, err := s.service.ListBookings(s.context, s.parkingSpotID, &from, nil, nil)
+	got, err := s.service.ListBookings(s.context, s.parkingSpotID, &from, nil, nil, false)
 
 	s.Require().NoError(err)
 	s.Nil(got)
@@ -115,10 +115,27 @@ func (s *serviceSuite) TestListBookings_RepositoryErrorPropagates() {
 		ListBookings(gomock.Any(), s.parkingSpotID, (*time.Time)(nil), (*time.Time)(nil), (*enum.BookingStatus)(nil)).
 		Return(nil, repositoryFailure)
 
-	got, err := s.service.ListBookings(s.context, s.parkingSpotID, nil, nil, nil)
+	got, err := s.service.ListBookings(s.context, s.parkingSpotID, nil, nil, nil, false)
 
 	s.Nil(got)
 	s.ErrorIs(err, repositoryFailure)
+}
+
+func (s *serviceSuite) TestListBookings_ActiveOnlyExcludesInactiveAndExpiredHolds() {
+	expiredHold := time.Now().Add(-time.Hour)
+	confirmed := entity.BookingWindow{Status: enum.BookingStatusConfirmed}
+	cancelled := entity.BookingWindow{Status: enum.BookingStatusCancelled}
+	expiredHoldBooking := entity.BookingWindow{Status: enum.BookingStatusPendingPayment, HoldExpiresAt: &expiredHold}
+
+	s.bookingRepository.EXPECT().
+		ListBookings(gomock.Any(), s.parkingSpotID, (*time.Time)(nil), (*time.Time)(nil), (*enum.BookingStatus)(nil)).
+		Return([]entity.BookingWindow{confirmed, cancelled, expiredHoldBooking}, nil)
+
+	got, err := s.service.ListBookings(s.context, s.parkingSpotID, nil, nil, nil, true)
+
+	s.Require().NoError(err)
+	s.Require().Len(got, 1, "only the CONFIRMED booking should be active")
+	s.Equal([]entity.BookingWindow{confirmed}, got[0].Bookings)
 }
 
 var repositoryFailure = repositoryFailureFixture{}
