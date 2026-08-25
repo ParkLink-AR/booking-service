@@ -23,25 +23,23 @@ const testHoldDuration = 15 * time.Minute
 
 type serviceSuite struct {
 	suite.Suite
-	controller          *gomock.Controller
-	bookingRepository   *mocks.MockBookingRepository
-	parkingAvailability *mocks.MockParkingAvailability
-	service             *booking.Service
-	context             context.Context
-	location            *time.Location
-	parkingSpotID       string
+	controller        *gomock.Controller
+	bookingRepository *mocks.MockBookingRepository
+	service           *booking.Service
+	context           context.Context
+	location          *time.Location
+	parkingSpotID     string
 }
 
 func (s *serviceSuite) SetupTest() {
 	s.controller = gomock.NewController(s.T())
 	s.bookingRepository = mocks.NewMockBookingRepository(s.controller)
-	s.parkingAvailability = mocks.NewMockParkingAvailability(s.controller)
 
 	location, err := time.LoadLocation("America/Argentina/Buenos_Aires")
 	s.Require().NoError(err)
 	s.location = location
 
-	s.service = booking.NewService(s.bookingRepository, s.parkingAvailability, location, testHoldDuration)
+	s.service = booking.NewService(s.bookingRepository, location, testHoldDuration)
 	s.context = context.Background()
 	s.parkingSpotID = "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"
 }

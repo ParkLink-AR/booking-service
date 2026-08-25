@@ -23,32 +23,24 @@ type BookingRepository interface {
 	GetBookingsForSpotsInRange(ctx context.Context, parkingSpotIDs []string, start, end time.Time) ([]entity.SpotBooking, error)
 }
 
-// ParkingAvailability fetches the published availability base for a parking spot, used to
-// confirm a requested booking falls within the spot's published hours.
-type ParkingAvailability interface {
-	GetAvailabilityBase(ctx context.Context, parkingSpotID string, from, to time.Time) (*entity.AvailabilityBase, error)
-}
-
 // Service owns the business logic for a parking spot's bookings: listing them grouped by
-// day, and creating new ones (validating the range, published hours, and overlap with
-// existing active bookings).
+// day, and creating new ones (validating the range, published hours -- against the
+// schedule the caller provides, not fetched from anywhere -- and overlap with existing
+// active bookings).
 type Service struct {
-	bookingRepository   BookingRepository
-	parkingAvailability ParkingAvailability
-	location            *time.Location
-	holdDuration        time.Duration
+	bookingRepository BookingRepository
+	location          *time.Location
+	holdDuration      time.Duration
 }
 
 func NewService(
 	bookingRepository BookingRepository,
-	parkingAvailability ParkingAvailability,
 	location *time.Location,
 	holdDuration time.Duration,
 ) *Service {
 	return &Service{
-		bookingRepository:   bookingRepository,
-		parkingAvailability: parkingAvailability,
-		location:            location,
-		holdDuration:        holdDuration,
+		bookingRepository: bookingRepository,
+		location:          location,
+		holdDuration:      holdDuration,
 	}
 }

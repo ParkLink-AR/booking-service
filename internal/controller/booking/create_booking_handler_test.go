@@ -1,6 +1,7 @@
 package booking_test
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -13,6 +14,17 @@ import (
 )
 
 const validUserID = "11111111-1111-1111-1111-111111111111"
+
+// tuesdayScheduleBody is the parking_spot.schedule JSON fragment sent with every test
+// booking below (2026-08-18 is a Tuesday, dayOfWeek=1), open 08:00-20:00.
+const tuesdayScheduleBody = `[{"day_of_week":1,"start_hour":8,"end_hour":20}]`
+
+func createBookingBody(start, end string, amount int) string {
+	return fmt.Sprintf(
+		`{"user_id":"%s","start":"%s","end":"%s","amount":%d,"parking_spot":{"id":"%s","schedule":%s}}`,
+		validUserID, start, end, amount, validParkingSpotID, tuesdayScheduleBody,
+	)
+}
 
 func (s *handlerSuite) TestCreateBookingEndpoint_Success() {
 	// Parsed the same way the handler parses the request body's RFC3339 strings, so the
@@ -37,16 +49,16 @@ func (s *handlerSuite) TestCreateBookingEndpoint_Success() {
 	}
 	s.createBookingUseCase.EXPECT().
 		Execute(gomock.Any(), entity.CreateBookingInput{
-			ParkingSpotID: validParkingSpotID,
-			UserID:        validUserID,
-			Start:         start,
-			End:           end,
-			Amount:        5000,
+			ParkingSpotID:       validParkingSpotID,
+			ParkingSpotSchedule: []entity.ScheduleEntry{{DayOfWeek: 1, StartHour: 8, EndHour: 20}},
+			UserID:              validUserID,
+			Start:               start,
+			End:                 end,
+			Amount:              5000,
 		}).
 		Return(want, nil)
 
-	body := `{"user_id":"` + validUserID + `","start":"2026-08-18T10:00:00-03:00","end":"2026-08-18T11:00:00-03:00","amount":5000}`
-	recorder := s.doPost("/parking-spots/"+validParkingSpotID+"/bookings", body)
+	recorder := s.doPost("/bookings", createBookingBody("2026-08-18T10:00:00-03:00", "2026-08-18T11:00:00-03:00", 5000))
 
 	s.Equal(http.StatusCreated, recorder.Code)
 
@@ -72,23 +84,23 @@ func (s *handlerSuite) TestCreateBookingEndpoint_Success() {
 }
 
 func (s *handlerSuite) TestCreateBookingEndpoint_InvalidSpotID() {
-	body := `{"user_id":"` + validUserID + `","start":"2026-08-18T10:00:00-03:00","end":"2026-08-18T11:00:00-03:00","amount":5000}`
-	recorder := s.doPost("/parking-spots/not-a-uuid/bookings", body)
+	body := `{"user_id":"` + validUserID + `","start":"2026-08-18T10:00:00-03:00","end":"2026-08-18T11:00:00-03:00","amount":5000,"parking_spot":{"id":"not-a-uuid","schedule":` + tuesdayScheduleBody + `}}`
+	recorder := s.doPost("/bookings", body)
 
 	s.Equal(http.StatusBadRequest, recorder.Code)
 	s.Contains(recorder.Body.String(), "INVALID_SPOT_ID")
 }
 
 func (s *handlerSuite) TestCreateBookingEndpoint_InvalidBody() {
-	recorder := s.doPost("/parking-spots/"+validParkingSpotID+"/bookings", `not-json`)
+	recorder := s.doPost("/bookings", `not-json`)
 
 	s.Equal(http.StatusBadRequest, recorder.Code)
 	s.Contains(recorder.Body.String(), "INVALID_BODY")
 }
 
 func (s *handlerSuite) TestCreateBookingEndpoint_InvalidUserID() {
-	body := `{"user_id":"not-a-uuid","start":"2026-08-18T10:00:00-03:00","end":"2026-08-18T11:00:00-03:00","amount":5000}`
-	recorder := s.doPost("/parking-spots/"+validParkingSpotID+"/bookings", body)
+	body := `{"user_id":"not-a-uuid","start":"2026-08-18T10:00:00-03:00","end":"2026-08-18T11:00:00-03:00","amount":5000,"parking_spot":{"id":"` + validParkingSpotID + `","schedule":` + tuesdayScheduleBody + `}}`
+	recorder := s.doPost("/bookings", body)
 
 	s.Equal(http.StatusBadRequest, recorder.Code)
 	s.Contains(recorder.Body.String(), "INVALID_USER_ID")
@@ -98,21 +110,20 @@ var invalidTimeRangeCases = []struct {
 	name string
 	body string
 }{
-	{name: "invalid start", body: `{"user_id":"` + validUserID + `","start":"not-a-time","end":"2026-08-18T11:00:00-03:00","amount":5000}`},
-	{name: "invalid end", body: `{"user_id":"` + validUserID + `","start":"2026-08-18T10:00:00-03:00","end":"not-a-time","amount":5000}`},
+	{name: "invalid start", body: createBookingBody("not-a-time", "2026-08-18T11:00:00-03:00", 5000)},
+	{name: "invalid end", body: createBookingBody("2026-08-18T10:00:00-03:00", "not-a-time", 5000)},
 }
 
 func (s *handlerSuite) TestCreateBookingEndpoint_InvalidTimeRange() {
 	for _, testCase := range invalidTimeRangeCases {
-		recorder := s.doPost("/parking-spots/"+validParkingSpotID+"/bookings", testCase.body)
+		recorder := s.doPost("/bookings", testCase.body)
 		s.Equal(http.StatusBadRequest, recorder.Code, testCase.name)
 		s.Contains(recorder.Body.String(), "INVALID_TIME_RANGE", testCase.name)
 	}
 }
 
 func (s *handlerSuite) TestCreateBookingEndpoint_InvalidAmount() {
-	body := `{"user_id":"` + validUserID + `","start":"2026-08-18T10:00:00-03:00","end":"2026-08-18T11:00:00-03:00","amount":0}`
-	recorder := s.doPost("/parking-spots/"+validParkingSpotID+"/bookings", body)
+	recorder := s.doPost("/bookings", createBookingBody("2026-08-18T10:00:00-03:00", "2026-08-18T11:00:00-03:00", 0))
 
 	s.Equal(http.StatusBadRequest, recorder.Code)
 	s.Contains(recorder.Body.String(), "INVALID_AMOUNT")
@@ -123,8 +134,7 @@ func (s *handlerSuite) TestCreateBookingEndpoint_Conflict() {
 		Execute(gomock.Any(), gomock.Any()).
 		Return(entity.Booking{}, errors.NewConflict("requested time range overlaps with an existing booking"))
 
-	body := `{"user_id":"` + validUserID + `","start":"2026-08-18T10:00:00-03:00","end":"2026-08-18T11:00:00-03:00","amount":5000}`
-	recorder := s.doPost("/parking-spots/"+validParkingSpotID+"/bookings", body)
+	recorder := s.doPost("/bookings", createBookingBody("2026-08-18T10:00:00-03:00", "2026-08-18T11:00:00-03:00", 5000))
 
 	s.Equal(http.StatusConflict, recorder.Code)
 	s.Contains(recorder.Body.String(), "BOOKING_CONFLICT")
@@ -135,27 +145,8 @@ func (s *handlerSuite) TestCreateBookingEndpoint_OutsidePublishedHours() {
 		Execute(gomock.Any(), gomock.Any()).
 		Return(entity.Booking{}, errors.NewInvalidInput("OUTSIDE_PUBLISHED_HOURS", "requested time is outside the parking spot's published hours"))
 
-	body := `{"user_id":"` + validUserID + `","start":"2026-08-18T22:00:00-03:00","end":"2026-08-18T23:00:00-03:00","amount":5000}`
-	recorder := s.doPost("/parking-spots/"+validParkingSpotID+"/bookings", body)
+	recorder := s.doPost("/bookings", createBookingBody("2026-08-18T22:00:00-03:00", "2026-08-18T23:00:00-03:00", 5000))
 
 	s.Equal(http.StatusBadRequest, recorder.Code)
 	s.Contains(recorder.Body.String(), "OUTSIDE_PUBLISHED_HOURS")
 }
-
-func (s *handlerSuite) TestCreateBookingEndpoint_UpstreamError() {
-	s.createBookingUseCase.EXPECT().
-		Execute(gomock.Any(), gomock.Any()).
-		Return(entity.Booking{}, errors.NewUpstream("booking.GetAvailabilityBase", assertErr))
-
-	body := `{"user_id":"` + validUserID + `","start":"2026-08-18T10:00:00-03:00","end":"2026-08-18T11:00:00-03:00","amount":5000}`
-	recorder := s.doPost("/parking-spots/"+validParkingSpotID+"/bookings", body)
-
-	s.Equal(http.StatusBadGateway, recorder.Code)
-	s.Contains(recorder.Body.String(), "PARKING_SERVICE_ERROR")
-}
-
-var assertErr = assertErrFixture{}
-
-type assertErrFixture struct{}
-
-func (assertErrFixture) Error() string { return "connection refused" }

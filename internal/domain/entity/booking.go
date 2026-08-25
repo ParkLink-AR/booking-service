@@ -23,10 +23,13 @@ type Booking struct {
 
 // CreateBookingInput carries the data needed to create a new booking, threaded from the
 // controller through the usecase into the service that owns the creation business logic.
+// ParkingSpotSchedule is the spot's published weekly schedule as the caller knows it --
+// booking-service validates the requested range against it but never fetches it itself.
 type CreateBookingInput struct {
-	ParkingSpotID string
-	UserID        string
-	Start         time.Time
-	End           time.Time
-	Amount        int
+	ParkingSpotID       string
+	ParkingSpotSchedule []ScheduleEntry
+	UserID              string
+	Start               time.Time
+	End                 time.Time
+	Amount              int
 }
