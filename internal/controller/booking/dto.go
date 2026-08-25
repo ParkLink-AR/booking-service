@@ -6,11 +6,23 @@ import (
 	"github.com/example/bookings-service/internal/domain/entity"
 )
 
+type scheduleEntryRequest struct {
+	DayOfWeek int `json:"day_of_week"`
+	StartHour int `json:"start_hour"`
+	EndHour   int `json:"end_hour"`
+}
+
+type parkingSpotRequest struct {
+	ID       string                 `json:"id"`
+	Schedule []scheduleEntryRequest `json:"schedule"`
+}
+
 type createBookingRequest struct {
-	UserID string `json:"user_id"`
-	Start  string `json:"start"`
-	End    string `json:"end"`
-	Amount int    `json:"amount"`
+	UserID      string             `json:"user_id"`
+	Start       string             `json:"start"`
+	End         string             `json:"end"`
+	Amount      int                `json:"amount"`
+	ParkingSpot parkingSpotRequest `json:"parking_spot"`
 }
 
 type bookingResponse struct {

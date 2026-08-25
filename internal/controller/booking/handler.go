@@ -56,7 +56,7 @@ func NewHandler(
 
 func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Get(parkingSpotsBasePath+"/{id}/bookings", handler.ListBookingsEndpoint)
-	router.Post(parkingSpotsBasePath+"/{id}/bookings", handler.CreateBookingEndpoint)
+	router.Post("/bookings", handler.CreateBookingEndpoint)
 	router.Post(parkingSpotsBasePath+"/bookable", handler.GetBookableSpotsEndpoint)
 	router.Post("/bookings/{id}/confirm", handler.ConfirmBookingEndpoint)
 }

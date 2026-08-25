@@ -14,16 +14,11 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"
 
-	availabilitycontroller "github.com/example/bookings-service/internal/controller/availability"
 	bookingcontroller "github.com/example/bookings-service/internal/controller/booking"
 	"github.com/example/bookings-service/internal/domain/constants"
 	bookingrepository "github.com/example/bookings-service/internal/repository/booking"
 	"github.com/example/bookings-service/internal/repository/messaging"
-	parkingservicerepository "github.com/example/bookings-service/internal/repository/parkingservice"
-	availabilityservice "github.com/example/bookings-service/internal/service/availability"
 	bookingservice "github.com/example/bookings-service/internal/service/booking"
-	parkingservice "github.com/example/bookings-service/internal/service/parkingservice"
-	ucavailability "github.com/example/bookings-service/internal/usecase/availability"
 	ucbooking "github.com/example/bookings-service/internal/usecase/booking"
 )
 
@@ -50,16 +45,12 @@ func main() {
 
 	// Repositories
 	bookingRepository := bookingrepository.NewRepository(database)
-	parkingServiceRepository := parkingservicerepository.NewMockClient(buenosAiresLocation)
 	consumer := messaging.NewConsumer(rabbitChannel, logger)
 
 	// Services
-	availabilityService := availabilityservice.NewService(bookingRepository, maxAvailabilityDays())
-	parkingService := parkingservice.NewService(parkingServiceRepository)
-	bookingService := bookingservice.NewService(bookingRepository, parkingService, buenosAiresLocation, holdDuration())
+	bookingService := bookingservice.NewService(bookingRepository, buenosAiresLocation, holdDuration())
 
 	// Use cases
-	getAvailabilityUseCase := ucavailability.NewGetAvailabilityUseCase(parkingService, availabilityService)
 	listBookingsUseCase := ucbooking.NewListBookingsUseCase(bookingService)
 	createBookingUseCase := ucbooking.NewCreateBookingUseCase(bookingService)
 	confirmBookingUseCase := ucbooking.NewConfirmBookingUseCase(bookingRepository)
@@ -71,7 +62,7 @@ func main() {
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
 
-	loadHandlers(router, getAvailabilityUseCase, listBookingsUseCase, createBookingUseCase, confirmBookingUseCase, getBookableSpotsUseCase, buenosAiresLocation)
+	loadHandlers(router, listBookingsUseCase, createBookingUseCase, confirmBookingUseCase, getBookableSpotsUseCase, buenosAiresLocation)
 
 	// Start consumer in background
 	ctx, cancel := context.WithCancel(context.Background())
@@ -108,7 +99,6 @@ func main() {
 
 func loadHandlers(
 	router chi.Router,
-	getAvailabilityUseCase *ucavailability.GetAvailabilityUseCase,
 	listBookingsUseCase *ucbooking.ListBookingsUseCase,
 	createBookingUseCase *ucbooking.CreateBookingUseCase,
 	confirmBookingUseCase *ucbooking.ConfirmBookingUseCase,
@@ -116,26 +106,11 @@ func loadHandlers(
 	location *time.Location,
 ) {
 	handlers := []Handler{
-		availabilitycontroller.NewHandler(getAvailabilityUseCase, location),
 		bookingcontroller.NewHandler(listBookingsUseCase, createBookingUseCase, confirmBookingUseCase, getBookableSpotsUseCase, location),
 	}
 	for _, handler := range handlers {
 		handler.RegisterRoutes(router)
 	}
-}
-
-// maxAvailabilityDays reads BOOKING_AVAILABILITY_MAX_DAYS, falling back to the default
-// when unset or not a valid positive integer.
-func maxAvailabilityDays() int {
-	raw := os.Getenv("BOOKING_AVAILABILITY_MAX_DAYS")
-	if raw == "" {
-		return constants.DefaultMaxAvailabilityDays
-	}
-	value, err := strconv.Atoi(raw)
-	if err != nil || value <= 0 {
-		return constants.DefaultMaxAvailabilityDays
-	}
-	return value
 }
 
 // holdDuration reads BOOKING_HOLD_MINUTES, falling back to the default when unset or not

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 
@@ -20,18 +19,16 @@ type CreateBookingUseCase interface {
 }
 
 func (handler *Handler) CreateBookingEndpoint(responseWriter http.ResponseWriter, request *http.Request) {
-	parkingSpotID := chi.URLParam(request, "id")
-	if _, err := uuid.Parse(parkingSpotID); err != nil {
-		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_SPOT_ID", "id must be a valid UUID")
-		return
-	}
-
 	var body createBookingRequest
 	if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
 		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_BODY", "request body must be valid JSON")
 		return
 	}
 
+	if _, err := uuid.Parse(body.ParkingSpot.ID); err != nil {
+		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_SPOT_ID", "parking_spot.id must be a valid UUID")
+		return
+	}
 	if _, err := uuid.Parse(body.UserID); err != nil {
 		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_USER_ID", "user_id must be a valid UUID")
 		return
@@ -51,12 +48,22 @@ func (handler *Handler) CreateBookingEndpoint(responseWriter http.ResponseWriter
 		return
 	}
 
+	schedule := make([]entity.ScheduleEntry, len(body.ParkingSpot.Schedule))
+	for index, entry := range body.ParkingSpot.Schedule {
+		schedule[index] = entity.ScheduleEntry{
+			DayOfWeek: entry.DayOfWeek,
+			StartHour: entry.StartHour,
+			EndHour:   entry.EndHour,
+		}
+	}
+
 	input := entity.CreateBookingInput{
-		ParkingSpotID: parkingSpotID,
-		UserID:        body.UserID,
-		Start:         start,
-		End:           end,
-		Amount:        body.Amount,
+		ParkingSpotID:       body.ParkingSpot.ID,
+		ParkingSpotSchedule: schedule,
+		UserID:              body.UserID,
+		Start:               start,
+		End:                 end,
+		Amount:              body.Amount,
 	}
 
 	created, err := handler.createBookingUseCase.Execute(request.Context(), input)
