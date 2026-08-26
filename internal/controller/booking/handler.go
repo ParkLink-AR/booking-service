@@ -31,11 +31,13 @@ type ListBookingsUseCase interface {
 // Handler handles HTTP requests for listing and creating a parking spot's bookings, and
 // for checking which of a set of spots have no booking in a given time range.
 type Handler struct {
-	listBookingsUseCase     ListBookingsUseCase
-	createBookingUseCase    CreateBookingUseCase
-	confirmBookingUseCase   ConfirmBookingUseCase
-	getBookableSpotsUseCase GetBookableSpotsUseCase
-	location                *time.Location
+	listBookingsUseCase       ListBookingsUseCase
+	createBookingUseCase      CreateBookingUseCase
+	confirmBookingUseCase     ConfirmBookingUseCase
+	getBookableSpotsUseCase   GetBookableSpotsUseCase
+	getBookingUseCase         GetBookingUseCase
+	listBookingHistoryUseCase ListBookingHistoryUseCase
+	location                  *time.Location
 }
 
 func NewHandler(
@@ -43,14 +45,18 @@ func NewHandler(
 	createBookingUseCase CreateBookingUseCase,
 	confirmBookingUseCase ConfirmBookingUseCase,
 	getBookableSpotsUseCase GetBookableSpotsUseCase,
+	getBookingUseCase GetBookingUseCase,
+	listBookingHistoryUseCase ListBookingHistoryUseCase,
 	location *time.Location,
 ) *Handler {
 	return &Handler{
-		listBookingsUseCase:     listBookingsUseCase,
-		createBookingUseCase:    createBookingUseCase,
-		confirmBookingUseCase:   confirmBookingUseCase,
-		getBookableSpotsUseCase: getBookableSpotsUseCase,
-		location:                location,
+		listBookingsUseCase:       listBookingsUseCase,
+		createBookingUseCase:      createBookingUseCase,
+		confirmBookingUseCase:     confirmBookingUseCase,
+		getBookableSpotsUseCase:   getBookableSpotsUseCase,
+		getBookingUseCase:         getBookingUseCase,
+		listBookingHistoryUseCase: listBookingHistoryUseCase,
+		location:                  location,
 	}
 }
 
@@ -59,6 +65,8 @@ func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Post("/bookings", handler.CreateBookingEndpoint)
 	router.Post(parkingSpotsBasePath+"/bookable", handler.GetBookableSpotsEndpoint)
 	router.Post("/bookings/{id}/confirm", handler.ConfirmBookingEndpoint)
+	router.Get("/bookings/{id}", handler.GetBookingEndpoint)
+	router.Get("/users/{id}/bookings/history", handler.ListBookingHistoryEndpoint)
 }
 
 func (handler *Handler) ListBookingsEndpoint(responseWriter http.ResponseWriter, request *http.Request) {

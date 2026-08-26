@@ -327,3 +327,80 @@ func (s *bookingRepositoryIntegrationSuite) TestGetBookingsForSpotsInRange_OutOf
 	s.Require().NoError(err)
 	s.Empty(got)
 }
+
+func (s *bookingRepositoryIntegrationSuite) TestGetBookingByID_Success() {
+	created, err := s.repository.CreateBooking(s.context, entity.Booking{
+		ParkingSpotID: "11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+		UserID:        "22222222-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+		Start:         time.Date(2026, 8, 25, 9, 0, 0, 0, time.UTC),
+		End:           time.Date(2026, 8, 25, 11, 0, 0, 0, time.UTC),
+		Status:        enum.BookingStatusPendingPayment,
+		Amount:        180000,
+	})
+	s.Require().NoError(err)
+
+	got, err := s.repository.GetBookingByID(s.context, created.ID)
+
+	s.Require().NoError(err)
+	s.Equal(created.ID, got.ID)
+	s.Equal(created.ParkingSpotID, got.ParkingSpotID)
+	s.Equal(created.UserID, got.UserID)
+	s.Equal(180000, got.Amount)
+}
+
+func (s *bookingRepositoryIntegrationSuite) TestGetBookingByID_NotFound() {
+	_, err := s.repository.GetBookingByID(s.context, "00000000-0000-0000-0000-000000000000")
+
+	s.Require().Error(err)
+	s.True(errors.IsNotFound(err))
+}
+
+func (s *bookingRepositoryIntegrationSuite) TestListBookingsForUser_ReturnsOnlyThatUsersBookingsAcrossAllSpots() {
+	userID := "33333333-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+	otherUserID := "44444444-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+	first, err := s.repository.CreateBooking(s.context, entity.Booking{
+		ParkingSpotID: "11111111-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+		UserID:        userID,
+		Start:         time.Date(2026, 8, 25, 9, 0, 0, 0, time.UTC),
+		End:           time.Date(2026, 8, 25, 11, 0, 0, 0, time.UTC),
+		Status:        enum.BookingStatusConfirmed,
+		Amount:        180000,
+	})
+	s.Require().NoError(err)
+
+	second, err := s.repository.CreateBooking(s.context, entity.Booking{
+		ParkingSpotID: "11111111-cccc-cccc-cccc-cccccccccccc", // a different parking spot
+		UserID:        userID,
+		Start:         time.Date(2026, 8, 26, 9, 0, 0, 0, time.UTC),
+		End:           time.Date(2026, 8, 26, 11, 0, 0, 0, time.UTC),
+		Status:        enum.BookingStatusPendingPayment,
+		Amount:        90000,
+	})
+	s.Require().NoError(err)
+
+	_, err = s.repository.CreateBooking(s.context, entity.Booking{
+		ParkingSpotID: "11111111-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+		UserID:        otherUserID, // someone else's booking, must not appear
+		Start:         time.Date(2026, 8, 27, 9, 0, 0, 0, time.UTC),
+		End:           time.Date(2026, 8, 27, 11, 0, 0, 0, time.UTC),
+		Status:        enum.BookingStatusConfirmed,
+		Amount:        50000,
+	})
+	s.Require().NoError(err)
+
+	got, err := s.repository.ListBookingsForUser(s.context, userID)
+
+	s.Require().NoError(err)
+	s.Require().Len(got, 2)
+	ids := []string{got[0].ID, got[1].ID}
+	s.Contains(ids, first.ID)
+	s.Contains(ids, second.ID)
+}
+
+func (s *bookingRepositoryIntegrationSuite) TestListBookingsForUser_NoBookingsReturnsEmpty() {
+	got, err := s.repository.ListBookingsForUser(s.context, "55555555-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+
+	s.Require().NoError(err)
+	s.Empty(got)
+}

@@ -55,6 +55,8 @@ func main() {
 	createBookingUseCase := ucbooking.NewCreateBookingUseCase(bookingService)
 	confirmBookingUseCase := ucbooking.NewConfirmBookingUseCase(bookingRepository)
 	getBookableSpotsUseCase := ucbooking.NewGetBookableSpotsUseCase(bookingService)
+	getBookingUseCase := ucbooking.NewGetBookingUseCase(bookingService)
+	listBookingHistoryUseCase := ucbooking.NewListBookingHistoryUseCase(bookingService)
 
 	// Router
 	router := chi.NewRouter()
@@ -62,7 +64,7 @@ func main() {
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
 
-	loadHandlers(router, listBookingsUseCase, createBookingUseCase, confirmBookingUseCase, getBookableSpotsUseCase, buenosAiresLocation)
+	loadHandlers(router, listBookingsUseCase, createBookingUseCase, confirmBookingUseCase, getBookableSpotsUseCase, getBookingUseCase, listBookingHistoryUseCase, buenosAiresLocation)
 
 	// Start consumer in background
 	ctx, cancel := context.WithCancel(context.Background())
@@ -103,10 +105,15 @@ func loadHandlers(
 	createBookingUseCase *ucbooking.CreateBookingUseCase,
 	confirmBookingUseCase *ucbooking.ConfirmBookingUseCase,
 	getBookableSpotsUseCase *ucbooking.GetBookableSpotsUseCase,
+	getBookingUseCase *ucbooking.GetBookingUseCase,
+	listBookingHistoryUseCase *ucbooking.ListBookingHistoryUseCase,
 	location *time.Location,
 ) {
 	handlers := []Handler{
-		bookingcontroller.NewHandler(listBookingsUseCase, createBookingUseCase, confirmBookingUseCase, getBookableSpotsUseCase, location),
+		bookingcontroller.NewHandler(
+			listBookingsUseCase, createBookingUseCase, confirmBookingUseCase, getBookableSpotsUseCase,
+			getBookingUseCase, listBookingHistoryUseCase, location,
+		),
 	}
 	for _, handler := range handlers {
 		handler.RegisterRoutes(router)

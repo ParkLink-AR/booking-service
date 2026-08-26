@@ -21,6 +21,8 @@ type BookingRepository interface {
 	GetActiveBookingsInRange(ctx context.Context, parkingSpotID string, from, to time.Time) ([]entity.TimeWindow, error)
 	CreateBooking(ctx context.Context, booking entity.Booking) (entity.Booking, error)
 	GetBookingsForSpotsInRange(ctx context.Context, parkingSpotIDs []string, start, end time.Time) ([]entity.SpotBooking, error)
+	GetBookingByID(ctx context.Context, bookingID string) (entity.Booking, error)
+	ListBookingsForUser(ctx context.Context, userID string) ([]entity.Booking, error)
 }
 
 // Service owns the business logic for a parking spot's bookings: listing them grouped by

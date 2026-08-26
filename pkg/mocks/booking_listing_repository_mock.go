@@ -72,6 +72,21 @@ func (mr *MockBookingRepositoryMockRecorder) GetActiveBookingsInRange(ctx, parki
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveBookingsInRange", reflect.TypeOf((*MockBookingRepository)(nil).GetActiveBookingsInRange), ctx, parkingSpotID, from, to)
 }
 
+// GetBookingByID mocks base method.
+func (m *MockBookingRepository) GetBookingByID(ctx context.Context, bookingID string) (entity.Booking, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBookingByID", ctx, bookingID)
+	ret0, _ := ret[0].(entity.Booking)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBookingByID indicates an expected call of GetBookingByID.
+func (mr *MockBookingRepositoryMockRecorder) GetBookingByID(ctx, bookingID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBookingByID", reflect.TypeOf((*MockBookingRepository)(nil).GetBookingByID), ctx, bookingID)
+}
+
 // GetBookingsForSpotsInRange mocks base method.
 func (m *MockBookingRepository) GetBookingsForSpotsInRange(ctx context.Context, parkingSpotIDs []string, start, end time.Time) ([]entity.SpotBooking, error) {
 	m.ctrl.T.Helper()
@@ -100,4 +115,19 @@ func (m *MockBookingRepository) ListBookings(ctx context.Context, parkingSpotID 
 func (mr *MockBookingRepositoryMockRecorder) ListBookings(ctx, parkingSpotID, from, to, status any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBookings", reflect.TypeOf((*MockBookingRepository)(nil).ListBookings), ctx, parkingSpotID, from, to, status)
+}
+
+// ListBookingsForUser mocks base method.
+func (m *MockBookingRepository) ListBookingsForUser(ctx context.Context, userID string) ([]entity.Booking, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListBookingsForUser", ctx, userID)
+	ret0, _ := ret[0].([]entity.Booking)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListBookingsForUser indicates an expected call of ListBookingsForUser.
+func (mr *MockBookingRepositoryMockRecorder) ListBookingsForUser(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBookingsForUser", reflect.TypeOf((*MockBookingRepository)(nil).ListBookingsForUser), ctx, userID)
 }
