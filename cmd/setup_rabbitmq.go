@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	rabbitExchangeName = "events"
+	rabbitExchangeName = "parklink.events"
 	rabbitQueueName    = "events.notifications"
-	rabbitBindingKey   = "event.created"
+	rabbitBindingKey   = "#"
 )
 
 // setupRabbitMQ establishes a connection, declares the exchange/queue, and
