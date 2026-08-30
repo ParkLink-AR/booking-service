@@ -22,6 +22,11 @@ import (
 	ucbooking "github.com/example/bookings-service/internal/usecase/booking"
 )
 
+// holdExpiryInterval controls how often the background job expires stale holds.
+// A value equal to the hold duration means a worst-case slot blockage of 2×hold.
+// Running it more frequently (e.g. every minute) keeps the window tight.
+const holdExpiryInterval = time.Minute
+
 type Handler interface {
 	RegisterRoutes(router chi.Router)
 }
@@ -69,6 +74,12 @@ func main() {
 	defer cancel()
 	go consumer.Start(ctx)
 
+	// Background job: expire PENDING_PAYMENT bookings whose hold has elapsed.
+	// Without this, the DB's GIST EXCLUDE constraint keeps blocking those slots
+	// even though the business layer considers them free, causing 409s on valid
+	// new bookings.
+	go runHoldExpiryJob(ctx, bookingRepository, logger)
+
 	port := envOrDefault("HTTP_PORT", constants.DefaultHTTPPort)
 	server := &http.Server{Addr: ":" + port, Handler: router}
 
@@ -110,6 +121,27 @@ func loadHandlers(
 	}
 	for _, handler := range handlers {
 		handler.RegisterRoutes(router)
+	}
+}
+
+// runHoldExpiryJob ticks every holdExpiryInterval and transitions every
+// PENDING_PAYMENT row with an elapsed hold to EXPIRED, releasing the GIST
+// EXCLUDE constraint so those time slots can be booked again.
+func runHoldExpiryJob(ctx context.Context, repo *bookingrepository.Repository, logger *zap.Logger) {
+	ticker := time.NewTicker(holdExpiryInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			n, err := repo.ExpireStaleHolds(ctx)
+			if err != nil {
+				logger.Error("hold expiry job failed", zap.Error(err))
+			} else if n > 0 {
+				logger.Info("expired stale holds", zap.Int64("count", n))
+			}
+		}
 	}
 }
 
