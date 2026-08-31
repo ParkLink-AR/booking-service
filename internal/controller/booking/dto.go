@@ -55,6 +55,18 @@ func bookingResponseFromEntity(booking entity.Booking, location *time.Location) 
 	return response
 }
 
+type userBookingResponse struct {
+	ID            string  `json:"id"`
+	ParkingSpotID string  `json:"parking_spot_id"`
+	UserID        string  `json:"user_id"`
+	Start         string  `json:"start"`
+	End           string  `json:"end"`
+	Status        string  `json:"status"`
+	HoldExpiresAt *string `json:"hold_expires_at,omitempty"`
+	Amount        int     `json:"amount"`
+	PaymentID     string  `json:"payment_id,omitempty"`
+}
+
 type bookingWindowResponse struct {
 	Start  string `json:"start"`
 	End    string `json:"end"`

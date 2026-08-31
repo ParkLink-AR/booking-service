@@ -28,37 +28,80 @@ type ListBookingsUseCase interface {
 	) ([]entity.DayBookings, error)
 }
 
+// ListBookingsByUserUseCase is the interface consumed by GET /users/{id}/bookings/history.
+type ListBookingsByUserUseCase interface {
+	Execute(ctx context.Context, userID string) ([]entity.Booking, error)
+}
+
 // Handler handles HTTP requests for listing and creating a parking spot's bookings, and
 // for checking which of a set of spots have no booking in a given time range.
 type Handler struct {
-	listBookingsUseCase     ListBookingsUseCase
-	createBookingUseCase    CreateBookingUseCase
-	confirmBookingUseCase   ConfirmBookingUseCase
-	getBookableSpotsUseCase GetBookableSpotsUseCase
-	location                *time.Location
+	listBookingsUseCase       ListBookingsUseCase
+	listBookingsByUserUseCase ListBookingsByUserUseCase
+	createBookingUseCase      CreateBookingUseCase
+	confirmBookingUseCase     ConfirmBookingUseCase
+	getBookableSpotsUseCase   GetBookableSpotsUseCase
+	location                  *time.Location
 }
 
 func NewHandler(
 	listBookingsUseCase ListBookingsUseCase,
+	listBookingsByUserUseCase ListBookingsByUserUseCase,
 	createBookingUseCase CreateBookingUseCase,
 	confirmBookingUseCase ConfirmBookingUseCase,
 	getBookableSpotsUseCase GetBookableSpotsUseCase,
 	location *time.Location,
 ) *Handler {
 	return &Handler{
-		listBookingsUseCase:     listBookingsUseCase,
-		createBookingUseCase:    createBookingUseCase,
-		confirmBookingUseCase:   confirmBookingUseCase,
-		getBookableSpotsUseCase: getBookableSpotsUseCase,
-		location:                location,
+		listBookingsUseCase:       listBookingsUseCase,
+		listBookingsByUserUseCase: listBookingsByUserUseCase,
+		createBookingUseCase:      createBookingUseCase,
+		confirmBookingUseCase:     confirmBookingUseCase,
+		getBookableSpotsUseCase:   getBookableSpotsUseCase,
+		location:                  location,
 	}
 }
 
 func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Get(parkingSpotsBasePath+"/{id}/bookings", handler.ListBookingsEndpoint)
+	router.Get("/users/{id}/bookings/history", handler.ListBookingsByUserEndpoint)
 	router.Post("/bookings", handler.CreateBookingEndpoint)
 	router.Post(parkingSpotsBasePath+"/bookable", handler.GetBookableSpotsEndpoint)
 	router.Post("/bookings/{id}/confirm", handler.ConfirmBookingEndpoint)
+}
+
+func (handler *Handler) ListBookingsByUserEndpoint(responseWriter http.ResponseWriter, request *http.Request) {
+	userID := chi.URLParam(request, "id")
+	if _, err := uuid.Parse(userID); err != nil {
+		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_USER_ID", "id must be a valid UUID")
+		return
+	}
+
+	bookings, err := handler.listBookingsByUserUseCase.Execute(request.Context(), userID)
+	if err != nil {
+		writeDomainError(responseWriter, err)
+		return
+	}
+
+	response := make([]userBookingResponse, len(bookings))
+	for i, b := range bookings {
+		r := userBookingResponse{
+			ID:            b.ID,
+			ParkingSpotID: b.ParkingSpotID,
+			UserID:        b.UserID,
+			Start:         b.Start.In(handler.location).Format(time.RFC3339),
+			End:           b.End.In(handler.location).Format(time.RFC3339),
+			Status:        b.Status.String(),
+			Amount:        b.Amount,
+			PaymentID:     b.PaymentID,
+		}
+		if b.HoldExpiresAt != nil {
+			formatted := b.HoldExpiresAt.In(handler.location).Format(time.RFC3339)
+			r.HoldExpiresAt = &formatted
+		}
+		response[i] = r
+	}
+	writeJSON(responseWriter, http.StatusOK, response)
 }
 
 func (handler *Handler) ListBookingsEndpoint(responseWriter http.ResponseWriter, request *http.Request) {
