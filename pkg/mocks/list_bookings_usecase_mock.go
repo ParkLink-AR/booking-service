@@ -56,3 +56,41 @@ func (mr *MockListBookingsUseCaseMockRecorder) Execute(ctx, parkingSpotID, from,
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockListBookingsUseCase)(nil).Execute), ctx, parkingSpotID, from, to, status, activeOnly)
 }
+
+// MockListBookingsByUserUseCase is a mock of ListBookingsByUserUseCase interface.
+type MockListBookingsByUserUseCase struct {
+	ctrl     *gomock.Controller
+	recorder *MockListBookingsByUserUseCaseMockRecorder
+}
+
+// MockListBookingsByUserUseCaseMockRecorder is the mock recorder for MockListBookingsByUserUseCase.
+type MockListBookingsByUserUseCaseMockRecorder struct {
+	mock *MockListBookingsByUserUseCase
+}
+
+// NewMockListBookingsByUserUseCase creates a new mock instance.
+func NewMockListBookingsByUserUseCase(ctrl *gomock.Controller) *MockListBookingsByUserUseCase {
+	mock := &MockListBookingsByUserUseCase{ctrl: ctrl}
+	mock.recorder = &MockListBookingsByUserUseCaseMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockListBookingsByUserUseCase) EXPECT() *MockListBookingsByUserUseCaseMockRecorder {
+	return m.recorder
+}
+
+// Execute mocks base method.
+func (m *MockListBookingsByUserUseCase) Execute(ctx context.Context, userID string) ([]entity.Booking, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Execute", ctx, userID)
+	ret0, _ := ret[0].([]entity.Booking)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Execute indicates an expected call of Execute.
+func (mr *MockListBookingsByUserUseCaseMockRecorder) Execute(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockListBookingsByUserUseCase)(nil).Execute), ctx, userID)
+}
