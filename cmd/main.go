@@ -75,6 +75,7 @@ func main() {
 	submitReviewUseCase := ucbooking.NewSubmitReviewUseCase(bookingRepository, parkingClient, bookingRepository)
 	listReviewsByTargetUseCase := ucbooking.NewListReviewsByTargetUseCase(bookingRepository)
 	listReviewsByBookingUseCase := ucbooking.NewListReviewsByBookingUseCase(bookingRepository)
+	getSpotRatingsUseCase := ucbooking.NewGetSpotRatingsUseCase(bookingRepository)
 
 	// Router
 	router := chi.NewRouter()
@@ -89,6 +90,7 @@ func main() {
 		approveBookingUseCase, rejectBookingUseCase, listBookingsDetailedUseCase,
 		getBookingUseCase,
 		submitReviewUseCase, listReviewsByTargetUseCase, listReviewsByBookingUseCase,
+		getSpotRatingsUseCase,
 		buenosAiresLocation,
 	)
 
@@ -153,6 +155,7 @@ func loadHandlers(
 	submitReviewUseCase *ucbooking.SubmitReviewUseCase,
 	listReviewsByTargetUseCase *ucbooking.ListReviewsByTargetUseCase,
 	listReviewsByBookingUseCase *ucbooking.ListReviewsByBookingUseCase,
+	getSpotRatingsUseCase *ucbooking.GetSpotRatingsUseCase,
 	location *time.Location,
 ) {
 	handlers := []Handler{
@@ -162,6 +165,7 @@ func loadHandlers(
 			approveBookingUseCase, rejectBookingUseCase, listBookingsDetailedUseCase,
 			getBookingUseCase,
 			submitReviewUseCase, listReviewsByTargetUseCase, listReviewsByBookingUseCase,
+			getSpotRatingsUseCase,
 			location,
 		),
 	}

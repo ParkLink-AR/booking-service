@@ -48,6 +48,7 @@ type Handler struct {
 	submitReviewUseCase         SubmitReviewUseCase
 	listReviewsByTargetUseCase  ListReviewsByTargetUseCase
 	listReviewsByBookingUseCase ListReviewsByBookingUseCase
+	getSpotRatingsUseCase       GetSpotRatingsUseCase
 	location                    *time.Location
 }
 
@@ -64,6 +65,7 @@ func NewHandler(
 	submitReviewUseCase SubmitReviewUseCase,
 	listReviewsByTargetUseCase ListReviewsByTargetUseCase,
 	listReviewsByBookingUseCase ListReviewsByBookingUseCase,
+	getSpotRatingsUseCase GetSpotRatingsUseCase,
 	location *time.Location,
 ) *Handler {
 	return &Handler{
@@ -79,6 +81,7 @@ func NewHandler(
 		submitReviewUseCase:         submitReviewUseCase,
 		listReviewsByTargetUseCase:  listReviewsByTargetUseCase,
 		listReviewsByBookingUseCase: listReviewsByBookingUseCase,
+		getSpotRatingsUseCase:       getSpotRatingsUseCase,
 		location:                    location,
 	}
 }
@@ -91,6 +94,7 @@ func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Get("/users/{id}/reviews", handler.ListUserReviewsEndpoint)
 	router.Post("/bookings", handler.CreateBookingEndpoint)
 	router.Post(parkingSpotsBasePath+"/bookable", handler.GetBookableSpotsEndpoint)
+	router.Post(parkingSpotsBasePath+"/ratings", handler.GetSpotRatingsEndpoint)
 	router.Post("/bookings/{id}/confirm", handler.ConfirmBookingEndpoint)
 	router.Post("/bookings/{id}/approve", handler.ApproveBookingEndpoint)
 	router.Post("/bookings/{id}/reject", handler.RejectBookingEndpoint)
