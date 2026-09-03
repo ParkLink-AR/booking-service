@@ -29,6 +29,10 @@ type UpstreamError struct {
 // existing state (e.g. an overlapping booking for the same time range).
 type ConflictError struct{ Message string }
 
+// ForbiddenError signals that the caller is authenticated but not allowed to perform this
+// action (e.g. approving a booking on a parking spot they don't own).
+type ForbiddenError struct{ Message string }
+
 func (e *NotFoundError) Error() string {
 	return fmt.Sprintf("%s with id %q not found", e.Resource, e.ID)
 }
@@ -39,6 +43,7 @@ func (e *InvalidInputError) Error() string { return e.Message }
 func (e *UpstreamError) Error() string     { return fmt.Sprintf("%s: %v", e.Op, e.Err) }
 func (e *UpstreamError) Unwrap() error     { return e.Err }
 func (e *ConflictError) Error() string     { return e.Message }
+func (e *ForbiddenError) Error() string    { return e.Message }
 
 func NewNotFound(resource, id string) error       { return &NotFoundError{Resource: resource, ID: id} }
 func NewValidation(msg string) error              { return &ValidationError{Message: msg} }
@@ -48,12 +53,18 @@ func NewInvalidInput(code, message string) error {
 }
 func NewUpstream(op string, err error) error { return &UpstreamError{Op: op, Err: err} }
 func NewConflict(message string) error       { return &ConflictError{Message: message} }
+func NewForbidden(message string) error      { return &ForbiddenError{Message: message} }
 
 func IsNotFound(err error) bool   { _, ok := err.(*NotFoundError); return ok }
 func IsValidation(err error) bool { _, ok := err.(*ValidationError); return ok }
 
 func IsConflict(err error) bool {
 	var target *ConflictError
+	return errors.As(err, &target)
+}
+
+func IsForbidden(err error) bool {
+	var target *ForbiddenError
 	return errors.As(err, &target)
 }
 

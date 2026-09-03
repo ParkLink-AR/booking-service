@@ -18,6 +18,8 @@ import (
 	"github.com/example/bookings-service/internal/domain/constants"
 	bookingrepository "github.com/example/bookings-service/internal/repository/booking"
 	"github.com/example/bookings-service/internal/repository/messaging"
+	"github.com/example/bookings-service/internal/repository/parkingclient"
+	"github.com/example/bookings-service/internal/repository/paymentclient"
 	bookingservice "github.com/example/bookings-service/internal/service/booking"
 	ucbooking "github.com/example/bookings-service/internal/usecase/booking"
 )
@@ -51,6 +53,11 @@ func main() {
 	// Repositories
 	bookingRepository := bookingrepository.NewRepository(database)
 	consumer := messaging.NewConsumer(rabbitChannel, logger)
+	parkingClient := parkingclient.NewClient(envOrDefault("PARKING_SERVICE_URL", "http://localhost:3001"))
+	paymentClient := paymentclient.NewClient(
+		envOrDefault("PAYMENT_SERVICE_URL", "http://localhost:8004"),
+		os.Getenv("INTERNAL_SERVICE_KEY"),
+	)
 
 	// Services
 	bookingService := bookingservice.NewService(bookingRepository, buenosAiresLocation, holdDuration())
@@ -59,8 +66,12 @@ func main() {
 	listBookingsUseCase := ucbooking.NewListBookingsUseCase(bookingService)
 	listBookingsByUserUseCase := ucbooking.NewListBookingsByUserUseCase(bookingRepository)
 	createBookingUseCase := ucbooking.NewCreateBookingUseCase(bookingService)
-	confirmBookingUseCase := ucbooking.NewConfirmBookingUseCase(bookingRepository)
+	confirmBookingUseCase := ucbooking.NewConfirmBookingUseCase(bookingRepository, parkingClient)
 	getBookableSpotsUseCase := ucbooking.NewGetBookableSpotsUseCase(bookingService)
+	approveBookingUseCase := ucbooking.NewApproveBookingUseCase(bookingRepository, parkingClient)
+	rejectBookingUseCase := ucbooking.NewRejectBookingUseCase(bookingRepository, parkingClient, paymentClient)
+	listBookingsDetailedUseCase := ucbooking.NewListBookingsDetailedUseCase(bookingRepository, parkingClient)
+	getBookingUseCase := ucbooking.NewGetBookingUseCase(bookingRepository)
 
 	// Router
 	router := chi.NewRouter()
@@ -68,7 +79,14 @@ func main() {
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
 
-	loadHandlers(router, listBookingsUseCase, listBookingsByUserUseCase, createBookingUseCase, confirmBookingUseCase, getBookableSpotsUseCase, buenosAiresLocation)
+	loadHandlers(
+		router,
+		listBookingsUseCase, listBookingsByUserUseCase, createBookingUseCase,
+		confirmBookingUseCase, getBookableSpotsUseCase,
+		approveBookingUseCase, rejectBookingUseCase, listBookingsDetailedUseCase,
+		getBookingUseCase,
+		buenosAiresLocation,
+	)
 
 	// Start consumer in background
 	ctx, cancel := context.WithCancel(context.Background())
@@ -80,6 +98,10 @@ func main() {
 	// even though the business layer considers them free, causing 409s on valid
 	// new bookings.
 	go runHoldExpiryJob(ctx, bookingRepository, logger)
+
+	// Background job: auto-cancel + refund PENDING_OWNER_APPROVAL bookings the
+	// owner never responded to within OWNER_APPROVAL_HOURS.
+	go runOwnerApprovalExpiryJob(ctx, bookingRepository, paymentClient, logger)
 
 	port := envOrDefault("HTTP_PORT", constants.DefaultHTTPPort)
 	server := &http.Server{Addr: ":" + port, Handler: router}
@@ -116,10 +138,20 @@ func loadHandlers(
 	createBookingUseCase *ucbooking.CreateBookingUseCase,
 	confirmBookingUseCase *ucbooking.ConfirmBookingUseCase,
 	getBookableSpotsUseCase *ucbooking.GetBookableSpotsUseCase,
+	approveBookingUseCase *ucbooking.ApproveBookingUseCase,
+	rejectBookingUseCase *ucbooking.RejectBookingUseCase,
+	listBookingsDetailedUseCase *ucbooking.ListBookingsDetailedUseCase,
+	getBookingUseCase *ucbooking.GetBookingUseCase,
 	location *time.Location,
 ) {
 	handlers := []Handler{
-		bookingcontroller.NewHandler(listBookingsUseCase, listBookingsByUserUseCase, createBookingUseCase, confirmBookingUseCase, getBookableSpotsUseCase, location),
+		bookingcontroller.NewHandler(
+			listBookingsUseCase, listBookingsByUserUseCase, createBookingUseCase,
+			confirmBookingUseCase, getBookableSpotsUseCase,
+			approveBookingUseCase, rejectBookingUseCase, listBookingsDetailedUseCase,
+			getBookingUseCase,
+			location,
+		),
 	}
 	for _, handler := range handlers {
 		handler.RegisterRoutes(router)
@@ -142,6 +174,36 @@ func runHoldExpiryJob(ctx context.Context, repo *bookingrepository.Repository, l
 				logger.Error("hold expiry job failed", zap.Error(err))
 			} else if n > 0 {
 				logger.Info("expired stale holds", zap.Int64("count", n))
+			}
+		}
+	}
+}
+
+// runOwnerApprovalExpiryJob ticks every minute and auto-cancels + refunds every
+// PENDING_OWNER_APPROVAL booking whose owner_response_deadline has elapsed. Reuses the
+// hold-expiry job's cadence -- these bookings are rare compared to payment holds, no need
+// for a separate interval.
+func runOwnerApprovalExpiryJob(ctx context.Context, repo *bookingrepository.Repository, refunder *paymentclient.Client, logger *zap.Logger) {
+	ticker := time.NewTicker(holdExpiryInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			expired, err := repo.ExpireStalePendingApprovals(ctx)
+			if err != nil {
+				logger.Error("owner approval expiry job failed", zap.Error(err))
+				continue
+			}
+			for _, booking := range expired {
+				if err := refunder.RefundPayment(ctx, booking.PaymentID); err != nil {
+					logger.Error("refund failed for expired pending-approval booking",
+						zap.String("booking_id", booking.ID), zap.Error(err))
+				}
+			}
+			if len(expired) > 0 {
+				logger.Info("expired stale pending-owner-approval bookings", zap.Int("count", len(expired)))
 			}
 		}
 	}

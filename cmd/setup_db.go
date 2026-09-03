@@ -27,9 +27,11 @@ func setupDB() *sql.DB {
 // runMigrations creates the booking-service schema (bookings + booking_status_history).
 // Mirrors migrations/001-004_*.sql for environments that run migrations inline at startup.
 func runMigrations(database *sql.DB) error {
-	_, err := database.Exec(`
-		CREATE EXTENSION IF NOT EXISTS btree_gist;
-
+	// Postgres refuses to use a brand-new enum value in the same transaction
+	// that added it ("unsafe use of new value") -- ALTER TYPE ADD VALUE has
+	// to commit on its own, separate from the ALTER TABLE below that
+	// references PENDING_OWNER_APPROVAL in the EXCLUDE constraint.
+	if _, err := database.Exec(`
 		DO $$
 		BEGIN
 			IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'booking_status') THEN
@@ -38,28 +40,50 @@ func runMigrations(database *sql.DB) error {
 				  'CONFIRMED',
 				  'COMPLETED',
 				  'CANCELLED',
-				  'EXPIRED'
+				  'EXPIRED',
+				  'PENDING_OWNER_APPROVAL'
 				);
 			END IF;
 		END$$;
+	`); err != nil {
+		return err
+	}
+	if _, err := database.Exec(`ALTER TYPE booking_status ADD VALUE IF NOT EXISTS 'PENDING_OWNER_APPROVAL';`); err != nil {
+		return err
+	}
+
+	_, err := database.Exec(`
+		CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 		CREATE TABLE IF NOT EXISTS bookings (
-			id               UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
-			parking_spot_id  UUID          NOT NULL,
-			user_id          UUID          NOT NULL,
-			time_range       TSTZRANGE     NOT NULL,
-			status           booking_status NOT NULL,
-			hold_expires_at  TIMESTAMPTZ,
-			amount           INT           NOT NULL,
-			payment_id       TEXT,
-			created_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
-			updated_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
+			id                       UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+			parking_spot_id          UUID          NOT NULL,
+			user_id                  UUID          NOT NULL,
+			time_range               TSTZRANGE     NOT NULL,
+			status                   booking_status NOT NULL,
+			hold_expires_at          TIMESTAMPTZ,
+			owner_response_deadline  TIMESTAMPTZ,
+			amount                   INT           NOT NULL,
+			payment_id               TEXT,
+			created_at               TIMESTAMPTZ   NOT NULL DEFAULT now(),
+			updated_at               TIMESTAMPTZ   NOT NULL DEFAULT now(),
 
 			EXCLUDE USING GIST (
 				parking_spot_id WITH =,
 				time_range WITH &&
-			) WHERE (status IN ('PENDING_PAYMENT', 'CONFIRMED'))
+			) WHERE (status IN ('PENDING_PAYMENT', 'CONFIRMED', 'PENDING_OWNER_APPROVAL'))
 		);
+
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS owner_response_deadline TIMESTAMPTZ;
+
+		-- Recrea el EXCLUDE constraint agregando PENDING_OWNER_APPROVAL a su WHERE
+		-- -- necesario en bases que ya tenían la tabla creada con la versión vieja.
+		-- Una reserva pendiente de aprobación del dueño sigue ocupando el horario
+		-- (nadie más puede reservarlo mientras espera la decisión).
+		ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_parking_spot_id_time_range_excl;
+		ALTER TABLE bookings ADD CONSTRAINT bookings_parking_spot_id_time_range_excl
+			EXCLUDE USING GIST (parking_spot_id WITH =, time_range WITH &&)
+			WHERE (status IN ('PENDING_PAYMENT', 'CONFIRMED', 'PENDING_OWNER_APPROVAL'));
 
 		CREATE INDEX IF NOT EXISTS idx_bookings_spot_range
 			ON bookings USING GIST (parking_spot_id, time_range);

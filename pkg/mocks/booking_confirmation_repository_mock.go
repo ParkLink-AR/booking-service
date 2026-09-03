@@ -12,8 +12,10 @@ package mocks
 import (
 	context "context"
 	reflect "reflect"
+	time "time"
 
 	entity "github.com/example/bookings-service/internal/domain/entity"
+	enum "github.com/example/bookings-service/internal/domain/enum"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -41,16 +43,69 @@ func (m *MockBookingConfirmer) EXPECT() *MockBookingConfirmerMockRecorder {
 }
 
 // ConfirmBooking mocks base method.
-func (m *MockBookingConfirmer) ConfirmBooking(ctx context.Context, bookingID, paymentID string) (entity.Booking, error) {
+func (m *MockBookingConfirmer) ConfirmBooking(ctx context.Context, bookingID, paymentID string, status enum.BookingStatus, ownerResponseDeadline *time.Time) (entity.Booking, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ConfirmBooking", ctx, bookingID, paymentID)
+	ret := m.ctrl.Call(m, "ConfirmBooking", ctx, bookingID, paymentID, status, ownerResponseDeadline)
 	ret0, _ := ret[0].(entity.Booking)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ConfirmBooking indicates an expected call of ConfirmBooking.
-func (mr *MockBookingConfirmerMockRecorder) ConfirmBooking(ctx, bookingID, paymentID any) *gomock.Call {
+func (mr *MockBookingConfirmerMockRecorder) ConfirmBooking(ctx, bookingID, paymentID, status, ownerResponseDeadline any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConfirmBooking", reflect.TypeOf((*MockBookingConfirmer)(nil).ConfirmBooking), ctx, bookingID, paymentID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConfirmBooking", reflect.TypeOf((*MockBookingConfirmer)(nil).ConfirmBooking), ctx, bookingID, paymentID, status, ownerResponseDeadline)
+}
+
+// GetByID mocks base method.
+func (m *MockBookingConfirmer) GetByID(ctx context.Context, bookingID string) (entity.Booking, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByID", ctx, bookingID)
+	ret0, _ := ret[0].(entity.Booking)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByID indicates an expected call of GetByID.
+func (mr *MockBookingConfirmerMockRecorder) GetByID(ctx, bookingID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockBookingConfirmer)(nil).GetByID), ctx, bookingID)
+}
+
+// MockSpotLookup is a mock of SpotLookup interface.
+type MockSpotLookup struct {
+	ctrl     *gomock.Controller
+	recorder *MockSpotLookupMockRecorder
+}
+
+// MockSpotLookupMockRecorder is the mock recorder for MockSpotLookup.
+type MockSpotLookupMockRecorder struct {
+	mock *MockSpotLookup
+}
+
+// NewMockSpotLookup creates a new mock instance.
+func NewMockSpotLookup(ctrl *gomock.Controller) *MockSpotLookup {
+	mock := &MockSpotLookup{ctrl: ctrl}
+	mock.recorder = &MockSpotLookupMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockSpotLookup) EXPECT() *MockSpotLookupMockRecorder {
+	return m.recorder
+}
+
+// IsInstantBooking mocks base method.
+func (m *MockSpotLookup) IsInstantBooking(ctx context.Context, spotID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsInstantBooking", ctx, spotID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsInstantBooking indicates an expected call of IsInstantBooking.
+func (mr *MockSpotLookupMockRecorder) IsInstantBooking(ctx, spotID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsInstantBooking", reflect.TypeOf((*MockSpotLookup)(nil).IsInstantBooking), ctx, spotID)
 }

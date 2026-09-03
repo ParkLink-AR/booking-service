@@ -25,14 +25,18 @@ func TestHandlerSuite(t *testing.T) {
 
 type handlerSuite struct {
 	suite.Suite
-	controller                *gomock.Controller
-	listBookingsUseCase       *mocks.MockListBookingsUseCase
-	listBookingsByUserUseCase *mocks.MockListBookingsByUserUseCase
-	createBookingUseCase      *mocks.MockCreateBookingUseCase
-	confirmBookingUseCase     *mocks.MockConfirmBookingUseCase
-	getBookableSpotsUseCase   *mocks.MockGetBookableSpotsUseCase
-	router                    chi.Router
-	location                  *time.Location
+	controller                  *gomock.Controller
+	listBookingsUseCase         *mocks.MockListBookingsUseCase
+	listBookingsByUserUseCase   *mocks.MockListBookingsByUserUseCase
+	createBookingUseCase        *mocks.MockCreateBookingUseCase
+	confirmBookingUseCase       *mocks.MockConfirmBookingUseCase
+	getBookableSpotsUseCase     *mocks.MockGetBookableSpotsUseCase
+	approveBookingUseCase       *mocks.MockApproveBookingUseCase
+	rejectBookingUseCase        *mocks.MockRejectBookingUseCase
+	listBookingsDetailedUseCase *mocks.MockListBookingsDetailedUseCase
+	getBookingUseCase           *mocks.MockGetBookingUseCase
+	router                      chi.Router
+	location                    *time.Location
 }
 
 const validParkingSpotID = "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"
@@ -44,13 +48,23 @@ func (s *handlerSuite) SetupTest() {
 	s.createBookingUseCase = mocks.NewMockCreateBookingUseCase(s.controller)
 	s.confirmBookingUseCase = mocks.NewMockConfirmBookingUseCase(s.controller)
 	s.getBookableSpotsUseCase = mocks.NewMockGetBookableSpotsUseCase(s.controller)
+	s.approveBookingUseCase = mocks.NewMockApproveBookingUseCase(s.controller)
+	s.rejectBookingUseCase = mocks.NewMockRejectBookingUseCase(s.controller)
+	s.listBookingsDetailedUseCase = mocks.NewMockListBookingsDetailedUseCase(s.controller)
+	s.getBookingUseCase = mocks.NewMockGetBookingUseCase(s.controller)
 
 	location, err := time.LoadLocation("America/Argentina/Buenos_Aires")
 	s.Require().NoError(err)
 	s.location = location
 
 	s.router = chi.NewRouter()
-	booking.NewHandler(s.listBookingsUseCase, s.listBookingsByUserUseCase, s.createBookingUseCase, s.confirmBookingUseCase, s.getBookableSpotsUseCase, s.location).RegisterRoutes(s.router)
+	booking.NewHandler(
+		s.listBookingsUseCase, s.listBookingsByUserUseCase, s.createBookingUseCase,
+		s.confirmBookingUseCase, s.getBookableSpotsUseCase,
+		s.approveBookingUseCase, s.rejectBookingUseCase, s.listBookingsDetailedUseCase,
+		s.getBookingUseCase,
+		s.location,
+	).RegisterRoutes(s.router)
 }
 
 func (s *handlerSuite) TearDownTest() {

@@ -10,7 +10,8 @@ import (
 )
 
 // GetActiveBookingsInRange returns the time windows of bookings that occupy availability
-// (CONFIRMED, or PENDING_PAYMENT with an unexpired hold) and overlap [from, to).
+// (CONFIRMED, PENDING_OWNER_APPROVAL, or PENDING_PAYMENT with an unexpired hold) and
+// overlap [from, to).
 func (repository *Repository) GetActiveBookingsInRange(
 	ctx context.Context,
 	parkingSpotID string,
@@ -21,7 +22,7 @@ func (repository *Repository) GetActiveBookingsInRange(
 		FROM `+constants.BookingsTableName+`
 		WHERE parking_spot_id = $1
 		  AND (
-		    status = 'CONFIRMED'
+		    status IN ('CONFIRMED', 'PENDING_OWNER_APPROVAL')
 		    OR (status = 'PENDING_PAYMENT' AND hold_expires_at > now())
 		  )
 		  AND time_range && tstzrange($2, $3, '[)')

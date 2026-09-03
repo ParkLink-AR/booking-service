@@ -15,10 +15,13 @@ type Booking struct {
 	End           time.Time
 	Status        enum.BookingStatus
 	HoldExpiresAt *time.Time
-	Amount        int
-	PaymentID     string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	// Set only when Status is PENDING_OWNER_APPROVAL: how long the owner has
+	// to approve/reject before the sweep auto-cancels and refunds it.
+	OwnerResponseDeadline *time.Time
+	Amount                int
+	PaymentID             string
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 // CreateBookingInput carries the data needed to create a new booking, threaded from the

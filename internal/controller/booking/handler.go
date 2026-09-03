@@ -36,12 +36,16 @@ type ListBookingsByUserUseCase interface {
 // Handler handles HTTP requests for listing and creating a parking spot's bookings, and
 // for checking which of a set of spots have no booking in a given time range.
 type Handler struct {
-	listBookingsUseCase       ListBookingsUseCase
-	listBookingsByUserUseCase ListBookingsByUserUseCase
-	createBookingUseCase      CreateBookingUseCase
-	confirmBookingUseCase     ConfirmBookingUseCase
-	getBookableSpotsUseCase   GetBookableSpotsUseCase
-	location                  *time.Location
+	listBookingsUseCase         ListBookingsUseCase
+	listBookingsByUserUseCase   ListBookingsByUserUseCase
+	createBookingUseCase        CreateBookingUseCase
+	confirmBookingUseCase       ConfirmBookingUseCase
+	getBookableSpotsUseCase     GetBookableSpotsUseCase
+	approveBookingUseCase       ApproveBookingUseCase
+	rejectBookingUseCase        RejectBookingUseCase
+	listBookingsDetailedUseCase ListBookingsDetailedUseCase
+	getBookingUseCase           GetBookingUseCase
+	location                    *time.Location
 }
 
 func NewHandler(
@@ -50,24 +54,36 @@ func NewHandler(
 	createBookingUseCase CreateBookingUseCase,
 	confirmBookingUseCase ConfirmBookingUseCase,
 	getBookableSpotsUseCase GetBookableSpotsUseCase,
+	approveBookingUseCase ApproveBookingUseCase,
+	rejectBookingUseCase RejectBookingUseCase,
+	listBookingsDetailedUseCase ListBookingsDetailedUseCase,
+	getBookingUseCase GetBookingUseCase,
 	location *time.Location,
 ) *Handler {
 	return &Handler{
-		listBookingsUseCase:       listBookingsUseCase,
-		listBookingsByUserUseCase: listBookingsByUserUseCase,
-		createBookingUseCase:      createBookingUseCase,
-		confirmBookingUseCase:     confirmBookingUseCase,
-		getBookableSpotsUseCase:   getBookableSpotsUseCase,
-		location:                  location,
+		listBookingsUseCase:         listBookingsUseCase,
+		listBookingsByUserUseCase:   listBookingsByUserUseCase,
+		createBookingUseCase:        createBookingUseCase,
+		confirmBookingUseCase:       confirmBookingUseCase,
+		getBookableSpotsUseCase:     getBookableSpotsUseCase,
+		approveBookingUseCase:       approveBookingUseCase,
+		rejectBookingUseCase:        rejectBookingUseCase,
+		listBookingsDetailedUseCase: listBookingsDetailedUseCase,
+		getBookingUseCase:           getBookingUseCase,
+		location:                    location,
 	}
 }
 
 func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Get(parkingSpotsBasePath+"/{id}/bookings", handler.ListBookingsEndpoint)
+	router.Get(parkingSpotsBasePath+"/{id}/bookings/detailed", handler.ListBookingsDetailedEndpoint)
 	router.Get("/users/{id}/bookings/history", handler.ListBookingsByUserEndpoint)
 	router.Post("/bookings", handler.CreateBookingEndpoint)
 	router.Post(parkingSpotsBasePath+"/bookable", handler.GetBookableSpotsEndpoint)
 	router.Post("/bookings/{id}/confirm", handler.ConfirmBookingEndpoint)
+	router.Post("/bookings/{id}/approve", handler.ApproveBookingEndpoint)
+	router.Post("/bookings/{id}/reject", handler.RejectBookingEndpoint)
+	router.Get("/bookings/{id}", handler.GetBookingEndpoint)
 }
 
 func (handler *Handler) ListBookingsByUserEndpoint(responseWriter http.ResponseWriter, request *http.Request) {
@@ -173,6 +189,8 @@ func writeDomainError(responseWriter http.ResponseWriter, err error) {
 		writeErrorCode(responseWriter, http.StatusBadRequest, errors.InvalidInputCode(err), err.Error())
 	case errors.IsConflict(err):
 		writeErrorCode(responseWriter, http.StatusConflict, "BOOKING_CONFLICT", err.Error())
+	case errors.IsForbidden(err):
+		writeErrorCode(responseWriter, http.StatusForbidden, "NOT_SPOT_OWNER", err.Error())
 	case errors.IsUpstream(err):
 		writeErrorCode(responseWriter, http.StatusBadGateway, "PARKING_SERVICE_ERROR", err.Error())
 	default:

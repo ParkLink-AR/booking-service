@@ -8,22 +8,25 @@ const (
 	BookingStatusCompleted
 	BookingStatusCancelled
 	BookingStatusExpired
+	BookingStatusPendingOwnerApproval
 )
 
 var bookingStatusStrings = map[BookingStatus]string{
-	BookingStatusPendingPayment: "PENDING_PAYMENT",
-	BookingStatusConfirmed:      "CONFIRMED",
-	BookingStatusCompleted:      "COMPLETED",
-	BookingStatusCancelled:      "CANCELLED",
-	BookingStatusExpired:        "EXPIRED",
+	BookingStatusPendingPayment:       "PENDING_PAYMENT",
+	BookingStatusConfirmed:            "CONFIRMED",
+	BookingStatusCompleted:            "COMPLETED",
+	BookingStatusCancelled:            "CANCELLED",
+	BookingStatusExpired:              "EXPIRED",
+	BookingStatusPendingOwnerApproval: "PENDING_OWNER_APPROVAL",
 }
 
 var bookingStatusFromString = map[string]BookingStatus{
-	"PENDING_PAYMENT": BookingStatusPendingPayment,
-	"CONFIRMED":       BookingStatusConfirmed,
-	"COMPLETED":       BookingStatusCompleted,
-	"CANCELLED":       BookingStatusCancelled,
-	"EXPIRED":         BookingStatusExpired,
+	"PENDING_PAYMENT":        BookingStatusPendingPayment,
+	"CONFIRMED":              BookingStatusConfirmed,
+	"COMPLETED":              BookingStatusCompleted,
+	"CANCELLED":              BookingStatusCancelled,
+	"EXPIRED":                BookingStatusExpired,
+	"PENDING_OWNER_APPROVAL": BookingStatusPendingOwnerApproval,
 }
 
 func (s BookingStatus) String() string {
