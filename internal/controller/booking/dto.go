@@ -107,3 +107,49 @@ func listBookingsResponseFromEntities(days []entity.DayBookings, location *time.
 	}
 	return response
 }
+
+type reviewResponse struct {
+	ID         string `json:"id"`
+	BookingID  string `json:"booking_id"`
+	ReviewerID string `json:"reviewer_id"`
+	TargetType string `json:"target_type"`
+	TargetID   string `json:"target_id"`
+	Rating     int    `json:"rating"`
+	Comment    string `json:"comment,omitempty"`
+	CreatedAt  string `json:"created_at"`
+}
+
+// reviewListResponse is the shape for every "reviews about X" endpoint: the spot's,
+// an owner's, or a driver's. AverageRating is 0 when there are no reviews yet.
+type reviewListResponse struct {
+	AverageRating float64          `json:"average_rating"`
+	Count         int              `json:"count"`
+	Reviews       []reviewResponse `json:"reviews"`
+}
+
+func reviewResponseFromEntity(review entity.Review, location *time.Location) reviewResponse {
+	return reviewResponse{
+		ID:         review.ID,
+		BookingID:  review.BookingID,
+		ReviewerID: review.ReviewerID,
+		TargetType: review.TargetType.String(),
+		TargetID:   review.TargetID,
+		Rating:     review.Rating,
+		Comment:    review.Comment,
+		CreatedAt:  review.CreatedAt.In(location).Format(time.RFC3339),
+	}
+}
+
+func reviewListResponseFromEntities(reviews []entity.Review, location *time.Location) reviewListResponse {
+	responses := make([]reviewResponse, len(reviews))
+	sum := 0
+	for i, review := range reviews {
+		responses[i] = reviewResponseFromEntity(review, location)
+		sum += review.Rating
+	}
+	average := 0.0
+	if len(reviews) > 0 {
+		average = float64(sum) / float64(len(reviews))
+	}
+	return reviewListResponse{AverageRating: average, Count: len(reviews), Reviews: responses}
+}

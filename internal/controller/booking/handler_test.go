@@ -35,6 +35,9 @@ type handlerSuite struct {
 	rejectBookingUseCase        *mocks.MockRejectBookingUseCase
 	listBookingsDetailedUseCase *mocks.MockListBookingsDetailedUseCase
 	getBookingUseCase           *mocks.MockGetBookingUseCase
+	submitReviewUseCase         *mocks.MockSubmitReviewUseCase
+	listReviewsByTargetUseCase  *mocks.MockListReviewsByTargetUseCase
+	listReviewsByBookingUseCase *mocks.MockListReviewsByBookingUseCase
 	router                      chi.Router
 	location                    *time.Location
 }
@@ -52,6 +55,9 @@ func (s *handlerSuite) SetupTest() {
 	s.rejectBookingUseCase = mocks.NewMockRejectBookingUseCase(s.controller)
 	s.listBookingsDetailedUseCase = mocks.NewMockListBookingsDetailedUseCase(s.controller)
 	s.getBookingUseCase = mocks.NewMockGetBookingUseCase(s.controller)
+	s.submitReviewUseCase = mocks.NewMockSubmitReviewUseCase(s.controller)
+	s.listReviewsByTargetUseCase = mocks.NewMockListReviewsByTargetUseCase(s.controller)
+	s.listReviewsByBookingUseCase = mocks.NewMockListReviewsByBookingUseCase(s.controller)
 
 	location, err := time.LoadLocation("America/Argentina/Buenos_Aires")
 	s.Require().NoError(err)
@@ -63,6 +69,7 @@ func (s *handlerSuite) SetupTest() {
 		s.confirmBookingUseCase, s.getBookableSpotsUseCase,
 		s.approveBookingUseCase, s.rejectBookingUseCase, s.listBookingsDetailedUseCase,
 		s.getBookingUseCase,
+		s.submitReviewUseCase, s.listReviewsByTargetUseCase, s.listReviewsByBookingUseCase,
 		s.location,
 	).RegisterRoutes(s.router)
 }

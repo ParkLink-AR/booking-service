@@ -45,6 +45,9 @@ type Handler struct {
 	rejectBookingUseCase        RejectBookingUseCase
 	listBookingsDetailedUseCase ListBookingsDetailedUseCase
 	getBookingUseCase           GetBookingUseCase
+	submitReviewUseCase         SubmitReviewUseCase
+	listReviewsByTargetUseCase  ListReviewsByTargetUseCase
+	listReviewsByBookingUseCase ListReviewsByBookingUseCase
 	location                    *time.Location
 }
 
@@ -58,6 +61,9 @@ func NewHandler(
 	rejectBookingUseCase RejectBookingUseCase,
 	listBookingsDetailedUseCase ListBookingsDetailedUseCase,
 	getBookingUseCase GetBookingUseCase,
+	submitReviewUseCase SubmitReviewUseCase,
+	listReviewsByTargetUseCase ListReviewsByTargetUseCase,
+	listReviewsByBookingUseCase ListReviewsByBookingUseCase,
 	location *time.Location,
 ) *Handler {
 	return &Handler{
@@ -70,6 +76,9 @@ func NewHandler(
 		rejectBookingUseCase:        rejectBookingUseCase,
 		listBookingsDetailedUseCase: listBookingsDetailedUseCase,
 		getBookingUseCase:           getBookingUseCase,
+		submitReviewUseCase:         submitReviewUseCase,
+		listReviewsByTargetUseCase:  listReviewsByTargetUseCase,
+		listReviewsByBookingUseCase: listReviewsByBookingUseCase,
 		location:                    location,
 	}
 }
@@ -77,13 +86,17 @@ func NewHandler(
 func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Get(parkingSpotsBasePath+"/{id}/bookings", handler.ListBookingsEndpoint)
 	router.Get(parkingSpotsBasePath+"/{id}/bookings/detailed", handler.ListBookingsDetailedEndpoint)
+	router.Get(parkingSpotsBasePath+"/{id}/reviews", handler.ListSpotReviewsEndpoint)
 	router.Get("/users/{id}/bookings/history", handler.ListBookingsByUserEndpoint)
+	router.Get("/users/{id}/reviews", handler.ListUserReviewsEndpoint)
 	router.Post("/bookings", handler.CreateBookingEndpoint)
 	router.Post(parkingSpotsBasePath+"/bookable", handler.GetBookableSpotsEndpoint)
 	router.Post("/bookings/{id}/confirm", handler.ConfirmBookingEndpoint)
 	router.Post("/bookings/{id}/approve", handler.ApproveBookingEndpoint)
 	router.Post("/bookings/{id}/reject", handler.RejectBookingEndpoint)
+	router.Post("/bookings/{id}/reviews", handler.SubmitReviewEndpoint)
 	router.Get("/bookings/{id}", handler.GetBookingEndpoint)
+	router.Get("/bookings/{id}/reviews", handler.ListBookingReviewsEndpoint)
 }
 
 func (handler *Handler) ListBookingsByUserEndpoint(responseWriter http.ResponseWriter, request *http.Request) {

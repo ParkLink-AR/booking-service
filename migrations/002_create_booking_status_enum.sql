@@ -6,7 +6,8 @@ BEGIN
           'CONFIRMED',
           'COMPLETED',
           'CANCELLED',
-          'EXPIRED'
+          'EXPIRED',
+          'PENDING_OWNER_APPROVAL'
         );
     END IF;
 END$$;

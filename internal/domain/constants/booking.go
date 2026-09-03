@@ -10,4 +10,7 @@ const (
 
 	// BookingsTableName is the PostgreSQL table backing the booking repository.
 	BookingsTableName = "bookings"
+
+	// ReviewsTableName is the PostgreSQL table backing the review repository.
+	ReviewsTableName = "reviews"
 )

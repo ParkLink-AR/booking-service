@@ -72,6 +72,9 @@ func main() {
 	rejectBookingUseCase := ucbooking.NewRejectBookingUseCase(bookingRepository, parkingClient, paymentClient)
 	listBookingsDetailedUseCase := ucbooking.NewListBookingsDetailedUseCase(bookingRepository, parkingClient)
 	getBookingUseCase := ucbooking.NewGetBookingUseCase(bookingRepository)
+	submitReviewUseCase := ucbooking.NewSubmitReviewUseCase(bookingRepository, parkingClient, bookingRepository)
+	listReviewsByTargetUseCase := ucbooking.NewListReviewsByTargetUseCase(bookingRepository)
+	listReviewsByBookingUseCase := ucbooking.NewListReviewsByBookingUseCase(bookingRepository)
 
 	// Router
 	router := chi.NewRouter()
@@ -85,6 +88,7 @@ func main() {
 		confirmBookingUseCase, getBookableSpotsUseCase,
 		approveBookingUseCase, rejectBookingUseCase, listBookingsDetailedUseCase,
 		getBookingUseCase,
+		submitReviewUseCase, listReviewsByTargetUseCase, listReviewsByBookingUseCase,
 		buenosAiresLocation,
 	)
 
@@ -102,6 +106,10 @@ func main() {
 	// Background job: auto-cancel + refund PENDING_OWNER_APPROVAL bookings the
 	// owner never responded to within OWNER_APPROVAL_HOURS.
 	go runOwnerApprovalExpiryJob(ctx, bookingRepository, paymentClient, logger)
+
+	// Background job: mark CONFIRMED bookings COMPLETED once their time window has
+	// passed -- this is what makes a stay "over" and triggers the review prompts.
+	go runCompletionSweepJob(ctx, bookingRepository, logger)
 
 	port := envOrDefault("HTTP_PORT", constants.DefaultHTTPPort)
 	server := &http.Server{Addr: ":" + port, Handler: router}
@@ -142,6 +150,9 @@ func loadHandlers(
 	rejectBookingUseCase *ucbooking.RejectBookingUseCase,
 	listBookingsDetailedUseCase *ucbooking.ListBookingsDetailedUseCase,
 	getBookingUseCase *ucbooking.GetBookingUseCase,
+	submitReviewUseCase *ucbooking.SubmitReviewUseCase,
+	listReviewsByTargetUseCase *ucbooking.ListReviewsByTargetUseCase,
+	listReviewsByBookingUseCase *ucbooking.ListReviewsByBookingUseCase,
 	location *time.Location,
 ) {
 	handlers := []Handler{
@@ -150,6 +161,7 @@ func loadHandlers(
 			confirmBookingUseCase, getBookableSpotsUseCase,
 			approveBookingUseCase, rejectBookingUseCase, listBookingsDetailedUseCase,
 			getBookingUseCase,
+			submitReviewUseCase, listReviewsByTargetUseCase, listReviewsByBookingUseCase,
 			location,
 		),
 	}
@@ -204,6 +216,26 @@ func runOwnerApprovalExpiryJob(ctx context.Context, repo *bookingrepository.Repo
 			}
 			if len(expired) > 0 {
 				logger.Info("expired stale pending-owner-approval bookings", zap.Int("count", len(expired)))
+			}
+		}
+	}
+}
+
+// runCompletionSweepJob ticks every minute and marks CONFIRMED bookings whose time
+// window has already ended as COMPLETED.
+func runCompletionSweepJob(ctx context.Context, repo *bookingrepository.Repository, logger *zap.Logger) {
+	ticker := time.NewTicker(holdExpiryInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			n, err := repo.ExpireCompletedBookings(ctx)
+			if err != nil {
+				logger.Error("completion sweep job failed", zap.Error(err))
+			} else if n > 0 {
+				logger.Info("marked bookings completed", zap.Int64("count", n))
 			}
 		}
 	}

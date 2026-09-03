@@ -24,14 +24,13 @@ func setupDB() *sql.DB {
 	return database
 }
 
-// runMigrations creates the booking-service schema (bookings + booking_status_history).
-// Mirrors migrations/001-004_*.sql for environments that run migrations inline at startup.
+// runMigrations creates the booking-service schema (bookings, booking_status_history,
+// reviews). Mirrors migrations/001-006_*.sql for environments that run migrations inline
+// at startup.
 func runMigrations(database *sql.DB) error {
-	// Postgres refuses to use a brand-new enum value in the same transaction
-	// that added it ("unsafe use of new value") -- ALTER TYPE ADD VALUE has
-	// to commit on its own, separate from the ALTER TABLE below that
-	// references PENDING_OWNER_APPROVAL in the EXCLUDE constraint.
-	if _, err := database.Exec(`
+	_, err := database.Exec(`
+		CREATE EXTENSION IF NOT EXISTS btree_gist;
+
 		DO $$
 		BEGIN
 			IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'booking_status') THEN
@@ -45,15 +44,6 @@ func runMigrations(database *sql.DB) error {
 				);
 			END IF;
 		END$$;
-	`); err != nil {
-		return err
-	}
-	if _, err := database.Exec(`ALTER TYPE booking_status ADD VALUE IF NOT EXISTS 'PENDING_OWNER_APPROVAL';`); err != nil {
-		return err
-	}
-
-	_, err := database.Exec(`
-		CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 		CREATE TABLE IF NOT EXISTS bookings (
 			id                       UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -74,17 +64,6 @@ func runMigrations(database *sql.DB) error {
 			) WHERE (status IN ('PENDING_PAYMENT', 'CONFIRMED', 'PENDING_OWNER_APPROVAL'))
 		);
 
-		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS owner_response_deadline TIMESTAMPTZ;
-
-		-- Recrea el EXCLUDE constraint agregando PENDING_OWNER_APPROVAL a su WHERE
-		-- -- necesario en bases que ya tenían la tabla creada con la versión vieja.
-		-- Una reserva pendiente de aprobación del dueño sigue ocupando el horario
-		-- (nadie más puede reservarlo mientras espera la decisión).
-		ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_parking_spot_id_time_range_excl;
-		ALTER TABLE bookings ADD CONSTRAINT bookings_parking_spot_id_time_range_excl
-			EXCLUDE USING GIST (parking_spot_id WITH =, time_range WITH &&)
-			WHERE (status IN ('PENDING_PAYMENT', 'CONFIRMED', 'PENDING_OWNER_APPROVAL'));
-
 		CREATE INDEX IF NOT EXISTS idx_bookings_spot_range
 			ON bookings USING GIST (parking_spot_id, time_range);
 
@@ -98,6 +77,26 @@ func runMigrations(database *sql.DB) error {
 		);
 
 		CREATE INDEX IF NOT EXISTS idx_bsh_booking_id ON booking_status_history (booking_id);
+
+		-- A review is tied to one completed booking and targets one of three
+		-- things: the spot, its owner, or the driver. The UNIQUE constraint
+		-- stops the same reviewer from rating the same target twice for the
+		-- same booking.
+		CREATE TABLE IF NOT EXISTS reviews (
+			id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+			booking_id   UUID        NOT NULL REFERENCES bookings(id),
+			reviewer_id  UUID        NOT NULL,
+			target_type  TEXT        NOT NULL CHECK (target_type IN ('spot', 'owner', 'driver')),
+			target_id    UUID        NOT NULL,
+			rating       SMALLINT    NOT NULL CHECK (rating BETWEEN 1 AND 5),
+			comment      TEXT,
+			created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+			UNIQUE (booking_id, reviewer_id, target_type)
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_reviews_target ON reviews (target_type, target_id);
+		CREATE INDEX IF NOT EXISTS idx_reviews_booking ON reviews (booking_id);
 	`)
 	return err
 }
