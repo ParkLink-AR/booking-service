@@ -34,6 +34,8 @@ type bookingResponse struct {
 	Status        string  `json:"status"`
 	HoldExpiresAt *string `json:"hold_expires_at,omitempty"`
 	Amount        int     `json:"amount"`
+	PaymentID     string  `json:"payment_id,omitempty"`
+	UpdatedAt     string  `json:"updated_at"`
 }
 
 // bookingResponseFromEntity maps a created booking to the wire format, rendering every
@@ -47,6 +49,8 @@ func bookingResponseFromEntity(booking entity.Booking, location *time.Location) 
 		End:           booking.End.In(location).Format(time.RFC3339),
 		Status:        booking.Status.String(),
 		Amount:        booking.Amount,
+		PaymentID:     booking.PaymentID,
+		UpdatedAt:     booking.UpdatedAt.In(location).Format(time.RFC3339),
 	}
 	if booking.HoldExpiresAt != nil {
 		formatted := booking.HoldExpiresAt.In(location).Format(time.RFC3339)
