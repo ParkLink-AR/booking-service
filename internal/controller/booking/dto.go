@@ -15,6 +15,9 @@ type scheduleEntryRequest struct {
 type parkingSpotRequest struct {
 	ID       string                 `json:"id"`
 	Schedule []scheduleEntryRequest `json:"schedule"`
+	// Number of identical places the spot rents against this id ("playa"). Omitted or
+	// <1 is treated as 1.
+	Capacity int `json:"capacity"`
 }
 
 type createBookingRequest struct {

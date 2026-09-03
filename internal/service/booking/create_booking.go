@@ -11,13 +11,13 @@ import (
 
 // CreateBooking validates input.Start < input.End, confirms the requested range falls
 // within the parking spot's published hours (input.ParkingSpotSchedule, provided by the
-// caller -- booking-service does not fetch this itself), checks for overlap with existing
-// active bookings, and creates the booking as PENDING_PAYMENT with a hold that expires
-// after the service's holdDuration.
+// caller -- booking-service does not fetch this itself), checks that fewer than the spot's
+// capacity active bookings already overlap the requested range, and creates the booking as
+// PENDING_PAYMENT with a hold that expires after the service's holdDuration.
 //
-// The overlap check here is a pre-check for a fast, friendly conflict response; the
-// database's EXCLUDE constraint is the final authority and is what the repository maps to
-// the same conflict error if a race slips past this check.
+// The concurrency check here is a pre-check for a fast, friendly conflict response; the
+// repository re-checks it under a per-spot advisory lock and is the final authority,
+// mapping a lost race to the same conflict error.
 func (service *Service) CreateBooking(ctx context.Context, input entity.CreateBookingInput) (entity.Booking, error) {
 	if !input.Start.Before(input.End) {
 		return entity.Booking{}, errors.NewInvalidInput("INVALID_DATE_RANGE", "start must be before end")
@@ -28,11 +28,16 @@ func (service *Service) CreateBooking(ctx context.Context, input entity.CreateBo
 			"requested time is outside the parking spot's published hours")
 	}
 
+	capacity := input.Capacity
+	if capacity < 1 {
+		capacity = 1
+	}
+
 	activeBookings, err := service.bookingRepository.GetActiveBookingsInRange(ctx, input.ParkingSpotID, input.Start.UTC(), input.End.UTC())
 	if err != nil {
 		return entity.Booking{}, err
 	}
-	if hasOverlap(activeBookings, input.Start.UTC(), input.End.UTC()) {
+	if entity.MaxConcurrency(activeBookings, input.Start.UTC(), input.End.UTC()) >= capacity {
 		return entity.Booking{}, errors.NewConflict("requested time range overlaps with an existing booking")
 	}
 
@@ -45,6 +50,7 @@ func (service *Service) CreateBooking(ctx context.Context, input entity.CreateBo
 		Status:        enum.BookingStatusPendingPayment,
 		HoldExpiresAt: &holdExpiresAt,
 		Amount:        input.Amount,
+		Capacity:      capacity,
 	}
 
 	return service.bookingRepository.CreateBooking(ctx, booking)

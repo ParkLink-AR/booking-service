@@ -27,6 +27,10 @@ func setupDB() *sql.DB {
 // runMigrations creates the booking-service schema (bookings, booking_status_history,
 // reviews). Mirrors migrations/001-006_*.sql for environments that run migrations inline
 // at startup.
+//
+// There is no EXCLUDE constraint on bookings: a capacity-N parking spot allows up to N
+// overlapping active bookings, so overlap is enforced in the repository under a per-spot
+// advisory lock (see internal/repository/booking/create_booking.go).
 func runMigrations(database *sql.DB) error {
 	_, err := database.Exec(`
 		CREATE EXTENSION IF NOT EXISTS btree_gist;
@@ -55,13 +59,9 @@ func runMigrations(database *sql.DB) error {
 			owner_response_deadline  TIMESTAMPTZ,
 			amount                   INT           NOT NULL,
 			payment_id               TEXT,
+			capacity                 INT           NOT NULL DEFAULT 1,
 			created_at               TIMESTAMPTZ   NOT NULL DEFAULT now(),
-			updated_at               TIMESTAMPTZ   NOT NULL DEFAULT now(),
-
-			EXCLUDE USING GIST (
-				parking_spot_id WITH =,
-				time_range WITH &&
-			) WHERE (status IN ('PENDING_PAYMENT', 'CONFIRMED', 'PENDING_OWNER_APPROVAL'))
+			updated_at               TIMESTAMPTZ   NOT NULL DEFAULT now()
 		);
 
 		CREATE INDEX IF NOT EXISTS idx_bookings_spot_range
@@ -97,6 +97,19 @@ func runMigrations(database *sql.DB) error {
 
 		CREATE INDEX IF NOT EXISTS idx_reviews_target ON reviews (target_type, target_id);
 		CREATE INDEX IF NOT EXISTS idx_reviews_booking ON reviews (booking_id);
+
+		-- migrations/006: for databases created before capacity existed / with the
+		-- old EXCLUDE constraint (a capacity-N "playa" allows N overlapping bookings).
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS capacity INT NOT NULL DEFAULT 1;
+		DO $$
+		DECLARE cname text;
+		BEGIN
+			SELECT conname INTO cname FROM pg_constraint
+				WHERE conrelid = 'bookings'::regclass AND contype = 'x';
+			IF cname IS NOT NULL THEN
+				EXECUTE format('ALTER TABLE bookings DROP CONSTRAINT %I', cname);
+			END IF;
+		END$$;
 	`)
 	return err
 }

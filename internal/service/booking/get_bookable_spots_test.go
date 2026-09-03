@@ -12,6 +12,15 @@ import (
 
 const otherParkingSpotID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 
+// caps turns spot ids into capacity-1 SpotCapacity entries (the common case).
+func caps(ids ...string) []entity.SpotCapacity {
+	out := make([]entity.SpotCapacity, len(ids))
+	for i, id := range ids {
+		out[i] = entity.SpotCapacity{ID: id, Capacity: 1}
+	}
+	return out
+}
+
 func (s *serviceSuite) TestGetBookableSpots_NoBookingsAllAreBookable() {
 	start := time.Date(2026, 8, 24, 10, 0, 0, 0, s.location)
 	end := time.Date(2026, 8, 24, 11, 0, 0, 0, s.location)
@@ -21,7 +30,7 @@ func (s *serviceSuite) TestGetBookableSpots_NoBookingsAllAreBookable() {
 		GetBookingsForSpotsInRange(gomock.Any(), spotIDs, start.UTC(), end.UTC()).
 		Return(nil, nil)
 
-	got, err := s.service.GetBookableSpots(s.context, spotIDs, start, end)
+	got, err := s.service.GetBookableSpots(s.context, caps(spotIDs...), start, end)
 
 	s.Require().NoError(err)
 	s.Equal(spotIDs, got)
@@ -38,10 +47,39 @@ func (s *serviceSuite) TestGetBookableSpots_ConfirmedBookingExcludesSpot() {
 			{ParkingSpotID: s.parkingSpotID, Status: enum.BookingStatusConfirmed},
 		}, nil)
 
-	got, err := s.service.GetBookableSpots(s.context, spotIDs, start, end)
+	got, err := s.service.GetBookableSpots(s.context, caps(spotIDs...), start, end)
 
 	s.Require().NoError(err)
 	s.Equal([]string{otherParkingSpotID}, got)
+}
+
+func (s *serviceSuite) TestGetBookableSpots_CapacityKeepsPlayaBookableUntilFull() {
+	start := time.Date(2026, 8, 24, 10, 0, 0, 0, s.location)
+	end := time.Date(2026, 8, 24, 11, 0, 0, 0, s.location)
+	spots := []entity.SpotCapacity{{ID: s.parkingSpotID, Capacity: 2}}
+
+	// One active booking, capacity 2 -> still has room.
+	s.bookingRepository.EXPECT().
+		GetBookingsForSpotsInRange(gomock.Any(), []string{s.parkingSpotID}, start.UTC(), end.UTC()).
+		Return([]entity.SpotBooking{
+			{ParkingSpotID: s.parkingSpotID, Status: enum.BookingStatusConfirmed},
+		}, nil)
+
+	got, err := s.service.GetBookableSpots(s.context, spots, start, end)
+	s.Require().NoError(err)
+	s.Equal([]string{s.parkingSpotID}, got)
+
+	// Two active bookings, capacity 2 -> full.
+	s.bookingRepository.EXPECT().
+		GetBookingsForSpotsInRange(gomock.Any(), []string{s.parkingSpotID}, start.UTC(), end.UTC()).
+		Return([]entity.SpotBooking{
+			{ParkingSpotID: s.parkingSpotID, Status: enum.BookingStatusConfirmed},
+			{ParkingSpotID: s.parkingSpotID, Status: enum.BookingStatusConfirmed},
+		}, nil)
+
+	got, err = s.service.GetBookableSpots(s.context, spots, start, end)
+	s.Require().NoError(err)
+	s.Empty(got)
 }
 
 func (s *serviceSuite) TestGetBookableSpots_UnexpiredPendingPaymentExcludesSpot() {
@@ -56,7 +94,7 @@ func (s *serviceSuite) TestGetBookableSpots_UnexpiredPendingPaymentExcludesSpot(
 			{ParkingSpotID: s.parkingSpotID, Status: enum.BookingStatusPendingPayment, HoldExpiresAt: &futureHold},
 		}, nil)
 
-	got, err := s.service.GetBookableSpots(s.context, spotIDs, start, end)
+	got, err := s.service.GetBookableSpots(s.context, caps(spotIDs...), start, end)
 
 	s.Require().NoError(err)
 	s.Empty(got)
@@ -74,7 +112,7 @@ func (s *serviceSuite) TestGetBookableSpots_ExpiredPendingPaymentDoesNotExcludeS
 			{ParkingSpotID: s.parkingSpotID, Status: enum.BookingStatusPendingPayment, HoldExpiresAt: &expiredHold},
 		}, nil)
 
-	got, err := s.service.GetBookableSpots(s.context, spotIDs, start, end)
+	got, err := s.service.GetBookableSpots(s.context, caps(spotIDs...), start, end)
 
 	s.Require().NoError(err)
 	s.Equal(spotIDs, got)
@@ -96,7 +134,7 @@ func (s *serviceSuite) TestGetBookableSpots_InactiveStatusesDoNotExcludeSpot() {
 			GetBookingsForSpotsInRange(gomock.Any(), spotIDs, start.UTC(), end.UTC()).
 			Return([]entity.SpotBooking{{ParkingSpotID: s.parkingSpotID, Status: status}}, nil)
 
-		got, err := s.service.GetBookableSpots(s.context, spotIDs, start, end)
+		got, err := s.service.GetBookableSpots(s.context, caps(spotIDs...), start, end)
 
 		s.Require().NoError(err)
 		s.Equal(spotIDs, got, "status %s must not exclude the spot", status)
@@ -107,7 +145,7 @@ func (s *serviceSuite) TestGetBookableSpots_InvalidDateRange() {
 	start := time.Date(2026, 8, 24, 11, 0, 0, 0, s.location)
 	end := time.Date(2026, 8, 24, 10, 0, 0, 0, s.location)
 
-	got, err := s.service.GetBookableSpots(s.context, []string{s.parkingSpotID}, start, end)
+	got, err := s.service.GetBookableSpots(s.context, caps(s.parkingSpotID), start, end)
 
 	s.Nil(got)
 	s.True(errors.IsInvalidInput(err))
@@ -133,7 +171,7 @@ func (s *serviceSuite) TestGetBookableSpots_RepositoryErrorPropagates() {
 		GetBookingsForSpotsInRange(gomock.Any(), spotIDs, start.UTC(), end.UTC()).
 		Return(nil, repositoryFailure)
 
-	got, err := s.service.GetBookableSpots(s.context, spotIDs, start, end)
+	got, err := s.service.GetBookableSpots(s.context, caps(spotIDs...), start, end)
 
 	s.Nil(got)
 	s.ErrorIs(err, repositoryFailure)

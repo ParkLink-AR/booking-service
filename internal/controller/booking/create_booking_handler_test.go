@@ -55,6 +55,7 @@ func (s *handlerSuite) TestCreateBookingEndpoint_Success() {
 			Start:               start,
 			End:                 end,
 			Amount:              5000,
+			Capacity:            1, // omitted in the body -> defaulted to 1
 		}).
 		Return(want, nil)
 
@@ -81,6 +82,33 @@ func (s *handlerSuite) TestCreateBookingEndpoint_Success() {
 	s.Equal("PENDING_PAYMENT", response.Status)
 	s.Equal("2026-08-18T09:45:00-03:00", response.HoldExpiresAt)
 	s.Equal(5000, response.Amount)
+}
+
+func (s *handlerSuite) TestCreateBookingEndpoint_PassesCapacityThrough() {
+	start, err := time.Parse(time.RFC3339, "2026-08-18T10:00:00-03:00")
+	s.Require().NoError(err)
+	end, err := time.Parse(time.RFC3339, "2026-08-18T11:00:00-03:00")
+	s.Require().NoError(err)
+
+	s.createBookingUseCase.EXPECT().
+		Execute(gomock.Any(), entity.CreateBookingInput{
+			ParkingSpotID:       validParkingSpotID,
+			ParkingSpotSchedule: []entity.ScheduleEntry{{DayOfWeek: 1, StartHour: 8, EndHour: 20}},
+			UserID:              validUserID,
+			Start:               start,
+			End:                 end,
+			Amount:              5000,
+			Capacity:            4,
+		}).
+		Return(entity.Booking{ID: "created-id"}, nil)
+
+	body := fmt.Sprintf(
+		`{"user_id":"%s","start":"%s","end":"%s","amount":%d,"parking_spot":{"id":"%s","schedule":%s,"capacity":4}}`,
+		validUserID, "2026-08-18T10:00:00-03:00", "2026-08-18T11:00:00-03:00", 5000, validParkingSpotID, tuesdayScheduleBody,
+	)
+	recorder := s.doPost("/bookings", body)
+
+	s.Equal(http.StatusCreated, recorder.Code)
 }
 
 func (s *handlerSuite) TestCreateBookingEndpoint_InvalidSpotID() {

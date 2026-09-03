@@ -7,19 +7,26 @@ import (
 
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
+
+	"github.com/example/bookings-service/internal/domain/entity"
 )
 
 //go:generate go tool mockgen -destination=../../../pkg/mocks/get_bookable_spots_usecase_mock.go -package=mocks -source=./get_bookable_spots_handler.go
 
 // GetBookableSpotsUseCase is the interface consumed by this controller.
 type GetBookableSpotsUseCase interface {
-	Execute(ctx context.Context, parkingSpotIDs []string, start, end time.Time) ([]string, error)
+	Execute(ctx context.Context, spots []entity.SpotCapacity, start, end time.Time) ([]string, error)
+}
+
+type spotCapacityRequest struct {
+	ID       string `json:"id"`
+	Capacity int    `json:"capacity"`
 }
 
 type getBookableSpotsRequest struct {
-	ParkingSpotIDs []string `json:"parking_spot_ids"`
-	Start          string   `json:"start"`
-	End            string   `json:"end"`
+	Spots []spotCapacityRequest `json:"spots"`
+	Start string                `json:"start"`
+	End   string                `json:"end"`
 }
 
 type getBookableSpotsResponse struct {
@@ -33,15 +40,22 @@ func (handler *Handler) GetBookableSpotsEndpoint(responseWriter http.ResponseWri
 		return
 	}
 
-	if len(body.ParkingSpotIDs) == 0 {
-		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_SPOT_ID", "parking_spot_ids must not be empty")
+	if len(body.Spots) == 0 {
+		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_SPOT_ID", "spots must not be empty")
 		return
 	}
-	for _, parkingSpotID := range body.ParkingSpotIDs {
-		if _, err := uuid.Parse(parkingSpotID); err != nil {
-			writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_SPOT_ID", "parking_spot_ids must all be valid UUIDs")
+
+	spots := make([]entity.SpotCapacity, len(body.Spots))
+	for index, spot := range body.Spots {
+		if _, err := uuid.Parse(spot.ID); err != nil {
+			writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_SPOT_ID", "spots[].id must all be valid UUIDs")
 			return
 		}
+		capacity := spot.Capacity
+		if capacity < 1 {
+			capacity = 1
+		}
+		spots[index] = entity.SpotCapacity{ID: spot.ID, Capacity: capacity}
 	}
 
 	start, err := time.Parse(time.RFC3339, body.Start)
@@ -55,7 +69,7 @@ func (handler *Handler) GetBookableSpotsEndpoint(responseWriter http.ResponseWri
 		return
 	}
 
-	bookableParkingSpotIDs, err := handler.getBookableSpotsUseCase.Execute(request.Context(), body.ParkingSpotIDs, start, end)
+	bookableParkingSpotIDs, err := handler.getBookableSpotsUseCase.Execute(request.Context(), spots, start, end)
 	if err != nil {
 		writeDomainError(responseWriter, err)
 		return

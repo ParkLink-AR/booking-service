@@ -14,6 +14,7 @@ import (
 	reflect "reflect"
 	time "time"
 
+	entity "github.com/example/bookings-service/internal/domain/entity"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -41,16 +42,16 @@ func (m *MockBookableSpotsFinder) EXPECT() *MockBookableSpotsFinderMockRecorder 
 }
 
 // GetBookableSpots mocks base method.
-func (m *MockBookableSpotsFinder) GetBookableSpots(ctx context.Context, parkingSpotIDs []string, start, end time.Time) ([]string, error) {
+func (m *MockBookableSpotsFinder) GetBookableSpots(ctx context.Context, spots []entity.SpotCapacity, start, end time.Time) ([]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBookableSpots", ctx, parkingSpotIDs, start, end)
+	ret := m.ctrl.Call(m, "GetBookableSpots", ctx, spots, start, end)
 	ret0, _ := ret[0].([]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetBookableSpots indicates an expected call of GetBookableSpots.
-func (mr *MockBookableSpotsFinderMockRecorder) GetBookableSpots(ctx, parkingSpotIDs, start, end any) *gomock.Call {
+func (mr *MockBookableSpotsFinderMockRecorder) GetBookableSpots(ctx, spots, start, end any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBookableSpots", reflect.TypeOf((*MockBookableSpotsFinder)(nil).GetBookableSpots), ctx, parkingSpotIDs, start, end)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBookableSpots", reflect.TypeOf((*MockBookableSpotsFinder)(nil).GetBookableSpots), ctx, spots, start, end)
 }

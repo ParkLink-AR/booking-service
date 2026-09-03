@@ -26,13 +26,3 @@ func isWithinPublishedHours(start, end time.Time, schedule []entity.ScheduleEntr
 	}
 	return false
 }
-
-// hasOverlap reports whether [start, end) overlaps any of activeBookings.
-func hasOverlap(activeBookings []entity.TimeWindow, start, end time.Time) bool {
-	for _, booking := range activeBookings {
-		if booking.Start.Before(end) && booking.End.After(start) {
-			return true
-		}
-	}
-	return false
-}

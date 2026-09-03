@@ -6,6 +6,7 @@ import (
 	"github.com/goccy/go-json"
 	"go.uber.org/mock/gomock"
 
+	"github.com/example/bookings-service/internal/domain/entity"
 	"github.com/example/bookings-service/internal/domain/errors"
 )
 
@@ -13,10 +14,13 @@ const otherParkingSpotID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 
 func (s *handlerSuite) TestGetBookableSpotsEndpoint_Success() {
 	s.getBookableSpotsUseCase.EXPECT().
-		Execute(gomock.Any(), []string{validParkingSpotID, otherParkingSpotID}, gomock.Any(), gomock.Any()).
+		Execute(gomock.Any(), []entity.SpotCapacity{
+			{ID: validParkingSpotID, Capacity: 1},
+			{ID: otherParkingSpotID, Capacity: 3},
+		}, gomock.Any(), gomock.Any()).
 		Return([]string{validParkingSpotID}, nil)
 
-	body := `{"parking_spot_ids":["` + validParkingSpotID + `","` + otherParkingSpotID + `"],"start":"2026-08-24T10:00:00-03:00","end":"2026-08-24T11:00:00-03:00"}`
+	body := `{"spots":[{"id":"` + validParkingSpotID + `","capacity":1},{"id":"` + otherParkingSpotID + `","capacity":3}],"start":"2026-08-24T10:00:00-03:00","end":"2026-08-24T11:00:00-03:00"}`
 	recorder := s.doPost("/parking-spots/bookable", body)
 
 	s.Equal(http.StatusOK, recorder.Code)
@@ -28,6 +32,17 @@ func (s *handlerSuite) TestGetBookableSpotsEndpoint_Success() {
 	s.Equal([]string{validParkingSpotID}, response.BookableParkingSpotIDs)
 }
 
+func (s *handlerSuite) TestGetBookableSpotsEndpoint_DefaultsMissingCapacityToOne() {
+	s.getBookableSpotsUseCase.EXPECT().
+		Execute(gomock.Any(), []entity.SpotCapacity{{ID: validParkingSpotID, Capacity: 1}}, gomock.Any(), gomock.Any()).
+		Return([]string{validParkingSpotID}, nil)
+
+	body := `{"spots":[{"id":"` + validParkingSpotID + `"}],"start":"2026-08-24T10:00:00-03:00","end":"2026-08-24T11:00:00-03:00"}`
+	recorder := s.doPost("/parking-spots/bookable", body)
+
+	s.Equal(http.StatusOK, recorder.Code)
+}
+
 func (s *handlerSuite) TestGetBookableSpotsEndpoint_InvalidBody() {
 	recorder := s.doPost("/parking-spots/bookable", `not-json`)
 
@@ -35,8 +50,8 @@ func (s *handlerSuite) TestGetBookableSpotsEndpoint_InvalidBody() {
 	s.Contains(recorder.Body.String(), "INVALID_BODY")
 }
 
-func (s *handlerSuite) TestGetBookableSpotsEndpoint_EmptySpotIDs() {
-	body := `{"parking_spot_ids":[],"start":"2026-08-24T10:00:00-03:00","end":"2026-08-24T11:00:00-03:00"}`
+func (s *handlerSuite) TestGetBookableSpotsEndpoint_EmptySpots() {
+	body := `{"spots":[],"start":"2026-08-24T10:00:00-03:00","end":"2026-08-24T11:00:00-03:00"}`
 	recorder := s.doPost("/parking-spots/bookable", body)
 
 	s.Equal(http.StatusBadRequest, recorder.Code)
@@ -44,7 +59,7 @@ func (s *handlerSuite) TestGetBookableSpotsEndpoint_EmptySpotIDs() {
 }
 
 func (s *handlerSuite) TestGetBookableSpotsEndpoint_InvalidSpotID() {
-	body := `{"parking_spot_ids":["not-a-uuid"],"start":"2026-08-24T10:00:00-03:00","end":"2026-08-24T11:00:00-03:00"}`
+	body := `{"spots":[{"id":"not-a-uuid","capacity":1}],"start":"2026-08-24T10:00:00-03:00","end":"2026-08-24T11:00:00-03:00"}`
 	recorder := s.doPost("/parking-spots/bookable", body)
 
 	s.Equal(http.StatusBadRequest, recorder.Code)
@@ -55,8 +70,8 @@ var bookableInvalidTimeRangeCases = []struct {
 	name string
 	body string
 }{
-	{name: "invalid start", body: `{"parking_spot_ids":["` + validParkingSpotID + `"],"start":"not-a-time","end":"2026-08-24T11:00:00-03:00"}`},
-	{name: "invalid end", body: `{"parking_spot_ids":["` + validParkingSpotID + `"],"start":"2026-08-24T10:00:00-03:00","end":"not-a-time"}`},
+	{name: "invalid start", body: `{"spots":[{"id":"` + validParkingSpotID + `","capacity":1}],"start":"not-a-time","end":"2026-08-24T11:00:00-03:00"}`},
+	{name: "invalid end", body: `{"spots":[{"id":"` + validParkingSpotID + `","capacity":1}],"start":"2026-08-24T10:00:00-03:00","end":"not-a-time"}`},
 }
 
 func (s *handlerSuite) TestGetBookableSpotsEndpoint_InvalidTimeRange() {
@@ -72,7 +87,7 @@ func (s *handlerSuite) TestGetBookableSpotsEndpoint_UsecaseInvalidDateRange() {
 		Execute(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, errors.NewInvalidInput("INVALID_DATE_RANGE", "start must be before end"))
 
-	body := `{"parking_spot_ids":["` + validParkingSpotID + `"],"start":"2026-08-24T11:00:00-03:00","end":"2026-08-24T10:00:00-03:00"}`
+	body := `{"spots":[{"id":"` + validParkingSpotID + `","capacity":1}],"start":"2026-08-24T11:00:00-03:00","end":"2026-08-24T10:00:00-03:00"}`
 	recorder := s.doPost("/parking-spots/bookable", body)
 
 	s.Equal(http.StatusBadRequest, recorder.Code)
