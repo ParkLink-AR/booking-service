@@ -3,14 +3,17 @@ package booking
 import (
 	"context"
 	"time"
+
+	"github.com/example/bookings-service/internal/domain/entity"
 )
 
 //go:generate go tool mockgen -destination=../../../pkg/mocks/bookable_spots_service_mock.go -package=mocks -source=./get_bookable_spots_usecase.go
 
-// BookableSpotsFinder returns the subset of parking spot IDs with no booking occupying a
-// given time range. Implemented by internal/service/booking.
+// BookableSpotsFinder returns the subset of spot IDs that still have room (fewer active
+// bookings than their capacity) in a given time range. Implemented by
+// internal/service/booking.
 type BookableSpotsFinder interface {
-	GetBookableSpots(ctx context.Context, parkingSpotIDs []string, start, end time.Time) ([]string, error)
+	GetBookableSpots(ctx context.Context, spots []entity.SpotCapacity, start, end time.Time) ([]string, error)
 }
 
 // GetBookableSpotsUseCase orchestrates the bookable-spots flow. It contains no business
@@ -23,11 +26,11 @@ func NewGetBookableSpotsUseCase(bookableSpotsFinder BookableSpotsFinder) *GetBoo
 	return &GetBookableSpotsUseCase{bookableSpotsFinder: bookableSpotsFinder}
 }
 
-// Execute returns the subset of parkingSpotIDs with no booking occupying [start, end).
+// Execute returns the subset of spot IDs that still have room in [start, end).
 func (useCase *GetBookableSpotsUseCase) Execute(
 	ctx context.Context,
-	parkingSpotIDs []string,
+	spots []entity.SpotCapacity,
 	start, end time.Time,
 ) ([]string, error) {
-	return useCase.bookableSpotsFinder.GetBookableSpots(ctx, parkingSpotIDs, start, end)
+	return useCase.bookableSpotsFinder.GetBookableSpots(ctx, spots, start, end)
 }

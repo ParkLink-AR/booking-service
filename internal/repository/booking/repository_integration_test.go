@@ -16,11 +16,11 @@ import (
 	"github.com/example/bookings-service/internal/repository/booking"
 )
 
-// TestBookingRepositoryIntegrationSuite exercises GetActiveBookingsInRange against a real
-// PostgreSQL instance, since its correctness depends on TSTZRANGE overlap and the
-// EXCLUDE USING GIST constraint — behavior a mocked *sql.DB cannot verify. It is skipped
-// unless BOOKING_TEST_DSN is set (e.g. to a disposable postgres:16-alpine container with
-// the migrations in migrations/001-004_*.sql applied).
+// TestBookingRepositoryIntegrationSuite exercises the repository against a real PostgreSQL
+// instance, since its correctness depends on TSTZRANGE overlap and the per-spot advisory
+// lock + concurrency recount in CreateBooking — behavior a mocked *sql.DB cannot verify.
+// It is skipped unless BOOKING_TEST_DSN is set (e.g. to a disposable postgres:16-alpine
+// container with the migrations in migrations/001-005_*.sql applied).
 func TestBookingRepositoryIntegrationSuite(t *testing.T) {
 	dataSourceName := os.Getenv("BOOKING_TEST_DSN")
 	if dataSourceName == "" {
@@ -132,8 +132,9 @@ func (s *bookingRepositoryIntegrationSuite) TestInactiveStatusesDoNotOccupyAvail
 	}
 }
 
-// The EXCLUDE USING GIST constraint must reject overlapping active bookings for the same spot.
-func (s *bookingRepositoryIntegrationSuite) TestOverlappingActiveBookingsAreRejectedByConstraint() {
+// There is no EXCLUDE constraint anymore: a raw overlapping INSERT succeeds. Overlap is
+// enforced in CreateBooking (advisory lock + recount vs capacity), not by the schema.
+func (s *bookingRepositoryIntegrationSuite) TestRawOverlappingInsertsAreAllowedWithoutConstraint() {
 	parkingSpotID := "55555555-5555-5555-5555-555555555555"
 	s.insertBooking(parkingSpotID,
 		time.Date(2026, 8, 18, 10, 0, 0, 0, time.UTC),
@@ -146,7 +147,7 @@ func (s *bookingRepositoryIntegrationSuite) TestOverlappingActiveBookingsAreReje
 		VALUES ($1, gen_random_uuid(), tstzrange($2, $3, '[)'), 'CONFIRMED', 1000)
 	`, parkingSpotID, time.Date(2026, 8, 18, 11, 0, 0, 0, time.UTC), time.Date(2026, 8, 18, 13, 0, 0, 0, time.UTC))
 
-	s.Require().Error(err, "overlapping active bookings for the same spot must be rejected")
+	s.Require().NoError(err, "no schema-level constraint blocks overlapping rows anymore")
 }
 
 func (s *bookingRepositoryIntegrationSuite) TestListBookings_NoFiltersReturnsAllOrderedByStart() {
@@ -235,9 +236,8 @@ func (s *bookingRepositoryIntegrationSuite) TestCreateBooking_Success() {
 	s.Equal(5000, got.Amount)
 }
 
-// This is the safety net for the race window between the service's pre-check and the
-// insert: the EXCLUDE constraint rejects the overlap, and the repository maps that to a
-// domain conflict error rather than a raw Postgres error.
+// CreateBooking recounts concurrent active bookings under the advisory lock; a capacity-1
+// spot with one overlapping booking rejects the second with a domain conflict error.
 func (s *bookingRepositoryIntegrationSuite) TestCreateBooking_OverlapIsMappedToConflictError() {
 	parkingSpotID := "cccccccc-cccc-cccc-cccc-cccccccccccc"
 	s.insertBooking(parkingSpotID,
@@ -258,6 +258,34 @@ func (s *bookingRepositoryIntegrationSuite) TestCreateBooking_OverlapIsMappedToC
 	_, err := s.repository.CreateBooking(s.context, newBooking)
 
 	s.Require().Error(err)
+	s.True(errors.IsConflict(err))
+}
+
+// A capacity-2 spot ("playa") accepts a second overlapping booking and rejects the third.
+func (s *bookingRepositoryIntegrationSuite) TestCreateBooking_CapacityAllowsSecondOverlapRejectsThird() {
+	parkingSpotID := "cccccccc-cccc-cccc-cccc-cccccccccc02"
+	window := func(userTag string) entity.Booking {
+		return entity.Booking{
+			ParkingSpotID: parkingSpotID,
+			UserID:        "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbb" + userTag,
+			Start:         time.Date(2026, 8, 18, 10, 0, 0, 0, time.UTC),
+			End:           time.Date(2026, 8, 18, 12, 0, 0, 0, time.UTC),
+			Status:        enum.BookingStatusConfirmed,
+			Amount:        5000,
+			Capacity:      2,
+		}
+	}
+
+	first, err := s.repository.CreateBooking(s.context, window("0001"))
+	s.Require().NoError(err)
+	s.NotEmpty(first.ID)
+
+	second, err := s.repository.CreateBooking(s.context, window("0002"))
+	s.Require().NoError(err, "second overlapping booking must fit within capacity 2")
+	s.NotEmpty(second.ID)
+
+	_, err = s.repository.CreateBooking(s.context, window("0003"))
+	s.Require().Error(err, "third overlapping booking must be rejected")
 	s.True(errors.IsConflict(err))
 }
 

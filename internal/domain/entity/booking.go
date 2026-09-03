@@ -20,8 +20,12 @@ type Booking struct {
 	OwnerResponseDeadline *time.Time
 	Amount                int
 	PaymentID             string
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
+	// Capacity is the number of identical places the spot rents against this same id
+	// (a "playa"): up to Capacity active bookings may overlap. Caller-supplied, like
+	// ParkingSpotSchedule -- booking-service does not fetch it. 0 is treated as 1.
+	Capacity  int
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // CreateBookingInput carries the data needed to create a new booking, threaded from the
@@ -35,4 +39,6 @@ type CreateBookingInput struct {
 	Start               time.Time
 	End                 time.Time
 	Amount              int
+	// Capacity of the spot as the caller knows it (see Booking.Capacity). 0 == 1.
+	Capacity int
 }

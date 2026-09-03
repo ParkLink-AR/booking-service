@@ -187,14 +187,13 @@ CREATE TABLE bookings (
   hold_expires_at  TIMESTAMPTZ,                    -- solo para PENDING_PAYMENT
   amount           INT           NOT NULL,         -- pesos ARS enteros
   payment_id       TEXT,                           -- referencia al payment-service
+  capacity         INT           NOT NULL DEFAULT 1, -- lugares del spot ("playa"): hasta N reservas activas se solapan
   created_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
-  updated_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
-
-  -- Previene solapamiento de reservas activas para el mismo spot
-  EXCLUDE USING GIST (
-    parking_spot_id WITH =,
-    time_range WITH &&
-  ) WHERE (status IN ('PENDING_PAYMENT', 'CONFIRMED'))
+  updated_at       TIMESTAMPTZ   NOT NULL DEFAULT now()
+  -- Sin EXCLUDE: un spot de capacidad N admite hasta N reservas activas solapadas.
+  -- El solapamiento se controla en el repositorio (advisory lock por spot +
+  -- recuento de concurrencia contra `capacity` dentro de la transacción de
+  -- CreateBooking), no a nivel de esquema.
 );
 
 CREATE INDEX idx_bookings_spot_range

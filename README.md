@@ -46,7 +46,7 @@ Lists a spot's bookings grouped by day. `from`, `to`, and `status` are all optio
 
 ### `POST /parking-spots/{id}/bookings`
 
-Creates a booking. Validates the range, checks it falls within the spot's published hours, and checks for overlap with existing active bookings (pre-check plus a DB-level `EXCLUDE` constraint as the race-condition safety net). Created as `PENDING_PAYMENT` with a hold that expires after `BOOKING_HOLD_MINUTES` (default 15).
+Creates a booking. Validates the range, checks it falls within the spot's published hours, and checks that fewer than the spot's `capacity` active bookings already overlap the requested range (`parking_spot.capacity` in the body, default 1 — a "playa" passes N so up to N reservations can overlap). The check is a fast pre-check plus an authoritative recount inside the repository transaction under a per-spot advisory lock (there is no `EXCLUDE` constraint anymore). Created as `PENDING_PAYMENT` with a hold that expires after `BOOKING_HOLD_MINUTES` (default 15).
 
 Request:
 ```json
@@ -127,6 +127,6 @@ make race               # unit tests with -race
 BOOKING_TEST_DSN="postgres://appuser:apppassword@localhost:5432/cleanapi?sslmode=disable" go test ./internal/repository/booking/...
 ```
 
-The last command runs the repository integration suite against a real PostgreSQL instance (skipped by default) — it's what actually exercises the `TSTZRANGE` overlap logic and the `EXCLUDE` constraint, which a mocked `*sql.DB` can't verify.
+The last command runs the repository integration suite against a real PostgreSQL instance (skipped by default) — it's what actually exercises the `TSTZRANGE` overlap logic and the advisory-lock + capacity recount in `CreateBooking`, which a mocked `*sql.DB` can't verify.
 
 See `docs/go-rules.md` for the full coding standards, and `spec.md` / `plan.md` for the original availability-endpoint design.

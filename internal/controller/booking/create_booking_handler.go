@@ -57,6 +57,11 @@ func (handler *Handler) CreateBookingEndpoint(responseWriter http.ResponseWriter
 		}
 	}
 
+	capacity := body.ParkingSpot.Capacity
+	if capacity < 1 {
+		capacity = 1
+	}
+
 	input := entity.CreateBookingInput{
 		ParkingSpotID:       body.ParkingSpot.ID,
 		ParkingSpotSchedule: schedule,
@@ -64,6 +69,7 @@ func (handler *Handler) CreateBookingEndpoint(responseWriter http.ResponseWriter
 		Start:               start,
 		End:                 end,
 		Amount:              body.Amount,
+		Capacity:            capacity,
 	}
 
 	created, err := handler.createBookingUseCase.Execute(request.Context(), input)
