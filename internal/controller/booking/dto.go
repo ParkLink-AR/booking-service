@@ -69,6 +69,7 @@ type userBookingResponse struct {
 	HoldExpiresAt *string `json:"hold_expires_at,omitempty"`
 	Amount        int     `json:"amount"`
 	PaymentID     string  `json:"payment_id,omitempty"`
+	UpdatedAt     string  `json:"updated_at"`
 }
 
 type bookingWindowResponse struct {
