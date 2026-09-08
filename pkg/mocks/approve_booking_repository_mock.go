@@ -107,3 +107,41 @@ func (mr *MockSpotOwnerLookupMockRecorder) GetSpotOwnerID(ctx, spotID any) *gomo
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSpotOwnerID", reflect.TypeOf((*MockSpotOwnerLookup)(nil).GetSpotOwnerID), ctx, spotID)
 }
+
+// MockSpotDetailsLookup is a mock of SpotDetailsLookup interface.
+type MockSpotDetailsLookup struct {
+	ctrl     *gomock.Controller
+	recorder *MockSpotDetailsLookupMockRecorder
+}
+
+// MockSpotDetailsLookupMockRecorder is the mock recorder for MockSpotDetailsLookup.
+type MockSpotDetailsLookupMockRecorder struct {
+	mock *MockSpotDetailsLookup
+}
+
+// NewMockSpotDetailsLookup creates a new mock instance.
+func NewMockSpotDetailsLookup(ctrl *gomock.Controller) *MockSpotDetailsLookup {
+	mock := &MockSpotDetailsLookup{ctrl: ctrl}
+	mock.recorder = &MockSpotDetailsLookupMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockSpotDetailsLookup) EXPECT() *MockSpotDetailsLookupMockRecorder {
+	return m.recorder
+}
+
+// GetSpotDetails mocks base method.
+func (m *MockSpotDetailsLookup) GetSpotDetails(ctx context.Context, spotID string) (entity.SpotDetails, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSpotDetails", ctx, spotID)
+	ret0, _ := ret[0].(entity.SpotDetails)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSpotDetails indicates an expected call of GetSpotDetails.
+func (mr *MockSpotDetailsLookupMockRecorder) GetSpotDetails(ctx, spotID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSpotDetails", reflect.TypeOf((*MockSpotDetailsLookup)(nil).GetSpotDetails), ctx, spotID)
+}
