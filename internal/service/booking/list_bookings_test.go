@@ -25,6 +25,7 @@ type serviceSuite struct {
 	suite.Suite
 	controller        *gomock.Controller
 	bookingRepository *mocks.MockBookingRepository
+	parkingClient     *mocks.MockParkingClient
 	service           *booking.Service
 	context           context.Context
 	location          *time.Location
@@ -34,12 +35,13 @@ type serviceSuite struct {
 func (s *serviceSuite) SetupTest() {
 	s.controller = gomock.NewController(s.T())
 	s.bookingRepository = mocks.NewMockBookingRepository(s.controller)
+	s.parkingClient = mocks.NewMockParkingClient(s.controller)
 
 	location, err := time.LoadLocation("America/Argentina/Buenos_Aires")
 	s.Require().NoError(err)
 	s.location = location
 
-	s.service = booking.NewService(s.bookingRepository, location, testHoldDuration)
+	s.service = booking.NewService(s.bookingRepository, s.parkingClient, location, testHoldDuration)
 	s.context = context.Background()
 	s.parkingSpotID = "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"
 }
@@ -50,6 +52,22 @@ func (s *serviceSuite) TearDownTest() {
 
 func (s *serviceSuite) localDate(day int) time.Time {
 	return time.Date(2026, 8, day, 0, 0, 0, 0, s.location)
+}
+
+// futureDate returns local midnight `daysFromNow` days out from whenever the test
+// actually runs -- unlike localDate's fixed 2026-08-* dates, it never rots into "today"
+// (or the past) as the calendar advances, which matters for STAY tests: a quoted start
+// that's already today or earlier gets clamped to "now" by CreateBooking (see
+// TestCreateBooking_Stay_StartingTodayClampsToNow), which would break these otherwise.
+func (s *serviceSuite) futureDate(daysFromNow int) time.Time {
+	now := time.Now().In(s.location).AddDate(0, 0, daysFromNow)
+	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, s.location)
+}
+
+// dateStr formats t as the YYYY-MM-DD parking-service/booking-service exchange for a
+// stay's start/end date, in the suite's location.
+func (s *serviceSuite) dateStr(t time.Time) string {
+	return t.In(s.location).Format("2006-01-02")
 }
 
 func (s *serviceSuite) TestListBookings_NoFiltersReturnsGroupedResult() {

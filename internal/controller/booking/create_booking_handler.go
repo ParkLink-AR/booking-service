@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/example/bookings-service/internal/domain/entity"
+	"github.com/example/bookings-service/internal/domain/enum"
 )
 
 //go:generate go tool mockgen -destination=../../../pkg/mocks/create_booking_usecase_mock.go -package=mocks -source=./create_booking_handler.go
@@ -38,12 +39,38 @@ func (handler *Handler) CreateBookingEndpoint(responseWriter http.ResponseWriter
 		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_TIME_RANGE", "start must be a valid RFC3339 timestamp")
 		return
 	}
+	// For a STAY booking `end` only needs to parse and be after `start` -- Service.CreateBooking
+	// overwrites it with parking-service's quoted end date, so mobile can send any placeholder
+	// after start (e.g. start + 1h) instead of computing the real end date itself.
 	end, err := time.Parse(time.RFC3339, body.End)
 	if err != nil {
 		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_TIME_RANGE", "end must be a valid RFC3339 timestamp")
 		return
 	}
-	if body.Amount <= 0 {
+	// Empty Kind means a client built before STAY existed -- default to HOURLY so it keeps
+	// working unchanged. A STAY booking's Amount is never trusted from the request body (see
+	// Service.CreateBooking), but it's still required here to be positive for HOURLY, which
+	// still has no server-side price of its own to check it against.
+	kindLabel := body.Kind
+	if kindLabel == "" {
+		kindLabel = "HOURLY"
+	}
+	kind, ok := enum.ParseBookingKind(kindLabel)
+	if !ok {
+		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_KIND", "kind must be HOURLY or STAY")
+		return
+	}
+
+	if kind == enum.BookingKindStay {
+		if body.StayUnit != "day" && body.StayUnit != "week" && body.StayUnit != "month" {
+			writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_STAY_UNIT", "stay_unit must be day, week or month")
+			return
+		}
+		if body.StayCount < 1 {
+			writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_STAY_COUNT", "stay_count must be a positive integer")
+			return
+		}
+	} else if body.Amount <= 0 {
 		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_AMOUNT", "amount must be a positive integer")
 		return
 	}
@@ -70,6 +97,9 @@ func (handler *Handler) CreateBookingEndpoint(responseWriter http.ResponseWriter
 		End:                 end,
 		Amount:              body.Amount,
 		Capacity:            capacity,
+		Kind:                kind,
+		StayUnit:            body.StayUnit,
+		StayCount:           body.StayCount,
 	}
 
 	created, err := handler.createBookingUseCase.Execute(request.Context(), input)

@@ -17,7 +17,7 @@ func (repository *Repository) ListBookingsBySpot(ctx context.Context, spotID str
 			id, parking_spot_id, user_id,
 			lower(time_range), upper(time_range),
 			status, hold_expires_at, owner_response_deadline, amount, COALESCE(payment_id, ''),
-			created_at, updated_at
+			kind, created_at, updated_at
 		FROM `+constants.BookingsTableName+`
 		WHERE parking_spot_id = $1
 		ORDER BY created_at DESC
@@ -30,16 +30,17 @@ func (repository *Repository) ListBookingsBySpot(ctx context.Context, spotID str
 	var bookings []entity.Booking
 	for rows.Next() {
 		var b entity.Booking
-		var statusLabel string
+		var statusLabel, kindLabel string
 		if err := rows.Scan(
 			&b.ID, &b.ParkingSpotID, &b.UserID,
 			&b.Start, &b.End,
 			&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.PaymentID,
-			&b.CreatedAt, &b.UpdatedAt,
+			&kindLabel, &b.CreatedAt, &b.UpdatedAt,
 		); err != nil {
 			return nil, errors.NewInternalError("booking.ListBookingsBySpot", err)
 		}
 		b.Status, _ = parseBookingStatus(statusLabel)
+		b.Kind, _ = parseBookingKind(kindLabel)
 		bookings = append(bookings, b)
 	}
 	if err := rows.Err(); err != nil {

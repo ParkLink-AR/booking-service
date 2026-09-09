@@ -60,7 +60,7 @@ func main() {
 	)
 
 	// Services
-	bookingService := bookingservice.NewService(bookingRepository, buenosAiresLocation, holdDuration())
+	bookingService := bookingservice.NewService(bookingRepository, parkingClient, buenosAiresLocation, holdDuration())
 
 	// Use cases
 	listBookingsUseCase := ucbooking.NewListBookingsUseCase(bookingService)
