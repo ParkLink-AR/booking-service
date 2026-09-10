@@ -20,26 +20,22 @@ type BookingConfirmer interface {
 	GetByID(ctx context.Context, bookingID string) (entity.Booking, error)
 }
 
-// SpotLookup resolves the parking spot behind a booking: whether it auto-confirms, who
-// owns it, and its title. The confirm flow needs the flag to branch on, and the owner id
-// plus title to populate the domain event it publishes. Implemented by
+// SpotLookup answers whether a parking spot auto-confirms bookings. Implemented by
 // internal/repository/parkingclient.
 type SpotLookup interface {
-	GetSpotDetails(ctx context.Context, spotID string) (entity.SpotDetails, error)
+	IsInstantBooking(ctx context.Context, spotID string) (bool, error)
 }
 
 // ConfirmBookingUseCase orchestrates the booking-confirmation step triggered by the
 // payment webhook: it decides, based on the spot's instant-booking setting, whether the
-// booking becomes CONFIRMED right away or PENDING_OWNER_APPROVAL (awaiting the owner), and
-// publishes the matching domain event (booking.confirmed / booking.pending_approval).
+// booking becomes CONFIRMED right away or PENDING_OWNER_APPROVAL (awaiting the owner).
 type ConfirmBookingUseCase struct {
 	confirmer  BookingConfirmer
 	spotLookup SpotLookup
-	events     EventPublisher
 }
 
-func NewConfirmBookingUseCase(confirmer BookingConfirmer, spotLookup SpotLookup, events EventPublisher) *ConfirmBookingUseCase {
-	return &ConfirmBookingUseCase{confirmer: confirmer, spotLookup: spotLookup, events: events}
+func NewConfirmBookingUseCase(confirmer BookingConfirmer, spotLookup SpotLookup) *ConfirmBookingUseCase {
+	return &ConfirmBookingUseCase{confirmer: confirmer, spotLookup: spotLookup}
 }
 
 // Execute confirms the booking identified by bookingID, attaching paymentID.
@@ -49,29 +45,17 @@ func (uc *ConfirmBookingUseCase) Execute(ctx context.Context, bookingID, payment
 		return entity.Booking{}, err
 	}
 
-	spot, err := uc.spotLookup.GetSpotDetails(ctx, booking.ParkingSpotID)
+	instantBooking, err := uc.spotLookup.IsInstantBooking(ctx, booking.ParkingSpotID)
 	if err != nil {
 		return entity.Booking{}, err
 	}
 
-	if spot.InstantBooking {
-		confirmed, err := uc.confirmer.ConfirmBooking(ctx, bookingID, paymentID, enum.BookingStatusConfirmed, nil)
-		if err != nil {
-			return entity.Booking{}, err
-		}
-		emitBookingEvent(ctx, uc.events, RoutingKeyBookingConfirmed,
-			newBookingEvent(RoutingKeyBookingConfirmed, confirmed, spot, true))
-		return confirmed, nil
+	if instantBooking {
+		return uc.confirmer.ConfirmBooking(ctx, bookingID, paymentID, enum.BookingStatusConfirmed, nil)
 	}
 
 	deadline := time.Now().Add(ownerApprovalWindow())
-	pending, err := uc.confirmer.ConfirmBooking(ctx, bookingID, paymentID, enum.BookingStatusPendingOwnerApproval, &deadline)
-	if err != nil {
-		return entity.Booking{}, err
-	}
-	emitBookingEvent(ctx, uc.events, RoutingKeyBookingPendingApproval,
-		newBookingEvent(RoutingKeyBookingPendingApproval, pending, spot, false))
-	return pending, nil
+	return uc.confirmer.ConfirmBooking(ctx, bookingID, paymentID, enum.BookingStatusPendingOwnerApproval, &deadline)
 }
 
 // ownerApprovalWindow reads OWNER_APPROVAL_HOURS, falling back to 24h when unset or not a
