@@ -95,17 +95,17 @@ func (m *MockSpotLookup) EXPECT() *MockSpotLookupMockRecorder {
 	return m.recorder
 }
 
-// GetSpotDetails mocks base method.
-func (m *MockSpotLookup) GetSpotDetails(ctx context.Context, spotID string) (entity.SpotDetails, error) {
+// IsInstantBooking mocks base method.
+func (m *MockSpotLookup) IsInstantBooking(ctx context.Context, spotID string) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSpotDetails", ctx, spotID)
-	ret0, _ := ret[0].(entity.SpotDetails)
+	ret := m.ctrl.Call(m, "IsInstantBooking", ctx, spotID)
+	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetSpotDetails indicates an expected call of GetSpotDetails.
-func (mr *MockSpotLookupMockRecorder) GetSpotDetails(ctx, spotID any) *gomock.Call {
+// IsInstantBooking indicates an expected call of IsInstantBooking.
+func (mr *MockSpotLookupMockRecorder) IsInstantBooking(ctx, spotID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSpotDetails", reflect.TypeOf((*MockSpotLookup)(nil).GetSpotDetails), ctx, spotID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsInstantBooking", reflect.TypeOf((*MockSpotLookup)(nil).IsInstantBooking), ctx, spotID)
 }
