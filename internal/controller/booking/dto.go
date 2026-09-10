@@ -21,10 +21,16 @@ type parkingSpotRequest struct {
 }
 
 type createBookingRequest struct {
-	UserID      string             `json:"user_id"`
-	Start       string             `json:"start"`
-	End         string             `json:"end"`
-	Amount      int                `json:"amount"`
+	UserID string `json:"user_id"`
+	Start  string `json:"start"`
+	End    string `json:"end"`
+	Amount int    `json:"amount"`
+	// Kind is "HOURLY" (default, for backward compatibility with clients built before this
+	// field existed) or "STAY". For STAY, StayUnit/StayCount are required and End/Amount are
+	// ignored -- see CreateBookingEndpoint and Service.CreateBooking.
+	Kind        string             `json:"kind,omitempty"`
+	StayUnit    string             `json:"stay_unit,omitempty"`
+	StayCount   int                `json:"stay_count,omitempty"`
 	ParkingSpot parkingSpotRequest `json:"parking_spot"`
 }
 
@@ -38,6 +44,7 @@ type bookingResponse struct {
 	HoldExpiresAt *string `json:"hold_expires_at,omitempty"`
 	Amount        int     `json:"amount"`
 	PaymentID     string  `json:"payment_id,omitempty"`
+	Kind          string  `json:"kind"`
 	UpdatedAt     string  `json:"updated_at"`
 }
 
@@ -53,6 +60,7 @@ func bookingResponseFromEntity(booking entity.Booking, location *time.Location) 
 		Status:        booking.Status.String(),
 		Amount:        booking.Amount,
 		PaymentID:     booking.PaymentID,
+		Kind:          booking.Kind.String(),
 		UpdatedAt:     booking.UpdatedAt.In(location).Format(time.RFC3339),
 	}
 	if booking.HoldExpiresAt != nil {
@@ -72,6 +80,7 @@ type userBookingResponse struct {
 	HoldExpiresAt *string `json:"hold_expires_at,omitempty"`
 	Amount        int     `json:"amount"`
 	PaymentID     string  `json:"payment_id,omitempty"`
+	Kind          string  `json:"kind"`
 	UpdatedAt     string  `json:"updated_at"`
 }
 

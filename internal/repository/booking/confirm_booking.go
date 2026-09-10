@@ -35,19 +35,20 @@ func (repository *Repository) ConfirmBooking(
 			id, parking_spot_id, user_id,
 			lower(time_range), upper(time_range),
 			status, hold_expires_at, owner_response_deadline, amount, payment_id,
-			created_at, updated_at
+			kind, created_at, updated_at
 	`, bookingID, paymentID, status.String(), ownerResponseDeadline)
 
 	var b entity.Booking
-	var statusLabel string
+	var statusLabel, kindLabel string
 	if err := row.Scan(
 		&b.ID, &b.ParkingSpotID, &b.UserID,
 		&b.Start, &b.End,
 		&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.PaymentID,
-		&b.CreatedAt, &b.UpdatedAt,
+		&kindLabel, &b.CreatedAt, &b.UpdatedAt,
 	); err != nil {
 		return entity.Booking{}, errors.NewNotFound("booking", bookingID)
 	}
 	b.Status, _ = parseBookingStatus(statusLabel)
+	b.Kind, _ = parseBookingKind(kindLabel)
 	return b, nil
 }

@@ -127,6 +127,7 @@ func (handler *Handler) ListBookingsByUserEndpoint(responseWriter http.ResponseW
 			Status:        b.Status.String(),
 			Amount:        b.Amount,
 			PaymentID:     b.PaymentID,
+			Kind:          b.Kind.String(),
 			UpdatedAt:     b.UpdatedAt.In(handler.location).Format(time.RFC3339),
 		}
 		if b.HoldExpiresAt != nil {

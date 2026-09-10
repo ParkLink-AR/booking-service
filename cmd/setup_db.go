@@ -60,6 +60,7 @@ func runMigrations(database *sql.DB) error {
 			amount                   INT           NOT NULL,
 			payment_id               TEXT,
 			capacity                 INT           NOT NULL DEFAULT 1,
+			kind                     TEXT          NOT NULL DEFAULT 'HOURLY' CHECK (kind IN ('HOURLY', 'STAY')),
 			created_at               TIMESTAMPTZ   NOT NULL DEFAULT now(),
 			updated_at               TIMESTAMPTZ   NOT NULL DEFAULT now()
 		);
@@ -110,6 +111,11 @@ func runMigrations(database *sql.DB) error {
 				EXECUTE format('ALTER TABLE bookings DROP CONSTRAINT %I', cname);
 			END IF;
 		END$$;
+
+		-- migrations/007: for databases created before "estadía" (day/week/month)
+		-- bookings existed. Every pre-existing row is an hourly slot booking.
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'HOURLY'
+			CHECK (kind IN ('HOURLY', 'STAY'));
 	`)
 	return err
 }

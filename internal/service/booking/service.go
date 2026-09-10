@@ -6,6 +6,7 @@ import (
 
 	"github.com/example/bookings-service/internal/domain/entity"
 	"github.com/example/bookings-service/internal/domain/enum"
+	"github.com/example/bookings-service/internal/repository/parkingclient"
 )
 
 //go:generate go tool mockgen -destination=../../../pkg/mocks/booking_listing_repository_mock.go -package=mocks -source=./service.go
@@ -23,23 +24,32 @@ type BookingRepository interface {
 	GetBookingsForSpotsInRange(ctx context.Context, parkingSpotIDs []string, start, end time.Time) ([]entity.SpotBooking, error)
 }
 
+// ParkingClient is the subset of parkingclient.Client this service needs: pricing and
+// validating a "stay" booking against the spot's owner-configured stay terms.
+type ParkingClient interface {
+	GetStayQuote(ctx context.Context, spotID, startDate, unit string, count int) (parkingclient.StayQuote, error)
+}
+
 // Service owns the business logic for a parking spot's bookings: listing them grouped by
 // day, and creating new ones (validating the range, published hours -- against the
 // schedule the caller provides, not fetched from anywhere -- and overlap with existing
 // active bookings).
 type Service struct {
 	bookingRepository BookingRepository
+	parkingClient     ParkingClient
 	location          *time.Location
 	holdDuration      time.Duration
 }
 
 func NewService(
 	bookingRepository BookingRepository,
+	parkingClient ParkingClient,
 	location *time.Location,
 	holdDuration time.Duration,
 ) *Service {
 	return &Service{
 		bookingRepository: bookingRepository,
+		parkingClient:     parkingClient,
 		location:          location,
 		holdDuration:      holdDuration,
 	}
