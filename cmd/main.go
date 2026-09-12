@@ -53,7 +53,6 @@ func main() {
 	// Repositories
 	bookingRepository := bookingrepository.NewRepository(database)
 	consumer := messaging.NewConsumer(rabbitChannel, logger)
-	eventPublisher := messaging.NewPublisher(rabbitChannel, rabbitExchangeName, logger)
 	parkingClient := parkingclient.NewClient(envOrDefault("PARKING_SERVICE_URL", "http://localhost:3001"))
 	paymentClient := paymentclient.NewClient(
 		envOrDefault("PAYMENT_SERVICE_URL", "http://localhost:8004"),
@@ -67,9 +66,9 @@ func main() {
 	listBookingsUseCase := ucbooking.NewListBookingsUseCase(bookingService)
 	listBookingsByUserUseCase := ucbooking.NewListBookingsByUserUseCase(bookingRepository)
 	createBookingUseCase := ucbooking.NewCreateBookingUseCase(bookingService)
-	confirmBookingUseCase := ucbooking.NewConfirmBookingUseCase(bookingRepository, parkingClient, eventPublisher)
+	confirmBookingUseCase := ucbooking.NewConfirmBookingUseCase(bookingRepository, parkingClient)
 	getBookableSpotsUseCase := ucbooking.NewGetBookableSpotsUseCase(bookingService)
-	approveBookingUseCase := ucbooking.NewApproveBookingUseCase(bookingRepository, parkingClient, eventPublisher)
+	approveBookingUseCase := ucbooking.NewApproveBookingUseCase(bookingRepository, parkingClient)
 	rejectBookingUseCase := ucbooking.NewRejectBookingUseCase(bookingRepository, parkingClient, paymentClient)
 	listBookingsDetailedUseCase := ucbooking.NewListBookingsDetailedUseCase(bookingRepository, parkingClient)
 	getBookingUseCase := ucbooking.NewGetBookingUseCase(bookingRepository)
