@@ -157,6 +157,18 @@ func (s *handlerSuite) TestCreateBookingEndpoint_InvalidAmount() {
 	s.Contains(recorder.Body.String(), "INVALID_AMOUNT")
 }
 
+func (s *handlerSuite) TestCreateBookingEndpoint_Stay_InvalidEndDate() {
+	body := fmt.Sprintf(
+		`{"user_id":"%s","start":"2026-08-18T10:00:00-03:00","end":"2026-08-18T11:00:00-03:00","kind":"STAY","stay_end_date":"not-a-date","parking_spot":{"id":"%s"}}`,
+		validUserID, validParkingSpotID,
+	)
+
+	recorder := s.doPost("/bookings", body)
+
+	s.Equal(http.StatusBadRequest, recorder.Code)
+	s.Contains(recorder.Body.String(), "INVALID_STAY_END_DATE")
+}
+
 func (s *handlerSuite) TestCreateBookingEndpoint_Conflict() {
 	s.createBookingUseCase.EXPECT().
 		Execute(gomock.Any(), gomock.Any()).

@@ -51,9 +51,8 @@ type CreateBookingInput struct {
 	// Kind selects which validation path CreateBooking takes. Zero value (BookingKindHourly)
 	// keeps every existing caller's behaviour unchanged.
 	Kind enum.BookingKind
-	// StayUnit/StayCount are required, and only meaningful, when Kind is BookingKindStay --
-	// e.g. StayUnit="week", StayCount=2 for a two-week stay starting on Start's calendar
-	// date. Ignored for an hourly booking.
-	StayUnit  string
-	StayCount int
+	// StayEndDate is required, and only meaningful, when Kind is BookingKindStay -- the
+	// calendar date (YYYY-MM-DD) the stay ends, e.g. "2026-09-23" for a stay starting on
+	// Start's calendar date and running 9 days. Ignored for an hourly booking.
+	StayEndDate string
 }

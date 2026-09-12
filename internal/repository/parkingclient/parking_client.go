@@ -88,15 +88,18 @@ func (client *Client) GetSpotOwnerID(ctx context.Context, spotID string) (string
 }
 
 // StayQuote mirrors parking-service's GET /parking-spots/{id}/stays/quote response: the
-// canonical price and date range for a day/week/month stay, computed and validated there
-// (stayEnabled, stayAvailableFrom, maxStayDays, and overlap with existing bookings) --
-// never trusted from whatever the mobile client sends.
+// canonical date range, exact check-in/check-out instants and price for a stay, computed
+// and validated there (stayEnabled, stayAvailableFrom, maxStayDays, and overlap with
+// existing bookings) -- never trusted from whatever the mobile client sends.
 type StayQuote struct {
 	StartDate string `json:"startDate"`
 	EndDate   string `json:"endDate"`
-	Unit      string `json:"unit"`
-	Count     int    `json:"count"`
-	TotalDays int    `json:"totalDays"`
+	// RFC3339 with the Buenos Aires offset -- the authoritative Start/End for the booking
+	// this creates (see Service.priceStay), already carrying the driver's check-in hour on
+	// both ends (a stay runs in 24h periods from check-in, not midnight to midnight).
+	StartDateTime string `json:"startDateTime"`
+	EndDateTime   string `json:"endDateTime"`
+	TotalDays     int    `json:"totalDays"`
 	// Amount is in centavos, same convention as entity.Booking.Amount.
 	Amount int `json:"amount"`
 }
@@ -107,16 +110,17 @@ type parkingServiceError struct {
 	Message string `json:"message"`
 }
 
-// GetStayQuote asks parking-service to price and validate a stay -- startDate is
-// YYYY-MM-DD, unit is "day"/"week"/"month". The caller (CreateBooking) uses the returned
-// EndDate and Amount as-is instead of whatever the create-booking request carried, so a
-// modified mobile client can't substitute a cheaper unit or a shorter/longer range than
-// what the spot's owner actually configured.
-func (client *Client) GetStayQuote(ctx context.Context, spotID, startDate, unit string, count int) (StayQuote, error) {
+// GetStayQuote asks parking-service to price and validate a stay -- startDate/endDate are
+// YYYY-MM-DD, startHour (0-23) is the driver's chosen check-in hour in Buenos Aires time.
+// The caller (CreateBooking) uses the returned StartDateTime/EndDateTime and Amount as-is
+// instead of whatever the create-booking request carried, so a modified mobile client
+// can't substitute a cheaper price or a shorter/longer range than what the spot's owner
+// actually configured.
+func (client *Client) GetStayQuote(ctx context.Context, spotID, startDate, endDate string, startHour int) (StayQuote, error) {
 	query := url.Values{
 		"startDate": {startDate},
-		"unit":      {unit},
-		"count":     {strconv.Itoa(count)},
+		"endDate":   {endDate},
+		"startHour": {strconv.Itoa(startHour)},
 	}
 	requestURL := fmt.Sprintf("%s/parking-spots/%s/stays/quote?%s", client.baseURL, spotID, query.Encode())
 

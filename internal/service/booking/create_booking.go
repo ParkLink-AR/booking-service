@@ -16,9 +16,10 @@ import (
 //     this itself), same as before this Kind existed.
 //   - STAY skips the published-hours check (it's meaningless for a multi-day range) and
 //     instead asks parking-service for a quote (see priceStay): the spot's owner-configured
-//     stay terms decide whether the requested start date/unit/count is even allowed, and
-//     the resulting end date and amount -- input.End and input.Amount are never trusted for
-//     a stay, so a modified client can't shrink the range or substitute a cheaper unit.
+//     stay terms decide whether the requested start/end date and check-in hour is even
+//     allowed, and the resulting exact start/end instants and amount -- input.End and
+//     input.Amount are never trusted for a stay, so a modified client can't shrink the
+//     range or substitute a cheaper price.
 //
 // Either way it then checks that fewer than the spot's capacity active bookings already
 // overlap the (possibly server-recomputed) range, and creates the booking as
@@ -42,13 +43,15 @@ func (service *Service) CreateBooking(ctx context.Context, input entity.CreateBo
 			return entity.Booking{}, err
 		}
 		start, end, amount = quote.Start, quote.End, quote.Amount
-		// A stay starting "today" quotes from local midnight, but midnight has
-		// already passed by the time anyone can book it -- clamping to now
-		// keeps a booking that already ended earlier today (still occupying
-		// the [midnight, now) sliver in the overlap check below) from
-		// registering as a false conflict against a stay that only needs the
-		// spot from this moment on. Same boundary parking-service's
-		// StaysService.assertRangeFree checks against when quoting.
+		// A stay whose check-in instant already passed by the time this
+		// request lands (e.g. driver picked "today at 09:00" and it's now
+		// 09:03) still needs to book from right now, not from the already-past
+		// instant -- clamping keeps a booking that already ended earlier
+		// today (still occupying the [checkin, now) sliver in the overlap
+		// check below) from registering as a false conflict against a stay
+		// that only needs the spot from this moment on. Same boundary
+		// parking-service's StaysService.assertRangeFree checks against when
+		// quoting.
 		if now := time.Now(); start.Before(now) {
 			start = now
 		}
@@ -93,31 +96,30 @@ type stayQuote struct {
 }
 
 // priceStay resolves a STAY booking's authoritative range and amount by asking
-// parking-service to quote it -- see parkingclient.Client.GetStayQuote. input.Start's
-// calendar date (in the service's location) is what "start date" means to the driver; the
-// end date and amount always come back from parking-service, never from input.
+// parking-service to quote it -- see parkingclient.Client.GetStayQuote. input.Start is the
+// driver's chosen check-in instant: its calendar date and hour (both in the service's
+// location) are what "start date"/"check-in time" mean to the driver. input.StayEndDate is
+// the calendar date they picked to check out -- parking-service applies the same check-in
+// hour to it (a stay runs in 24h periods from check-in, not midnight to midnight) and
+// returns the exact start/end instants and amount, never trusted from input.
 func (service *Service) priceStay(ctx context.Context, input entity.CreateBookingInput) (stayQuote, error) {
-	startDate := input.Start.In(service.location).Format("2006-01-02")
+	localStart := input.Start.In(service.location)
+	startDate := localStart.Format("2006-01-02")
+	startHour := localStart.Hour()
 
-	quote, err := service.parkingClient.GetStayQuote(ctx, input.ParkingSpotID, startDate, input.StayUnit, input.StayCount)
+	quote, err := service.parkingClient.GetStayQuote(ctx, input.ParkingSpotID, startDate, input.StayEndDate, startHour)
 	if err != nil {
 		return stayQuote{}, err
 	}
 
-	start, err := parseDateInLocation(quote.StartDate, service.location)
+	start, err := time.Parse(time.RFC3339, quote.StartDateTime)
 	if err != nil {
 		return stayQuote{}, errors.NewUpstream("priceStay", err)
 	}
-	end, err := parseDateInLocation(quote.EndDate, service.location)
+	end, err := time.Parse(time.RFC3339, quote.EndDateTime)
 	if err != nil {
 		return stayQuote{}, errors.NewUpstream("priceStay", err)
 	}
 
 	return stayQuote{Start: start, End: end, Amount: quote.Amount}, nil
-}
-
-// parseDateInLocation parses a YYYY-MM-DD calendar date as local midnight in location --
-// the same boundary parking-service's StaysService uses to define a stay's range.
-func parseDateInLocation(dateISO string, location *time.Location) (time.Time, error) {
-	return time.ParseInLocation("2006-01-02", dateISO, location)
 }

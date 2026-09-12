@@ -62,12 +62,8 @@ func (handler *Handler) CreateBookingEndpoint(responseWriter http.ResponseWriter
 	}
 
 	if kind == enum.BookingKindStay {
-		if body.StayUnit != "day" && body.StayUnit != "week" && body.StayUnit != "month" {
-			writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_STAY_UNIT", "stay_unit must be day, week or month")
-			return
-		}
-		if body.StayCount < 1 {
-			writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_STAY_COUNT", "stay_count must be a positive integer")
+		if _, err := time.Parse("2006-01-02", body.StayEndDate); err != nil {
+			writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_STAY_END_DATE", "stay_end_date must be a YYYY-MM-DD date")
 			return
 		}
 	} else if body.Amount <= 0 {
@@ -98,8 +94,7 @@ func (handler *Handler) CreateBookingEndpoint(responseWriter http.ResponseWriter
 		Amount:              body.Amount,
 		Capacity:            capacity,
 		Kind:                kind,
-		StayUnit:            body.StayUnit,
-		StayCount:           body.StayCount,
+		StayEndDate:         body.StayEndDate,
 	}
 
 	created, err := handler.createBookingUseCase.Execute(request.Context(), input)

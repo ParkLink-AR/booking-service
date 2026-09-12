@@ -216,13 +216,18 @@ func (s *serviceSuite) TestCreateBooking_Stay_UsesParkingServiceQuoteNotClientIn
 		End:           quotedStart.Add(24 * time.Hour),
 		Amount:        1,
 		Kind:          enum.BookingKindStay,
-		StayUnit:      "week",
-		StayCount:     2,
+		StayEndDate:   s.dateStr(quotedEnd),
 	}
 
 	s.parkingClient.EXPECT().
-		GetStayQuote(gomock.Any(), s.parkingSpotID, s.dateStr(quotedStart), "week", 2).
-		Return(parkingclient.StayQuote{StartDate: s.dateStr(quotedStart), EndDate: s.dateStr(quotedEnd), Amount: 50000}, nil)
+		GetStayQuote(gomock.Any(), s.parkingSpotID, s.dateStr(quotedStart), s.dateStr(quotedEnd), 0).
+		Return(parkingclient.StayQuote{
+			StartDate:     s.dateStr(quotedStart),
+			EndDate:       s.dateStr(quotedEnd),
+			StartDateTime: quotedStart.Format(time.RFC3339),
+			EndDateTime:   quotedEnd.Format(time.RFC3339),
+			Amount:        50000,
+		}, nil)
 
 	s.bookingRepository.EXPECT().
 		GetActiveBookingsInRange(gomock.Any(), s.parkingSpotID, quotedStart.UTC(), quotedEnd.UTC()).
@@ -246,17 +251,17 @@ func (s *serviceSuite) TestCreateBooking_Stay_UsesParkingServiceQuoteNotClientIn
 
 func (s *serviceSuite) TestCreateBooking_Stay_PropagatesParkingServiceRejection() {
 	start := s.futureDate(30)
+	end := s.futureDate(60)
 	input := entity.CreateBookingInput{
 		ParkingSpotID: s.parkingSpotID,
 		Start:         start,
 		End:           start.Add(24 * time.Hour),
 		Kind:          enum.BookingKindStay,
-		StayUnit:      "month",
-		StayCount:     1,
+		StayEndDate:   s.dateStr(end),
 	}
 
 	s.parkingClient.EXPECT().
-		GetStayQuote(gomock.Any(), s.parkingSpotID, s.dateStr(start), "month", 1).
+		GetStayQuote(gomock.Any(), s.parkingSpotID, s.dateStr(start), s.dateStr(end), 0).
 		Return(parkingclient.StayQuote{}, errors.NewInvalidInput("STAY_NOT_AVAILABLE", "this spot does not offer stays"))
 
 	got, err := s.service.CreateBooking(s.context, input)
@@ -273,20 +278,31 @@ func (s *serviceSuite) TestCreateBooking_Stay_PropagatesParkingServiceRejection(
 // moment on. See the comment in create_booking.go for the same reasoning
 // parking-service's StaysService.assertRangeFree applies when quoting.
 func (s *serviceSuite) TestCreateBooking_Stay_StartingTodayClampsToNow() {
-	today := s.dateStr(time.Now().In(s.location))
+	now := time.Now().In(s.location)
+	// Check-in at today's midnight (hour 0) -- like the pre-hour-of-day version of this
+	// test, this guarantees the quoted start instant is already in the past by the time
+	// CreateBooking clamps it, without racing the clock at whatever hour the test happens
+	// to run.
+	todayMidnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, s.location)
+	today := s.dateStr(now)
 	quotedEnd := s.futureDate(1)
 	input := entity.CreateBookingInput{
 		ParkingSpotID: s.parkingSpotID,
-		Start:         time.Now().In(s.location),
-		End:           time.Now().In(s.location).Add(time.Hour),
+		Start:         todayMidnight,
+		End:           todayMidnight.Add(time.Hour),
 		Kind:          enum.BookingKindStay,
-		StayUnit:      "day",
-		StayCount:     1,
+		StayEndDate:   s.dateStr(quotedEnd),
 	}
 
 	s.parkingClient.EXPECT().
-		GetStayQuote(gomock.Any(), s.parkingSpotID, today, "day", 1).
-		Return(parkingclient.StayQuote{StartDate: today, EndDate: s.dateStr(quotedEnd), Amount: 8000}, nil)
+		GetStayQuote(gomock.Any(), s.parkingSpotID, today, s.dateStr(quotedEnd), 0).
+		Return(parkingclient.StayQuote{
+			StartDate:     today,
+			EndDate:       s.dateStr(quotedEnd),
+			StartDateTime: todayMidnight.Format(time.RFC3339),
+			EndDateTime:   quotedEnd.Format(time.RFC3339),
+			Amount:        8000,
+		}, nil)
 
 	beforeCall := time.Now()
 	s.bookingRepository.EXPECT().

@@ -26,11 +26,12 @@ type createBookingRequest struct {
 	End    string `json:"end"`
 	Amount int    `json:"amount"`
 	// Kind is "HOURLY" (default, for backward compatibility with clients built before this
-	// field existed) or "STAY". For STAY, StayUnit/StayCount are required and End/Amount are
-	// ignored -- see CreateBookingEndpoint and Service.CreateBooking.
+	// field existed) or "STAY". For STAY, StayEndDate is required and End/Amount are
+	// ignored -- see CreateBookingEndpoint and Service.CreateBooking. Start's own time
+	// (not just its calendar date) matters for STAY too: it's the driver's chosen check-in
+	// hour, applied to both ends of the stay.
 	Kind        string             `json:"kind,omitempty"`
-	StayUnit    string             `json:"stay_unit,omitempty"`
-	StayCount   int                `json:"stay_count,omitempty"`
+	StayEndDate string             `json:"stay_end_date,omitempty"`
 	ParkingSpot parkingSpotRequest `json:"parking_spot"`
 }
 
