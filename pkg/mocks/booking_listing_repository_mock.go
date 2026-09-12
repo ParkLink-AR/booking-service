@@ -140,3 +140,18 @@ func (mr *MockParkingClientMockRecorder) GetStayQuote(ctx, spotID, startDate, en
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStayQuote", reflect.TypeOf((*MockParkingClient)(nil).GetStayQuote), ctx, spotID, startDate, endDate, startHour)
 }
+
+// IsSpotActive mocks base method.
+func (m *MockParkingClient) IsSpotActive(ctx context.Context, spotID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsSpotActive", ctx, spotID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsSpotActive indicates an expected call of IsSpotActive.
+func (mr *MockParkingClientMockRecorder) IsSpotActive(ctx, spotID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsSpotActive", reflect.TypeOf((*MockParkingClient)(nil).IsSpotActive), ctx, spotID)
+}

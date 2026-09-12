@@ -27,6 +27,9 @@ func (s *serviceSuite) TestCreateBooking_Success() {
 		Amount:              5000,
 	}
 
+	s.parkingClient.EXPECT().
+		IsSpotActive(gomock.Any(), s.parkingSpotID).
+		Return(true, nil)
 	s.bookingRepository.EXPECT().
 		GetActiveBookingsInRange(gomock.Any(), s.parkingSpotID, start.UTC(), end.UTC()).
 		Return(nil, nil)
@@ -73,6 +76,9 @@ func (s *serviceSuite) TestCreateBooking_OutsidePublishedHours() {
 		End:                 end,
 	}
 
+	s.parkingClient.EXPECT().
+		IsSpotActive(gomock.Any(), s.parkingSpotID).
+		Return(true, nil)
 	got, err := s.service.CreateBooking(s.context, input)
 
 	s.Equal(entity.Booking{}, got)
@@ -80,11 +86,55 @@ func (s *serviceSuite) TestCreateBooking_OutsidePublishedHours() {
 	s.Equal("OUTSIDE_PUBLISHED_HOURS", errors.InvalidInputCode(err))
 }
 
+func (s *serviceSuite) TestCreateBooking_Hourly_RejectsWhenSpotNotActive() {
+	start := s.localDate(18).Add(10 * time.Hour)
+	end := s.localDate(18).Add(11 * time.Hour)
+	input := entity.CreateBookingInput{
+		ParkingSpotID:       s.parkingSpotID,
+		ParkingSpotSchedule: tuesdaySchedule,
+		Start:               start,
+		End:                 end,
+	}
+
+	s.parkingClient.EXPECT().
+		IsSpotActive(gomock.Any(), s.parkingSpotID).
+		Return(false, nil)
+
+	got, err := s.service.CreateBooking(s.context, input)
+
+	s.Equal(entity.Booking{}, got)
+	s.True(errors.IsInvalidInput(err))
+	s.Equal("SPOT_NOT_ACTIVE", errors.InvalidInputCode(err))
+}
+
+func (s *serviceSuite) TestCreateBooking_Hourly_PropagatesSpotActiveCheckError() {
+	start := s.localDate(18).Add(10 * time.Hour)
+	end := s.localDate(18).Add(11 * time.Hour)
+	input := entity.CreateBookingInput{
+		ParkingSpotID:       s.parkingSpotID,
+		ParkingSpotSchedule: tuesdaySchedule,
+		Start:               start,
+		End:                 end,
+	}
+
+	s.parkingClient.EXPECT().
+		IsSpotActive(gomock.Any(), s.parkingSpotID).
+		Return(false, errors.NewUpstream("parkingclient.getSpot", errors.NewNotFound("parking_spot", s.parkingSpotID)))
+
+	got, err := s.service.CreateBooking(s.context, input)
+
+	s.Equal(entity.Booking{}, got)
+	s.True(errors.IsUpstream(err))
+}
+
 func (s *serviceSuite) TestCreateBooking_NoScheduleProvidedIsOutsidePublishedHours() {
 	start := s.localDate(18).Add(10 * time.Hour)
 	end := s.localDate(18).Add(11 * time.Hour)
 	input := entity.CreateBookingInput{ParkingSpotID: s.parkingSpotID, Start: start, End: end}
 
+	s.parkingClient.EXPECT().
+		IsSpotActive(gomock.Any(), s.parkingSpotID).
+		Return(true, nil)
 	got, err := s.service.CreateBooking(s.context, input)
 
 	s.Equal(entity.Booking{}, got)
@@ -102,6 +152,9 @@ func (s *serviceSuite) TestCreateBooking_OverlapWithActiveBookingIsConflict() {
 		End:                 end,
 	}
 
+	s.parkingClient.EXPECT().
+		IsSpotActive(gomock.Any(), s.parkingSpotID).
+		Return(true, nil)
 	s.bookingRepository.EXPECT().
 		GetActiveBookingsInRange(gomock.Any(), s.parkingSpotID, start.UTC(), end.UTC()).
 		Return([]entity.TimeWindow{{Start: start.UTC(), End: end.UTC()}}, nil)
@@ -125,6 +178,9 @@ func (s *serviceSuite) TestCreateBooking_CapacityAllowsConcurrentUpToLimit() {
 		Capacity:            2,
 	}
 
+	s.parkingClient.EXPECT().
+		IsSpotActive(gomock.Any(), s.parkingSpotID).
+		Return(true, nil)
 	// One active booking overlapping the whole range; capacity 2 -> still fits.
 	s.bookingRepository.EXPECT().
 		GetActiveBookingsInRange(gomock.Any(), s.parkingSpotID, start.UTC(), end.UTC()).
@@ -154,6 +210,9 @@ func (s *serviceSuite) TestCreateBooking_CapacityRejectsWhenAllPlacesConcurrentl
 		Capacity:            2,
 	}
 
+	s.parkingClient.EXPECT().
+		IsSpotActive(gomock.Any(), s.parkingSpotID).
+		Return(true, nil)
 	s.bookingRepository.EXPECT().
 		GetActiveBookingsInRange(gomock.Any(), s.parkingSpotID, start.UTC(), end.UTC()).
 		Return([]entity.TimeWindow{
@@ -180,6 +239,9 @@ func (s *serviceSuite) TestCreateBooking_SequentialBookingsDoNotCountAsConcurren
 		Capacity:            2,
 	}
 
+	s.parkingClient.EXPECT().
+		IsSpotActive(gomock.Any(), s.parkingSpotID).
+		Return(true, nil)
 	// Three back-to-back bookings inside the requested range -> never more than 1 concurrent.
 	s.bookingRepository.EXPECT().
 		GetActiveBookingsInRange(gomock.Any(), s.parkingSpotID, start.UTC(), end.UTC()).
@@ -336,6 +398,9 @@ func (s *serviceSuite) TestCreateBooking_RepositoryCreateErrorPropagates() {
 		End:                 end,
 	}
 
+	s.parkingClient.EXPECT().
+		IsSpotActive(gomock.Any(), s.parkingSpotID).
+		Return(true, nil)
 	s.bookingRepository.EXPECT().
 		GetActiveBookingsInRange(gomock.Any(), s.parkingSpotID, start.UTC(), end.UTC()).
 		Return(nil, nil)

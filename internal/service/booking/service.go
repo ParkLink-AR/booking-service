@@ -25,9 +25,11 @@ type BookingRepository interface {
 }
 
 // ParkingClient is the subset of parkingclient.Client this service needs: pricing and
-// validating a "stay" booking against the spot's owner-configured stay terms.
+// validating a "stay" booking against the spot's owner-configured stay terms, and checking
+// whether a spot accepts new reservations at all.
 type ParkingClient interface {
 	GetStayQuote(ctx context.Context, spotID, startDate, endDate string, startHour int) (parkingclient.StayQuote, error)
+	IsSpotActive(ctx context.Context, spotID string) (bool, error)
 }
 
 // Service owns the business logic for a parking spot's bookings: listing them grouped by

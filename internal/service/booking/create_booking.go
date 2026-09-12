@@ -11,15 +11,18 @@ import (
 
 // CreateBooking validates input.Start < input.End, then branches on input.Kind:
 //
-//   - HOURLY confirms the requested range falls within the parking spot's published hours
-//     (input.ParkingSpotSchedule, provided by the caller -- booking-service does not fetch
-//     this itself), same as before this Kind existed.
-//   - STAY skips the published-hours check (it's meaningless for a multi-day range) and
-//     instead asks parking-service for a quote (see priceStay): the spot's owner-configured
-//     stay terms decide whether the requested start/end date and check-in hour is even
-//     allowed, and the resulting exact start/end instants and amount -- input.End and
-//     input.Amount are never trusted for a stay, so a modified client can't shrink the
-//     range or substitute a cheaper price.
+//   - HOURLY first confirms with parking-service that the spot is still active (a paused
+//     or deleted spot must reject any new reservation, even though its already-existing
+//     bookings keep working), then that the requested range falls within the parking
+//     spot's published hours (input.ParkingSpotSchedule, provided by the caller --
+//     booking-service does not fetch this itself), same as before this Kind existed.
+//   - STAY skips both of those checks and instead asks parking-service for a quote (see
+//     priceStay): that lookup only ever finds an active spot, so a paused or deleted one
+//     surfaces the same rejection there, and the spot's owner-configured stay terms decide
+//     whether the requested start/end date and check-in hour is even allowed -- the
+//     resulting exact start/end instants and amount -- input.End and input.Amount are never
+//     trusted for a stay, so a modified client can't shrink the range or substitute a
+//     cheaper price.
 //
 // Either way it then checks that fewer than the spot's capacity active bookings already
 // overlap the (possibly server-recomputed) range, and creates the booking as
@@ -55,9 +58,19 @@ func (service *Service) CreateBooking(ctx context.Context, input entity.CreateBo
 		if now := time.Now(); start.Before(now) {
 			start = now
 		}
-	} else if !isWithinPublishedHours(input.Start, input.End, input.ParkingSpotSchedule, service.location) {
-		return entity.Booking{}, errors.NewInvalidInput("OUTSIDE_PUBLISHED_HOURS",
-			"requested time is outside the parking spot's published hours")
+	} else {
+		active, err := service.parkingClient.IsSpotActive(ctx, input.ParkingSpotID)
+		if err != nil {
+			return entity.Booking{}, err
+		}
+		if !active {
+			return entity.Booking{}, errors.NewInvalidInput("SPOT_NOT_ACTIVE",
+				"this parking spot is not accepting new reservations")
+		}
+		if !isWithinPublishedHours(input.Start, input.End, input.ParkingSpotSchedule, service.location) {
+			return entity.Booking{}, errors.NewInvalidInput("OUTSIDE_PUBLISHED_HOURS",
+				"requested time is outside the parking spot's published hours")
+		}
 	}
 
 	capacity := input.Capacity

@@ -23,6 +23,7 @@ import (
 type spotResponse struct {
 	OwnerID        string `json:"ownerId"`
 	InstantBooking bool   `json:"instantBooking"`
+	Status         string `json:"status"`
 }
 
 // Client calls parking-service directly inside the docker network, the same
@@ -77,6 +78,17 @@ func (client *Client) GetSpotOwnerID(ctx context.Context, spotID string) (string
 		return "", err
 	}
 	return spot.OwnerID, nil
+}
+
+// IsSpotActive reports whether a parking spot currently accepts new reservations. A spot
+// its owner paused (or deleted) keeps its existing bookings and detail page working --
+// this only gates the creation of a new one (see Service.CreateBooking).
+func (client *Client) IsSpotActive(ctx context.Context, spotID string) (bool, error) {
+	spot, err := client.getSpot(ctx, spotID)
+	if err != nil {
+		return false, err
+	}
+	return spot.Status == "active", nil
 }
 
 // StayQuote mirrors parking-service's GET /parking-spots/{id}/stays/quote response: the
