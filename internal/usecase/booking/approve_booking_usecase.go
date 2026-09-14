@@ -16,35 +16,53 @@ type BookingApprover interface {
 	ApproveBooking(ctx context.Context, bookingID string) (entity.Booking, error)
 }
 
-// SpotOwnerLookup answers who owns a parking spot, to verify the caller approving or
-// rejecting a booking actually owns it. Implemented by internal/repository/parkingclient.
+// SpotOwnerLookup answers who owns a parking spot, to verify the caller acting on a
+// booking actually owns its spot. Implemented by internal/repository/parkingclient.
+// Used by the reject / detailed-listing / review flows.
 type SpotOwnerLookup interface {
 	GetSpotOwnerID(ctx context.Context, spotID string) (string, error)
 }
 
+// SpotDetailsLookup resolves the owner id AND the title of a booking's parking spot in a
+// single call. The approve flow needs the owner to authorize the caller, and the title to
+// populate the booking.confirmed event it publishes. Implemented by
+// internal/repository/parkingclient.
+type SpotDetailsLookup interface {
+	GetSpotDetails(ctx context.Context, spotID string) (entity.SpotDetails, error)
+}
+
 type ApproveBookingUseCase struct {
 	approver BookingApprover
-	owners   SpotOwnerLookup
+	spots    SpotDetailsLookup
+	events   EventPublisher
 }
 
-func NewApproveBookingUseCase(approver BookingApprover, owners SpotOwnerLookup) *ApproveBookingUseCase {
-	return &ApproveBookingUseCase{approver: approver, owners: owners}
+func NewApproveBookingUseCase(approver BookingApprover, spots SpotDetailsLookup, events EventPublisher) *ApproveBookingUseCase {
+	return &ApproveBookingUseCase{approver: approver, spots: spots, events: events}
 }
 
-// Execute approves bookingID on behalf of callerID, who must own the booking's parking spot.
+// Execute approves bookingID on behalf of callerID, who must own the booking's parking
+// spot, and publishes booking.confirmed so the driver is notified.
 func (uc *ApproveBookingUseCase) Execute(ctx context.Context, bookingID, callerID string) (entity.Booking, error) {
 	booking, err := uc.approver.GetByID(ctx, bookingID)
 	if err != nil {
 		return entity.Booking{}, err
 	}
 
-	ownerID, err := uc.owners.GetSpotOwnerID(ctx, booking.ParkingSpotID)
+	spot, err := uc.spots.GetSpotDetails(ctx, booking.ParkingSpotID)
 	if err != nil {
 		return entity.Booking{}, err
 	}
-	if ownerID != callerID {
+	if spot.OwnerID != callerID {
 		return entity.Booking{}, errors.NewForbidden("no sos el dueño de esta cochera")
 	}
 
-	return uc.approver.ApproveBooking(ctx, bookingID)
+	approved, err := uc.approver.ApproveBooking(ctx, bookingID)
+	if err != nil {
+		return entity.Booking{}, err
+	}
+
+	emitBookingEvent(ctx, uc.events, RoutingKeyBookingConfirmed,
+		newBookingEvent(RoutingKeyBookingConfirmed, approved, spot, false))
+	return approved, nil
 }

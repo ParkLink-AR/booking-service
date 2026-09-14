@@ -1,8 +1,8 @@
-// Package parkingclient talks to parking-service to answer things
+// Package parkingclient talks to parking-service to answer the things
 // booking-service needs to know about a spot but doesn't own itself: who owns
-// it, whether it auto-confirms bookings or requires the owner's approval, and
-// -- for a "stay" booking -- what it actually costs and whether the spot
-// accepts it at all.
+// it, its human-facing title, whether it auto-confirms bookings or requires the
+// owner's approval, and -- for a "stay" booking -- what it actually costs and
+// whether the spot accepts it at all.
 package parkingclient
 
 import (
@@ -15,6 +15,7 @@ import (
 
 	"github.com/goccy/go-json"
 
+	"github.com/example/bookings-service/internal/domain/entity"
 	"github.com/example/bookings-service/internal/domain/errors"
 )
 
@@ -22,6 +23,7 @@ import (
 // response this client cares about.
 type spotResponse struct {
 	OwnerID        string `json:"ownerId"`
+	Title          string `json:"title"`
 	InstantBooking bool   `json:"instantBooking"`
 	Status         string `json:"status"`
 }
@@ -60,14 +62,20 @@ func (client *Client) getSpot(ctx context.Context, spotID string) (spotResponse,
 	return spot, nil
 }
 
-// IsInstantBooking reports whether a paid booking on this spot should confirm
-// immediately (true) or wait on the owner's approval (false).
-func (client *Client) IsInstantBooking(ctx context.Context, spotID string) (bool, error) {
+// GetSpotDetails returns the owner id, title and instant-booking flag of a parking spot
+// in a single call. Used by the confirm/approve flows, which need all three: the owner to
+// verify (approve) or notify (confirm), the title for the push copy, and the flag to
+// decide whether a paid booking confirms immediately or waits on the owner.
+func (client *Client) GetSpotDetails(ctx context.Context, spotID string) (entity.SpotDetails, error) {
 	spot, err := client.getSpot(ctx, spotID)
 	if err != nil {
-		return false, err
+		return entity.SpotDetails{}, err
 	}
-	return spot.InstantBooking, nil
+	return entity.SpotDetails{
+		OwnerID:        spot.OwnerID,
+		Title:          spot.Title,
+		InstantBooking: spot.InstantBooking,
+	}, nil
 }
 
 // GetSpotOwnerID returns the owner id of a parking spot, used to verify that
