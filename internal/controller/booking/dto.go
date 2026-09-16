@@ -46,12 +46,23 @@ type bookingResponse struct {
 	Amount        int     `json:"amount"`
 	PaymentID     string  `json:"payment_id,omitempty"`
 	Kind          string  `json:"kind"`
-	UpdatedAt     string  `json:"updated_at"`
+	// VerificationCode is only ever populated for the booking's own driver (see
+	// bookingResponseFromEntity's viewerID param) -- the owner enters this code after
+	// hearing it from the driver in person, so exposing it to the owner through any API
+	// response would defeat the whole point of an in-person check.
+	VerificationCode *string `json:"verification_code,omitempty"`
+	VerifiedAt       *string `json:"verified_at,omitempty"`
+	UpdatedAt        string  `json:"updated_at"`
 }
 
-// bookingResponseFromEntity maps a created booking to the wire format, rendering every
-// timestamp as RFC3339 with the given location's offset (e.g. "-03:00").
-func bookingResponseFromEntity(booking entity.Booking, location *time.Location) *bookingResponse {
+// bookingResponseFromEntity maps a booking to the wire format, rendering every timestamp
+// as RFC3339 with the given location's offset (e.g. "-03:00"). viewerID is whoever is
+// about to receive this response (an X-User-Id header, or the caller's own known identity
+// when there's nothing to compare against, e.g. the driver who just created/confirmed the
+// booking) -- VerificationCode/VerifiedAt are only included when viewerID matches
+// booking.UserID, i.e. when the viewer IS the driver. Pass "" to always omit them (e.g.
+// for the owner-facing approve/reject responses).
+func bookingResponseFromEntity(booking entity.Booking, location *time.Location, viewerID string) *bookingResponse {
 	response := &bookingResponse{
 		ID:            booking.ID,
 		ParkingSpotID: booking.ParkingSpotID,
@@ -68,6 +79,13 @@ func bookingResponseFromEntity(booking entity.Booking, location *time.Location) 
 		formatted := booking.HoldExpiresAt.In(location).Format(time.RFC3339)
 		response.HoldExpiresAt = &formatted
 	}
+	if viewerID != "" && viewerID == booking.UserID {
+		response.VerificationCode = booking.VerificationCode
+		if booking.VerifiedAt != nil {
+			formatted := booking.VerifiedAt.In(location).Format(time.RFC3339)
+			response.VerifiedAt = &formatted
+		}
+	}
 	return response
 }
 
@@ -82,7 +100,12 @@ type userBookingResponse struct {
 	Amount        int     `json:"amount"`
 	PaymentID     string  `json:"payment_id,omitempty"`
 	Kind          string  `json:"kind"`
-	UpdatedAt     string  `json:"updated_at"`
+	// Same visibility rule as bookingResponse.VerificationCode -- see
+	// ListBookingsByUserEndpoint, which only fills this in when the caller is asking
+	// about their own history.
+	VerificationCode *string `json:"verification_code,omitempty"`
+	VerifiedAt       *string `json:"verified_at,omitempty"`
+	UpdatedAt        string  `json:"updated_at"`
 }
 
 type bookingWindowResponse struct {

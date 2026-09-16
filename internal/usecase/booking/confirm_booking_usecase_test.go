@@ -81,10 +81,11 @@ func (s *confirmBookingUseCaseSuite) TestExecute_NonInstantSpot_GoesToPendingApp
 		Return(entity.SpotDetails{OwnerID: s.ownerID, Title: "Cochera en Palermo", InstantBooking: false}, nil)
 
 	s.confirmer.EXPECT().
-		ConfirmBooking(gomock.Any(), s.bookingID, s.paymentID, enum.BookingStatusPendingOwnerApproval, gomock.Any()).
-		DoAndReturn(func(_ context.Context, _, _ string, _ enum.BookingStatus, deadline *time.Time) (entity.Booking, error) {
+		ConfirmBooking(gomock.Any(), s.bookingID, s.paymentID, enum.BookingStatusPendingOwnerApproval, gomock.Any(), gomock.Nil()).
+		DoAndReturn(func(_ context.Context, _, _ string, _ enum.BookingStatus, deadline *time.Time, verificationCode *string) (entity.Booking, error) {
 			s.Require().NotNil(deadline)
 			s.WithinDuration(time.Now().Add(24*time.Hour), *deadline, time.Minute)
+			s.Nil(verificationCode, "no code should be generated before the owner approves")
 			return confirmed, nil
 		})
 
@@ -115,7 +116,7 @@ func (s *confirmBookingUseCaseSuite) TestExecute_InstantSpot_ConfirmsImmediately
 	s.spots.EXPECT().GetSpotDetails(gomock.Any(), s.spotID).
 		Return(entity.SpotDetails{OwnerID: s.ownerID, Title: "Cochera Centro", InstantBooking: true}, nil)
 	s.confirmer.EXPECT().
-		ConfirmBooking(gomock.Any(), s.bookingID, s.paymentID, enum.BookingStatusConfirmed, gomock.Nil()).
+		ConfirmBooking(gomock.Any(), s.bookingID, s.paymentID, enum.BookingStatusConfirmed, gomock.Nil(), gomock.Not(gomock.Nil())).
 		Return(confirmed, nil)
 
 	var gotKey string
@@ -140,7 +141,7 @@ func (s *confirmBookingUseCaseSuite) TestExecute_PublishFailureIsSwallowed() {
 	s.spots.EXPECT().GetSpotDetails(gomock.Any(), s.spotID).
 		Return(entity.SpotDetails{OwnerID: s.ownerID, Title: "x", InstantBooking: false}, nil)
 	s.confirmer.EXPECT().
-		ConfirmBooking(gomock.Any(), s.bookingID, s.paymentID, enum.BookingStatusPendingOwnerApproval, gomock.Any()).
+		ConfirmBooking(gomock.Any(), s.bookingID, s.paymentID, enum.BookingStatusPendingOwnerApproval, gomock.Any(), gomock.Nil()).
 		Return(confirmed, nil)
 	s.events.EXPECT().Publish(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.NewUpstream("rabbitmq", context.DeadlineExceeded))
 

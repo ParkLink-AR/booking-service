@@ -16,7 +16,7 @@ import (
 // transitioning its status to CONFIRMED or PENDING_OWNER_APPROVAL. Implemented by
 // internal/repository/booking.
 type BookingConfirmer interface {
-	ConfirmBooking(ctx context.Context, bookingID, paymentID string, status enum.BookingStatus, ownerResponseDeadline *time.Time) (entity.Booking, error)
+	ConfirmBooking(ctx context.Context, bookingID, paymentID string, status enum.BookingStatus, ownerResponseDeadline *time.Time, verificationCode *string) (entity.Booking, error)
 	GetByID(ctx context.Context, bookingID string) (entity.Booking, error)
 }
 
@@ -55,7 +55,11 @@ func (uc *ConfirmBookingUseCase) Execute(ctx context.Context, bookingID, payment
 	}
 
 	if spot.InstantBooking {
-		confirmed, err := uc.confirmer.ConfirmBooking(ctx, bookingID, paymentID, enum.BookingStatusConfirmed, nil)
+		code, err := entity.GenerateVerificationCode()
+		if err != nil {
+			return entity.Booking{}, err
+		}
+		confirmed, err := uc.confirmer.ConfirmBooking(ctx, bookingID, paymentID, enum.BookingStatusConfirmed, nil, &code)
 		if err != nil {
 			return entity.Booking{}, err
 		}
@@ -65,7 +69,7 @@ func (uc *ConfirmBookingUseCase) Execute(ctx context.Context, bookingID, payment
 	}
 
 	deadline := time.Now().Add(ownerApprovalWindow())
-	pending, err := uc.confirmer.ConfirmBooking(ctx, bookingID, paymentID, enum.BookingStatusPendingOwnerApproval, &deadline)
+	pending, err := uc.confirmer.ConfirmBooking(ctx, bookingID, paymentID, enum.BookingStatusPendingOwnerApproval, &deadline, nil)
 	if err != nil {
 		return entity.Booking{}, err
 	}

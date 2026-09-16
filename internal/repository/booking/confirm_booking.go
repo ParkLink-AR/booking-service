@@ -20,6 +20,7 @@ func (repository *Repository) ConfirmBooking(
 	bookingID, paymentID string,
 	status enum.BookingStatus,
 	ownerResponseDeadline *time.Time,
+	verificationCode *string,
 ) (entity.Booking, error) {
 	row := repository.database.QueryRowContext(ctx, `
 		UPDATE `+constants.BookingsTableName+`
@@ -27,6 +28,7 @@ func (repository *Repository) ConfirmBooking(
 			status                  = $3::booking_status,
 			payment_id              = $2,
 			owner_response_deadline = $4,
+			verification_code       = $5,
 			updated_at              = now()
 		WHERE id            = $1
 		  AND status        = 'PENDING_PAYMENT'
@@ -35,8 +37,8 @@ func (repository *Repository) ConfirmBooking(
 			id, parking_spot_id, user_id,
 			lower(time_range), upper(time_range),
 			status, hold_expires_at, owner_response_deadline, amount, payment_id,
-			kind, created_at, updated_at
-	`, bookingID, paymentID, status.String(), ownerResponseDeadline)
+			kind, verification_code, verification_attempts, verified_at, created_at, updated_at
+	`, bookingID, paymentID, status.String(), ownerResponseDeadline, verificationCode)
 
 	var b entity.Booking
 	var statusLabel, kindLabel string
@@ -44,7 +46,7 @@ func (repository *Repository) ConfirmBooking(
 		&b.ID, &b.ParkingSpotID, &b.UserID,
 		&b.Start, &b.End,
 		&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.PaymentID,
-		&kindLabel, &b.CreatedAt, &b.UpdatedAt,
+		&kindLabel, &b.VerificationCode, &b.VerificationAttempts, &b.VerifiedAt, &b.CreatedAt, &b.UpdatedAt,
 	); err != nil {
 		return entity.Booking{}, errors.NewNotFound("booking", bookingID)
 	}

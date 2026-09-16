@@ -42,5 +42,5 @@ func (handler *Handler) RejectBookingEndpoint(responseWriter http.ResponseWriter
 		return
 	}
 
-	writeJSON(responseWriter, http.StatusOK, bookingResponseFromEntity(rejected, handler.location))
+	writeJSON(responseWriter, http.StatusOK, bookingResponseFromEntity(rejected, handler.location, callerID))
 }

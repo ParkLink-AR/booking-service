@@ -37,9 +37,12 @@ func (handler *Handler) ListBookingsDetailedEndpoint(responseWriter http.Respons
 		return
 	}
 
+	// callerID here is the owner (verified above), never the driver -- combined with
+	// ListBookingsBySpot not even selecting verification_code from the DB, this is a
+	// belt-and-suspenders guarantee the owner's own listing never leaks a driver's code.
 	responses := make([]*bookingResponse, len(bookings))
 	for i, booking := range bookings {
-		responses[i] = bookingResponseFromEntity(booking, handler.location)
+		responses[i] = bookingResponseFromEntity(booking, handler.location, callerID)
 	}
 	writeJSON(responseWriter, http.StatusOK, responses)
 }

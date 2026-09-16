@@ -103,5 +103,7 @@ func (handler *Handler) CreateBookingEndpoint(responseWriter http.ResponseWriter
 		return
 	}
 
-	writeJSON(responseWriter, http.StatusCreated, bookingResponseFromEntity(created, handler.location))
+	// This response always goes straight back to the driver who just created the
+	// booking (no code exists yet at this point anyway -- it's generated on CONFIRMED).
+	writeJSON(responseWriter, http.StatusCreated, bookingResponseFromEntity(created, handler.location, created.UserID))
 }

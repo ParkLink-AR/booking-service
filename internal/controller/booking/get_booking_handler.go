@@ -35,5 +35,8 @@ func (handler *Handler) GetBookingEndpoint(responseWriter http.ResponseWriter, r
 		return
 	}
 
-	writeJSON(responseWriter, http.StatusOK, bookingResponseFromEntity(booking, handler.location))
+	// Optional: only gates whether the verification code is included (see
+	// bookingResponseFromEntity) -- this endpoint has no ownership check of its own.
+	viewerID := request.Header.Get("X-User-Id")
+	writeJSON(responseWriter, http.StatusOK, bookingResponseFromEntity(booking, handler.location, viewerID))
 }

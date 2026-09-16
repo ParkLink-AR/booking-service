@@ -9,6 +9,12 @@ const (
 	BookingStatusCancelled
 	BookingStatusExpired
 	BookingStatusPendingOwnerApproval
+	// BookingStatusInProgress is reached from CONFIRMED once the owner verifies the
+	// driver's in-person verification code (see usecase.VerifyBookingCodeUseCase). It
+	// converges back into COMPLETED via the same time-based sweep as CONFIRMED (see
+	// repository.ExpireCompletedBookings) -- verification is a checkpoint, not a
+	// separate terminal state.
+	BookingStatusInProgress
 )
 
 var bookingStatusStrings = map[BookingStatus]string{
@@ -18,6 +24,7 @@ var bookingStatusStrings = map[BookingStatus]string{
 	BookingStatusCancelled:            "CANCELLED",
 	BookingStatusExpired:              "EXPIRED",
 	BookingStatusPendingOwnerApproval: "PENDING_OWNER_APPROVAL",
+	BookingStatusInProgress:           "IN_PROGRESS",
 }
 
 var bookingStatusFromString = map[string]BookingStatus{
@@ -27,6 +34,7 @@ var bookingStatusFromString = map[string]BookingStatus{
 	"CANCELLED":              BookingStatusCancelled,
 	"EXPIRED":                BookingStatusExpired,
 	"PENDING_OWNER_APPROVAL": BookingStatusPendingOwnerApproval,
+	"IN_PROGRESS":            BookingStatusInProgress,
 }
 
 func (s BookingStatus) String() string {
