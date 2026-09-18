@@ -51,5 +51,7 @@ func (handler *Handler) ConfirmBookingEndpoint(responseWriter http.ResponseWrite
 		return
 	}
 
-	writeJSON(responseWriter, http.StatusOK, bookingResponseFromEntity(confirmed, handler.location))
+	// This response always goes straight back to the driver's own client (the payment
+	// webhook flow), so it's safe to always include the fresh verification code here.
+	writeJSON(responseWriter, http.StatusOK, bookingResponseFromEntity(confirmed, handler.location, confirmed.UserID))
 }

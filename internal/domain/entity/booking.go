@@ -20,6 +20,20 @@ type Booking struct {
 	OwnerResponseDeadline *time.Time
 	Amount                int
 	PaymentID             string
+	// VerificationCode is a 4-digit PIN generated the moment the booking reaches
+	// CONFIRMED (see entity.GenerateVerificationCode, called from
+	// ConfirmBookingUseCase/ApproveBookingUseCase). The driver reads it in the app and
+	// tells it to the owner in person; the owner enters it to transition the booking to
+	// IN_PROGRESS (see usecase.VerifyBookingCodeUseCase). Nil before CONFIRMED.
+	VerificationCode *string
+	// VerificationAttempts counts consecutive wrong codes entered against this booking.
+	// Verification is refused once it reaches maxVerificationAttempts, regardless of
+	// whether the next guess would be correct.
+	VerificationAttempts int
+	// VerifiedAt is set once, when the code is successfully verified. It survives the
+	// later CONFIRMED/IN_PROGRESS -> COMPLETED transition, so it remains the only record
+	// of whether a completed booking was ever verified in person.
+	VerifiedAt *time.Time
 	// Capacity is the number of identical places the spot rents against this same id
 	// (a "playa"): up to Capacity active bookings may overlap. Caller-supplied, like
 	// ParkingSpotSchedule -- booking-service does not fetch it. 0 is treated as 1.

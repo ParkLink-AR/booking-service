@@ -17,6 +17,7 @@ import (
 const (
 	RoutingKeyBookingPendingApproval = "booking.pending_approval"
 	RoutingKeyBookingConfirmed       = "booking.confirmed"
+	RoutingKeyBookingVerified        = "booking.verified"
 )
 
 // EventPublisher publishes a domain event to the shared event bus under a routing key.

@@ -68,7 +68,7 @@ func (s *approveBookingUseCaseSuite) TestExecute_OwnerApproves_ConfirmsAndPublis
 	s.approver.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(s.pendingBooking(), nil)
 	s.spots.EXPECT().GetSpotDetails(gomock.Any(), s.spotID).
 		Return(entity.SpotDetails{OwnerID: s.ownerID, Title: "Cochera en Palermo"}, nil)
-	s.approver.EXPECT().ApproveBooking(gomock.Any(), s.bookingID).Return(approved, nil)
+	s.approver.EXPECT().ApproveBooking(gomock.Any(), s.bookingID, gomock.Any()).Return(approved, nil)
 
 	var gotKey string
 	var gotPayload map[string]any
@@ -110,7 +110,7 @@ func (s *approveBookingUseCaseSuite) TestExecute_ApproveError_NoPublish() {
 	s.approver.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(s.pendingBooking(), nil)
 	s.spots.EXPECT().GetSpotDetails(gomock.Any(), s.spotID).
 		Return(entity.SpotDetails{OwnerID: s.ownerID, Title: "x"}, nil)
-	s.approver.EXPECT().ApproveBooking(gomock.Any(), s.bookingID).
+	s.approver.EXPECT().ApproveBooking(gomock.Any(), s.bookingID, gomock.Any()).
 		Return(entity.Booking{}, errors.NewNotFound("booking", s.bookingID))
 
 	got, err := s.useCase.Execute(s.context, s.bookingID, s.ownerID)

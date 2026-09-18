@@ -13,7 +13,7 @@ import (
 // Implemented by internal/repository/booking.
 type BookingApprover interface {
 	GetByID(ctx context.Context, bookingID string) (entity.Booking, error)
-	ApproveBooking(ctx context.Context, bookingID string) (entity.Booking, error)
+	ApproveBooking(ctx context.Context, bookingID, verificationCode string) (entity.Booking, error)
 }
 
 // SpotOwnerLookup answers who owns a parking spot, to verify the caller acting on a
@@ -57,7 +57,11 @@ func (uc *ApproveBookingUseCase) Execute(ctx context.Context, bookingID, callerI
 		return entity.Booking{}, errors.NewForbidden("no sos el dueño de esta cochera")
 	}
 
-	approved, err := uc.approver.ApproveBooking(ctx, bookingID)
+	code, err := entity.GenerateVerificationCode()
+	if err != nil {
+		return entity.Booking{}, err
+	}
+	approved, err := uc.approver.ApproveBooking(ctx, bookingID, code)
 	if err != nil {
 		return entity.Booking{}, err
 	}

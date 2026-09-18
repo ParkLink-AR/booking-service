@@ -43,18 +43,18 @@ func (m *MockBookingConfirmer) EXPECT() *MockBookingConfirmerMockRecorder {
 }
 
 // ConfirmBooking mocks base method.
-func (m *MockBookingConfirmer) ConfirmBooking(ctx context.Context, bookingID, paymentID string, status enum.BookingStatus, ownerResponseDeadline *time.Time) (entity.Booking, error) {
+func (m *MockBookingConfirmer) ConfirmBooking(ctx context.Context, bookingID, paymentID string, status enum.BookingStatus, ownerResponseDeadline *time.Time, verificationCode *string) (entity.Booking, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ConfirmBooking", ctx, bookingID, paymentID, status, ownerResponseDeadline)
+	ret := m.ctrl.Call(m, "ConfirmBooking", ctx, bookingID, paymentID, status, ownerResponseDeadline, verificationCode)
 	ret0, _ := ret[0].(entity.Booking)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ConfirmBooking indicates an expected call of ConfirmBooking.
-func (mr *MockBookingConfirmerMockRecorder) ConfirmBooking(ctx, bookingID, paymentID, status, ownerResponseDeadline any) *gomock.Call {
+func (mr *MockBookingConfirmerMockRecorder) ConfirmBooking(ctx, bookingID, paymentID, status, ownerResponseDeadline, verificationCode any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConfirmBooking", reflect.TypeOf((*MockBookingConfirmer)(nil).ConfirmBooking), ctx, bookingID, paymentID, status, ownerResponseDeadline)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConfirmBooking", reflect.TypeOf((*MockBookingConfirmer)(nil).ConfirmBooking), ctx, bookingID, paymentID, status, ownerResponseDeadline, verificationCode)
 }
 
 // GetByID mocks base method.

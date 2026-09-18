@@ -41,18 +41,18 @@ func (m *MockBookingApprover) EXPECT() *MockBookingApproverMockRecorder {
 }
 
 // ApproveBooking mocks base method.
-func (m *MockBookingApprover) ApproveBooking(ctx context.Context, bookingID string) (entity.Booking, error) {
+func (m *MockBookingApprover) ApproveBooking(ctx context.Context, bookingID, verificationCode string) (entity.Booking, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ApproveBooking", ctx, bookingID)
+	ret := m.ctrl.Call(m, "ApproveBooking", ctx, bookingID, verificationCode)
 	ret0, _ := ret[0].(entity.Booking)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ApproveBooking indicates an expected call of ApproveBooking.
-func (mr *MockBookingApproverMockRecorder) ApproveBooking(ctx, bookingID any) *gomock.Call {
+func (mr *MockBookingApproverMockRecorder) ApproveBooking(ctx, bookingID, verificationCode any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApproveBooking", reflect.TypeOf((*MockBookingApprover)(nil).ApproveBooking), ctx, bookingID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApproveBooking", reflect.TypeOf((*MockBookingApprover)(nil).ApproveBooking), ctx, bookingID, verificationCode)
 }
 
 // GetByID mocks base method.

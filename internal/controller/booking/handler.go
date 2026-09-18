@@ -49,6 +49,7 @@ type Handler struct {
 	listReviewsByTargetUseCase  ListReviewsByTargetUseCase
 	listReviewsByBookingUseCase ListReviewsByBookingUseCase
 	getSpotRatingsUseCase       GetSpotRatingsUseCase
+	verifyBookingCodeUseCase    VerifyBookingCodeUseCase
 	location                    *time.Location
 }
 
@@ -66,6 +67,7 @@ func NewHandler(
 	listReviewsByTargetUseCase ListReviewsByTargetUseCase,
 	listReviewsByBookingUseCase ListReviewsByBookingUseCase,
 	getSpotRatingsUseCase GetSpotRatingsUseCase,
+	verifyBookingCodeUseCase VerifyBookingCodeUseCase,
 	location *time.Location,
 ) *Handler {
 	return &Handler{
@@ -82,6 +84,7 @@ func NewHandler(
 		listReviewsByTargetUseCase:  listReviewsByTargetUseCase,
 		listReviewsByBookingUseCase: listReviewsByBookingUseCase,
 		getSpotRatingsUseCase:       getSpotRatingsUseCase,
+		verifyBookingCodeUseCase:    verifyBookingCodeUseCase,
 		location:                    location,
 	}
 }
@@ -98,6 +101,7 @@ func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Post("/bookings/{id}/confirm", handler.ConfirmBookingEndpoint)
 	router.Post("/bookings/{id}/approve", handler.ApproveBookingEndpoint)
 	router.Post("/bookings/{id}/reject", handler.RejectBookingEndpoint)
+	router.Post("/bookings/{id}/verify-code", handler.VerifyBookingCodeEndpoint)
 	router.Post("/bookings/{id}/reviews", handler.SubmitReviewEndpoint)
 	router.Get("/bookings/{id}", handler.GetBookingEndpoint)
 	router.Get("/bookings/{id}/reviews", handler.ListBookingReviewsEndpoint)
@@ -116,6 +120,11 @@ func (handler *Handler) ListBookingsByUserEndpoint(responseWriter http.ResponseW
 		return
 	}
 
+	// Only include verification codes when the caller is asking about their own history
+	// -- {id} is untrusted on its own (this endpoint doesn't require it to match the
+	// caller), so compare against X-User-Id rather than assuming {id} is the real driver.
+	includeCodes := request.Header.Get("X-User-Id") == userID
+
 	response := make([]userBookingResponse, len(bookings))
 	for i, b := range bookings {
 		r := userBookingResponse{
@@ -133,6 +142,13 @@ func (handler *Handler) ListBookingsByUserEndpoint(responseWriter http.ResponseW
 		if b.HoldExpiresAt != nil {
 			formatted := b.HoldExpiresAt.In(handler.location).Format(time.RFC3339)
 			r.HoldExpiresAt = &formatted
+		}
+		if includeCodes {
+			r.VerificationCode = b.VerificationCode
+			if b.VerifiedAt != nil {
+				formatted := b.VerifiedAt.In(handler.location).Format(time.RFC3339)
+				r.VerifiedAt = &formatted
+			}
 		}
 		response[i] = r
 	}

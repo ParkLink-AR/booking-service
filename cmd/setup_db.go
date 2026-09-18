@@ -116,6 +116,19 @@ func runMigrations(database *sql.DB) error {
 		-- bookings existed. Every pre-existing row is an hourly slot booking.
 		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'HOURLY'
 			CHECK (kind IN ('HOURLY', 'STAY'));
+
+		-- migrations/008: adds IN_PROGRESS to booking_status for databases created
+		-- before in-person verification existed. Safe to run alongside the rest of this
+		-- script because nothing else here references the new value -- Postgres only
+		-- forbids using a brand-new enum value in the same transaction that added it.
+		ALTER TYPE booking_status ADD VALUE IF NOT EXISTS 'IN_PROGRESS';
+
+		-- migrations/009: in-person verification -- the driver reads a 4-digit code in
+		-- the app and tells it to the owner, who enters it to prove the driver actually
+		-- showed up (see usecase.VerifyBookingCodeUseCase).
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS verification_code VARCHAR(4);
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS verification_attempts INT NOT NULL DEFAULT 0;
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
 	`)
 	return err
 }

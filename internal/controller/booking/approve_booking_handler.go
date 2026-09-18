@@ -42,5 +42,8 @@ func (handler *Handler) ApproveBookingEndpoint(responseWriter http.ResponseWrite
 		return
 	}
 
-	writeJSON(responseWriter, http.StatusOK, bookingResponseFromEntity(approved, handler.location))
+	// callerID is the owner here, not the driver -- bookingResponseFromEntity omits the
+	// verification code whenever viewerID doesn't match the booking's own driver, so this
+	// never leaks the code to the owner at the moment it's generated.
+	writeJSON(responseWriter, http.StatusOK, bookingResponseFromEntity(approved, handler.location, callerID))
 }
