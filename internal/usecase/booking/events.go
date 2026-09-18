@@ -44,13 +44,9 @@ type bookingEvent struct {
 	Amount                int        `json:"amount"`
 	PaymentID             string     `json:"payment_id"`
 	OwnerResponseDeadline *time.Time `json:"owner_response_deadline,omitempty"`
-	// AutoConfirmed marks a booking.confirmed that skipped owner approval because the
-	// spot is instant-booking -- the owner never acted, so consumers may still want to
-	// notify them.
-	AutoConfirmed bool `json:"auto_confirmed,omitempty"`
 }
 
-func newBookingEvent(eventType string, b entity.Booking, spot entity.SpotDetails, autoConfirmed bool) bookingEvent {
+func newBookingEvent(eventType string, b entity.Booking, spot entity.SpotDetails) bookingEvent {
 	return bookingEvent{
 		EventID:               uuid.NewString(),
 		EventType:             eventType,
@@ -65,7 +61,6 @@ func newBookingEvent(eventType string, b entity.Booking, spot entity.SpotDetails
 		Amount:                b.Amount,
 		PaymentID:             b.PaymentID,
 		OwnerResponseDeadline: b.OwnerResponseDeadline,
-		AutoConfirmed:         autoConfirmed,
 	}
 }
 

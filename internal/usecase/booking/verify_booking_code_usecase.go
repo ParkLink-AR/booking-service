@@ -53,6 +53,6 @@ func (uc *VerifyBookingCodeUseCase) Execute(ctx context.Context, bookingID, call
 	}
 
 	emitBookingEvent(ctx, uc.events, RoutingKeyBookingVerified,
-		newBookingEvent(RoutingKeyBookingVerified, verified, spot, false))
+		newBookingEvent(RoutingKeyBookingVerified, verified, spot))
 	return verified, nil
 }

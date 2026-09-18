@@ -67,6 +67,6 @@ func (uc *ApproveBookingUseCase) Execute(ctx context.Context, bookingID, callerI
 	}
 
 	emitBookingEvent(ctx, uc.events, RoutingKeyBookingConfirmed,
-		newBookingEvent(RoutingKeyBookingConfirmed, approved, spot, false))
+		newBookingEvent(RoutingKeyBookingConfirmed, approved, spot))
 	return approved, nil
 }
