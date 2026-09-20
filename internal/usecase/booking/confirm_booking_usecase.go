@@ -20,18 +20,16 @@ type BookingConfirmer interface {
 	GetByID(ctx context.Context, bookingID string) (entity.Booking, error)
 }
 
-// SpotLookup resolves the parking spot behind a booking: whether it auto-confirms, who
-// owns it, and its title. The confirm flow needs the flag to branch on, and the owner id
-// plus title to populate the domain event it publishes. Implemented by
+// SpotLookup resolves the parking spot behind a booking: who owns it and its title, to
+// populate the domain event the confirm flow publishes. Implemented by
 // internal/repository/parkingclient.
 type SpotLookup interface {
 	GetSpotDetails(ctx context.Context, spotID string) (entity.SpotDetails, error)
 }
 
 // ConfirmBookingUseCase orchestrates the booking-confirmation step triggered by the
-// payment webhook: it decides, based on the spot's instant-booking setting, whether the
-// booking becomes CONFIRMED right away or PENDING_OWNER_APPROVAL (awaiting the owner), and
-// publishes the matching domain event (booking.confirmed / booking.pending_approval).
+// payment webhook: every paid booking moves to PENDING_OWNER_APPROVAL (awaiting the
+// owner), and it publishes the matching domain event (booking.pending_approval).
 type ConfirmBookingUseCase struct {
 	confirmer  BookingConfirmer
 	spotLookup SpotLookup
@@ -54,27 +52,13 @@ func (uc *ConfirmBookingUseCase) Execute(ctx context.Context, bookingID, payment
 		return entity.Booking{}, err
 	}
 
-	if spot.InstantBooking {
-		code, err := entity.GenerateVerificationCode()
-		if err != nil {
-			return entity.Booking{}, err
-		}
-		confirmed, err := uc.confirmer.ConfirmBooking(ctx, bookingID, paymentID, enum.BookingStatusConfirmed, nil, &code)
-		if err != nil {
-			return entity.Booking{}, err
-		}
-		emitBookingEvent(ctx, uc.events, RoutingKeyBookingConfirmed,
-			newBookingEvent(RoutingKeyBookingConfirmed, confirmed, spot, true))
-		return confirmed, nil
-	}
-
 	deadline := time.Now().Add(ownerApprovalWindow())
 	pending, err := uc.confirmer.ConfirmBooking(ctx, bookingID, paymentID, enum.BookingStatusPendingOwnerApproval, &deadline, nil)
 	if err != nil {
 		return entity.Booking{}, err
 	}
 	emitBookingEvent(ctx, uc.events, RoutingKeyBookingPendingApproval,
-		newBookingEvent(RoutingKeyBookingPendingApproval, pending, spot, false))
+		newBookingEvent(RoutingKeyBookingPendingApproval, pending, spot))
 	return pending, nil
 }
 

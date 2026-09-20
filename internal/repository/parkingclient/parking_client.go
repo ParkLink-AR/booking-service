@@ -22,10 +22,9 @@ import (
 // spotResponse is the subset of parking-service's GET /parking-spots/{id}
 // response this client cares about.
 type spotResponse struct {
-	OwnerID        string `json:"ownerId"`
-	Title          string `json:"title"`
-	InstantBooking bool   `json:"instantBooking"`
-	Status         string `json:"status"`
+	OwnerID string `json:"ownerId"`
+	Title   string `json:"title"`
+	Status  string `json:"status"`
 }
 
 // Client calls parking-service directly inside the docker network, the same
@@ -62,19 +61,17 @@ func (client *Client) getSpot(ctx context.Context, spotID string) (spotResponse,
 	return spot, nil
 }
 
-// GetSpotDetails returns the owner id, title and instant-booking flag of a parking spot
-// in a single call. Used by the confirm/approve flows, which need all three: the owner to
-// verify (approve) or notify (confirm), the title for the push copy, and the flag to
-// decide whether a paid booking confirms immediately or waits on the owner.
+// GetSpotDetails returns the owner id and title of a parking spot in a single call. Used
+// by the confirm/approve flows, which need the owner to verify (approve) or notify
+// (confirm), and the title for the push copy.
 func (client *Client) GetSpotDetails(ctx context.Context, spotID string) (entity.SpotDetails, error) {
 	spot, err := client.getSpot(ctx, spotID)
 	if err != nil {
 		return entity.SpotDetails{}, err
 	}
 	return entity.SpotDetails{
-		OwnerID:        spot.OwnerID,
-		Title:          spot.Title,
-		InstantBooking: spot.InstantBooking,
+		OwnerID: spot.OwnerID,
+		Title:   spot.Title,
 	}, nil
 }
 

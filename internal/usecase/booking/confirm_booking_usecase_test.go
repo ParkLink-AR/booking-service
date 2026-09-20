@@ -72,13 +72,13 @@ func (s *confirmBookingUseCaseSuite) captureEvent(gotKey *string, gotPayload *ma
 		})
 }
 
-func (s *confirmBookingUseCaseSuite) TestExecute_NonInstantSpot_GoesToPendingApprovalAndPublishes() {
+func (s *confirmBookingUseCaseSuite) TestExecute_GoesToPendingApprovalAndPublishes() {
 	confirmed := s.pendingBooking()
 	confirmed.Status = enum.BookingStatusPendingOwnerApproval
 
 	s.confirmer.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(s.pendingBooking(), nil)
 	s.spots.EXPECT().GetSpotDetails(gomock.Any(), s.spotID).
-		Return(entity.SpotDetails{OwnerID: s.ownerID, Title: "Cochera en Palermo", InstantBooking: false}, nil)
+		Return(entity.SpotDetails{OwnerID: s.ownerID, Title: "Cochera en Palermo"}, nil)
 
 	s.confirmer.EXPECT().
 		ConfirmBooking(gomock.Any(), s.bookingID, s.paymentID, enum.BookingStatusPendingOwnerApproval, gomock.Any(), gomock.Nil()).
@@ -104,33 +104,6 @@ func (s *confirmBookingUseCaseSuite) TestExecute_NonInstantSpot_GoesToPendingApp
 	s.Equal("Cochera en Palermo", gotPayload["parking_spot_title"])
 	s.Equal(s.bookingID, gotPayload["booking_id"])
 	s.NotEmpty(gotPayload["event_id"])
-	_, hasAutoConfirmed := gotPayload["auto_confirmed"]
-	s.False(hasAutoConfirmed, "auto_confirmed should be omitted for the approval path")
-}
-
-func (s *confirmBookingUseCaseSuite) TestExecute_InstantSpot_ConfirmsImmediatelyAndPublishes() {
-	confirmed := s.pendingBooking()
-	confirmed.Status = enum.BookingStatusConfirmed
-
-	s.confirmer.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(s.pendingBooking(), nil)
-	s.spots.EXPECT().GetSpotDetails(gomock.Any(), s.spotID).
-		Return(entity.SpotDetails{OwnerID: s.ownerID, Title: "Cochera Centro", InstantBooking: true}, nil)
-	s.confirmer.EXPECT().
-		ConfirmBooking(gomock.Any(), s.bookingID, s.paymentID, enum.BookingStatusConfirmed, gomock.Nil(), gomock.Not(gomock.Nil())).
-		Return(confirmed, nil)
-
-	var gotKey string
-	var gotPayload map[string]any
-	s.captureEvent(&gotKey, &gotPayload)
-
-	got, err := s.useCase.Execute(s.context, s.bookingID, s.paymentID)
-
-	s.Require().NoError(err)
-	s.Equal(confirmed, got)
-	s.Equal("booking.confirmed", gotKey)
-	s.Equal("booking.confirmed", gotPayload["event_type"])
-	s.Equal(true, gotPayload["auto_confirmed"])
-	s.Equal(s.driverID, gotPayload["driver_user_id"])
 }
 
 func (s *confirmBookingUseCaseSuite) TestExecute_PublishFailureIsSwallowed() {
@@ -139,7 +112,7 @@ func (s *confirmBookingUseCaseSuite) TestExecute_PublishFailureIsSwallowed() {
 
 	s.confirmer.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(s.pendingBooking(), nil)
 	s.spots.EXPECT().GetSpotDetails(gomock.Any(), s.spotID).
-		Return(entity.SpotDetails{OwnerID: s.ownerID, Title: "x", InstantBooking: false}, nil)
+		Return(entity.SpotDetails{OwnerID: s.ownerID, Title: "x"}, nil)
 	s.confirmer.EXPECT().
 		ConfirmBooking(gomock.Any(), s.bookingID, s.paymentID, enum.BookingStatusPendingOwnerApproval, gomock.Any(), gomock.Nil()).
 		Return(confirmed, nil)

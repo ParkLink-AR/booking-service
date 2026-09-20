@@ -91,8 +91,6 @@ func (s *approveBookingUseCaseSuite) TestExecute_OwnerApproves_ConfirmsAndPublis
 	s.Equal(s.driverID, gotPayload["driver_user_id"])
 	s.Equal(s.ownerID, gotPayload["owner_user_id"])
 	s.Equal("Cochera en Palermo", gotPayload["parking_spot_title"])
-	_, hasAutoConfirmed := gotPayload["auto_confirmed"]
-	s.False(hasAutoConfirmed)
 }
 
 func (s *approveBookingUseCaseSuite) TestExecute_CallerIsNotOwner_ForbiddenNoApproveNoPublish() {
