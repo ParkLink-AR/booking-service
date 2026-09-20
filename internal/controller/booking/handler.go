@@ -43,6 +43,7 @@ type Handler struct {
 	getBookableSpotsUseCase     GetBookableSpotsUseCase
 	approveBookingUseCase       ApproveBookingUseCase
 	rejectBookingUseCase        RejectBookingUseCase
+	cancelBookingUseCase        CancelBookingUseCase
 	listBookingsDetailedUseCase ListBookingsDetailedUseCase
 	getBookingUseCase           GetBookingUseCase
 	submitReviewUseCase         SubmitReviewUseCase
@@ -61,6 +62,7 @@ func NewHandler(
 	getBookableSpotsUseCase GetBookableSpotsUseCase,
 	approveBookingUseCase ApproveBookingUseCase,
 	rejectBookingUseCase RejectBookingUseCase,
+	cancelBookingUseCase CancelBookingUseCase,
 	listBookingsDetailedUseCase ListBookingsDetailedUseCase,
 	getBookingUseCase GetBookingUseCase,
 	submitReviewUseCase SubmitReviewUseCase,
@@ -78,6 +80,7 @@ func NewHandler(
 		getBookableSpotsUseCase:     getBookableSpotsUseCase,
 		approveBookingUseCase:       approveBookingUseCase,
 		rejectBookingUseCase:        rejectBookingUseCase,
+		cancelBookingUseCase:        cancelBookingUseCase,
 		listBookingsDetailedUseCase: listBookingsDetailedUseCase,
 		getBookingUseCase:           getBookingUseCase,
 		submitReviewUseCase:         submitReviewUseCase,
@@ -101,6 +104,7 @@ func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Post("/bookings/{id}/confirm", handler.ConfirmBookingEndpoint)
 	router.Post("/bookings/{id}/approve", handler.ApproveBookingEndpoint)
 	router.Post("/bookings/{id}/reject", handler.RejectBookingEndpoint)
+	router.Post("/bookings/{id}/cancel", handler.CancelBookingEndpoint)
 	router.Post("/bookings/{id}/verify-code", handler.VerifyBookingCodeEndpoint)
 	router.Post("/bookings/{id}/reviews", handler.SubmitReviewEndpoint)
 	router.Get("/bookings/{id}", handler.GetBookingEndpoint)

@@ -33,6 +33,7 @@ type handlerSuite struct {
 	getBookableSpotsUseCase     *mocks.MockGetBookableSpotsUseCase
 	approveBookingUseCase       *mocks.MockApproveBookingUseCase
 	rejectBookingUseCase        *mocks.MockRejectBookingUseCase
+	cancelBookingUseCase        *mocks.MockCancelBookingUseCase
 	listBookingsDetailedUseCase *mocks.MockListBookingsDetailedUseCase
 	getBookingUseCase           *mocks.MockGetBookingUseCase
 	submitReviewUseCase         *mocks.MockSubmitReviewUseCase
@@ -55,6 +56,7 @@ func (s *handlerSuite) SetupTest() {
 	s.getBookableSpotsUseCase = mocks.NewMockGetBookableSpotsUseCase(s.controller)
 	s.approveBookingUseCase = mocks.NewMockApproveBookingUseCase(s.controller)
 	s.rejectBookingUseCase = mocks.NewMockRejectBookingUseCase(s.controller)
+	s.cancelBookingUseCase = mocks.NewMockCancelBookingUseCase(s.controller)
 	s.listBookingsDetailedUseCase = mocks.NewMockListBookingsDetailedUseCase(s.controller)
 	s.getBookingUseCase = mocks.NewMockGetBookingUseCase(s.controller)
 	s.submitReviewUseCase = mocks.NewMockSubmitReviewUseCase(s.controller)
@@ -71,7 +73,8 @@ func (s *handlerSuite) SetupTest() {
 	booking.NewHandler(
 		s.listBookingsUseCase, s.listBookingsByUserUseCase, s.createBookingUseCase,
 		s.confirmBookingUseCase, s.getBookableSpotsUseCase,
-		s.approveBookingUseCase, s.rejectBookingUseCase, s.listBookingsDetailedUseCase,
+		s.approveBookingUseCase, s.rejectBookingUseCase, s.cancelBookingUseCase,
+		s.listBookingsDetailedUseCase,
 		s.getBookingUseCase,
 		s.submitReviewUseCase, s.listReviewsByTargetUseCase, s.listReviewsByBookingUseCase,
 		s.getSpotRatingsUseCase, s.verifyBookingCodeUseCase,

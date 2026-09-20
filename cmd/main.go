@@ -78,6 +78,7 @@ func main() {
 	listReviewsByBookingUseCase := ucbooking.NewListReviewsByBookingUseCase(bookingRepository)
 	getSpotRatingsUseCase := ucbooking.NewGetSpotRatingsUseCase(bookingRepository)
 	verifyBookingCodeUseCase := ucbooking.NewVerifyBookingCodeUseCase(bookingRepository, parkingClient, eventPublisher)
+	cancelBookingUseCase := ucbooking.NewCancelBookingUseCase(bookingRepository, paymentClient)
 
 	// Router
 	router := chi.NewRouter()
@@ -89,7 +90,8 @@ func main() {
 		router,
 		listBookingsUseCase, listBookingsByUserUseCase, createBookingUseCase,
 		confirmBookingUseCase, getBookableSpotsUseCase,
-		approveBookingUseCase, rejectBookingUseCase, listBookingsDetailedUseCase,
+		approveBookingUseCase, rejectBookingUseCase, cancelBookingUseCase,
+		listBookingsDetailedUseCase,
 		getBookingUseCase,
 		submitReviewUseCase, listReviewsByTargetUseCase, listReviewsByBookingUseCase,
 		getSpotRatingsUseCase, verifyBookingCodeUseCase,
@@ -152,6 +154,7 @@ func loadHandlers(
 	getBookableSpotsUseCase *ucbooking.GetBookableSpotsUseCase,
 	approveBookingUseCase *ucbooking.ApproveBookingUseCase,
 	rejectBookingUseCase *ucbooking.RejectBookingUseCase,
+	cancelBookingUseCase *ucbooking.CancelBookingUseCase,
 	listBookingsDetailedUseCase *ucbooking.ListBookingsDetailedUseCase,
 	getBookingUseCase *ucbooking.GetBookingUseCase,
 	submitReviewUseCase *ucbooking.SubmitReviewUseCase,
@@ -165,7 +168,8 @@ func loadHandlers(
 		bookingcontroller.NewHandler(
 			listBookingsUseCase, listBookingsByUserUseCase, createBookingUseCase,
 			confirmBookingUseCase, getBookableSpotsUseCase,
-			approveBookingUseCase, rejectBookingUseCase, listBookingsDetailedUseCase,
+			approveBookingUseCase, rejectBookingUseCase, cancelBookingUseCase,
+			listBookingsDetailedUseCase,
 			getBookingUseCase,
 			submitReviewUseCase, listReviewsByTargetUseCase, listReviewsByBookingUseCase,
 			getSpotRatingsUseCase, verifyBookingCodeUseCase,
