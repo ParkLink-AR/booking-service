@@ -362,7 +362,7 @@ migrations/
 | Variable | Default | Descripción |
 |---|---|---|
 | `BOOKING_AVAILABILITY_MAX_DAYS` | `14` | Máximo de días por request |
-| `BOOKING_HOLD_MINUTES` | `15` | Duración del hold PENDING_PAYMENT |
+| `BOOKING_HOLD_MINUTES` | `5` | Duración del hold PENDING_PAYMENT |
 | `DATABASE_URL` | — | PostgreSQL connection string |
 
 ---

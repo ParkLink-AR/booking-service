@@ -46,7 +46,7 @@ Lists a spot's bookings grouped by day. `from`, `to`, and `status` are all optio
 
 ### `POST /parking-spots/{id}/bookings`
 
-Creates a booking. Validates the range, checks it falls within the spot's published hours, and checks that fewer than the spot's `capacity` active bookings already overlap the requested range (`parking_spot.capacity` in the body, default 1 — a "playa" passes N so up to N reservations can overlap). The check is a fast pre-check plus an authoritative recount inside the repository transaction under a per-spot advisory lock (there is no `EXCLUDE` constraint anymore). Created as `PENDING_PAYMENT` with a hold that expires after `BOOKING_HOLD_MINUTES` (default 15).
+Creates a booking. Validates the range, checks it falls within the spot's published hours, and checks that fewer than the spot's `capacity` active bookings already overlap the requested range (`parking_spot.capacity` in the body, default 1 — a "playa" passes N so up to N reservations can overlap). The check is a fast pre-check plus an authoritative recount inside the repository transaction under a per-spot advisory lock (there is no `EXCLUDE` constraint anymore). Created as `PENDING_PAYMENT` with a hold that expires after `BOOKING_HOLD_MINUTES` (default 5).
 
 Request:
 ```json
@@ -117,7 +117,7 @@ Config (`.env.example`):
 | `DB_DSN` | — | PostgreSQL connection string |
 | `RABBITMQ_URL` | — | Kept wired per project requirements; no feature publishes to it yet |
 | `BOOKING_AVAILABILITY_MAX_DAYS` | `14` | Max range for the availability endpoint |
-| `BOOKING_HOLD_MINUTES` | `15` | How long a `PENDING_PAYMENT` hold lasts |
+| `BOOKING_HOLD_MINUTES` | `5` | How long a `PENDING_PAYMENT` hold lasts |
 
 ## Testing
 
