@@ -11,6 +11,7 @@ import (
 
 	"github.com/goccy/go-json"
 
+	"github.com/example/bookings-service/internal/domain/constants"
 	"github.com/example/bookings-service/internal/domain/errors"
 )
 
@@ -34,6 +35,12 @@ type refundRequest struct {
 }
 
 func (client *Client) RefundPayment(ctx context.Context, paymentID string) error {
+	// A cash booking never had a real charge -- nothing to refund, and
+	// payment-service would just reject an unknown payment_id anyway.
+	if paymentID == constants.CashPaymentID {
+		return nil
+	}
+
 	body, err := json.Marshal(refundRequest{PaymentID: paymentID})
 	if err != nil {
 		return errors.NewUpstream("paymentclient.RefundPayment", err)
