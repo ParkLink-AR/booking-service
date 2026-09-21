@@ -51,6 +51,8 @@ type Handler struct {
 	listReviewsByBookingUseCase ListReviewsByBookingUseCase
 	getSpotRatingsUseCase       GetSpotRatingsUseCase
 	verifyBookingCodeUseCase    VerifyBookingCodeUseCase
+	sendMessageUseCase          SendMessageUseCase
+	listMessagesUseCase         ListMessagesUseCase
 	location                    *time.Location
 }
 
@@ -70,6 +72,8 @@ func NewHandler(
 	listReviewsByBookingUseCase ListReviewsByBookingUseCase,
 	getSpotRatingsUseCase GetSpotRatingsUseCase,
 	verifyBookingCodeUseCase VerifyBookingCodeUseCase,
+	sendMessageUseCase SendMessageUseCase,
+	listMessagesUseCase ListMessagesUseCase,
 	location *time.Location,
 ) *Handler {
 	return &Handler{
@@ -88,6 +92,8 @@ func NewHandler(
 		listReviewsByBookingUseCase: listReviewsByBookingUseCase,
 		getSpotRatingsUseCase:       getSpotRatingsUseCase,
 		verifyBookingCodeUseCase:    verifyBookingCodeUseCase,
+		sendMessageUseCase:          sendMessageUseCase,
+		listMessagesUseCase:         listMessagesUseCase,
 		location:                    location,
 	}
 }
@@ -107,8 +113,10 @@ func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Post("/bookings/{id}/cancel", handler.CancelBookingEndpoint)
 	router.Post("/bookings/{id}/verify-code", handler.VerifyBookingCodeEndpoint)
 	router.Post("/bookings/{id}/reviews", handler.SubmitReviewEndpoint)
+	router.Post("/bookings/{id}/messages", handler.SendMessageEndpoint)
 	router.Get("/bookings/{id}", handler.GetBookingEndpoint)
 	router.Get("/bookings/{id}/reviews", handler.ListBookingReviewsEndpoint)
+	router.Get("/bookings/{id}/messages", handler.ListMessagesEndpoint)
 }
 
 func (handler *Handler) ListBookingsByUserEndpoint(responseWriter http.ResponseWriter, request *http.Request) {

@@ -129,6 +129,17 @@ func runMigrations(database *sql.DB) error {
 		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS verification_code VARCHAR(4);
 		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS verification_attempts INT NOT NULL DEFAULT 0;
 		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
+
+		-- migrations/010: in-app messaging between a booking's driver and its spot's
+		-- owner (e.g. access instructions before the driver arrives).
+		CREATE TABLE IF NOT EXISTS booking_messages (
+			id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+			booking_id  UUID        NOT NULL REFERENCES bookings(id),
+			sender_id   UUID        NOT NULL,
+			body        TEXT        NOT NULL,
+			created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+		);
+		CREATE INDEX IF NOT EXISTS idx_booking_messages_booking ON booking_messages (booking_id, created_at);
 	`)
 	return err
 }

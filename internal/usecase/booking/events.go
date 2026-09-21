@@ -18,6 +18,7 @@ const (
 	RoutingKeyBookingPendingApproval = "booking.pending_approval"
 	RoutingKeyBookingConfirmed       = "booking.confirmed"
 	RoutingKeyBookingVerified        = "booking.verified"
+	RoutingKeyBookingMessageSent     = "booking.message_sent"
 )
 
 // EventPublisher publishes a domain event to the shared event bus under a routing key.
@@ -64,11 +65,42 @@ func newBookingEvent(eventType string, b entity.Booking, spot entity.SpotDetails
 	}
 }
 
+// bookingMessageEvent is the wire shape of booking.message_sent -- deliberately separate
+// from bookingEvent (no time_range/amount/payment_id concept for a chat message), but the
+// same self-contained philosophy: it carries the recipient id and spot title directly, so
+// notifications-service needs no follow-up lookup.
+type bookingMessageEvent struct {
+	EventID          string    `json:"event_id"`
+	EventType        string    `json:"event_type"`
+	OccurredAt       time.Time `json:"occurred_at"`
+	BookingID        string    `json:"booking_id"`
+	ParkingSpotID    string    `json:"parking_spot_id"`
+	ParkingSpotTitle string    `json:"parking_spot_title"`
+	SenderUserID     string    `json:"sender_user_id"`
+	RecipientUserID  string    `json:"recipient_user_id"`
+	Body             string    `json:"body"`
+}
+
+func newBookingMessageEvent(message entity.BookingMessage, spotTitle, spotID, recipientID string) bookingMessageEvent {
+	return bookingMessageEvent{
+		EventID:          uuid.NewString(),
+		EventType:        RoutingKeyBookingMessageSent,
+		OccurredAt:       time.Now().UTC(),
+		BookingID:        message.BookingID,
+		ParkingSpotID:    spotID,
+		ParkingSpotTitle: spotTitle,
+		SenderUserID:     message.SenderID,
+		RecipientUserID:  recipientID,
+		Body:             message.Body,
+	}
+}
+
 // emitBookingEvent publishes e under routingKey when a publisher is configured. A publish
 // failure is swallowed on purpose: the booking transition it announces has already been
 // committed and is the source of truth -- a lost notification degrades the experience but
-// must not fail the request that triggered it. The publisher logs the failure.
-func emitBookingEvent(ctx context.Context, publisher EventPublisher, routingKey string, e bookingEvent) {
+// must not fail the request that triggered it. The publisher logs the failure. e is any of
+// this file's *Event payload structs (bookingEvent, bookingMessageEvent, ...).
+func emitBookingEvent(ctx context.Context, publisher EventPublisher, routingKey string, e any) {
 	if publisher == nil {
 		return
 	}

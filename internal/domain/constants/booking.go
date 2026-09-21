@@ -14,6 +14,10 @@ const (
 	// ReviewsTableName is the PostgreSQL table backing the review repository.
 	ReviewsTableName = "reviews"
 
+	// BookingMessagesTableName is the PostgreSQL table backing in-app messages
+	// between a booking's driver and its spot's owner.
+	BookingMessagesTableName = "booking_messages"
+
 	// CashPaymentID is the sentinel payment_id a booking gets when the driver
 	// chose to pay in person, in cash, instead of through Mercado Pago -- there's
 	// no real payment to reference. Must match mobile's CASH_PAYMENT_ID
