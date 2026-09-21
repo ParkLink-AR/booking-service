@@ -18,6 +18,13 @@ const (
 	// between a booking's driver and its spot's owner.
 	BookingMessagesTableName = "booking_messages"
 
+	// SupportTicketsTableName is the PostgreSQL table backing booking-scoped support tickets.
+	SupportTicketsTableName = "support_tickets"
+
+	// SupportTicketMessagesTableName is the PostgreSQL table backing a support ticket's
+	// message thread between its creator and ParkLink staff.
+	SupportTicketMessagesTableName = "support_ticket_messages"
+
 	// CashPaymentID is the sentinel payment_id a booking gets when the driver
 	// chose to pay in person, in cash, instead of through Mercado Pago -- there's
 	// no real payment to reference. Must match mobile's CASH_PAYMENT_ID

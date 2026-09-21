@@ -25,26 +25,36 @@ func TestHandlerSuite(t *testing.T) {
 
 type handlerSuite struct {
 	suite.Suite
-	controller                  *gomock.Controller
-	listBookingsUseCase         *mocks.MockListBookingsUseCase
-	listBookingsByUserUseCase   *mocks.MockListBookingsByUserUseCase
-	createBookingUseCase        *mocks.MockCreateBookingUseCase
-	confirmBookingUseCase       *mocks.MockConfirmBookingUseCase
-	getBookableSpotsUseCase     *mocks.MockGetBookableSpotsUseCase
-	approveBookingUseCase       *mocks.MockApproveBookingUseCase
-	rejectBookingUseCase        *mocks.MockRejectBookingUseCase
-	cancelBookingUseCase        *mocks.MockCancelBookingUseCase
-	listBookingsDetailedUseCase *mocks.MockListBookingsDetailedUseCase
-	getBookingUseCase           *mocks.MockGetBookingUseCase
-	submitReviewUseCase         *mocks.MockSubmitReviewUseCase
-	listReviewsByTargetUseCase  *mocks.MockListReviewsByTargetUseCase
-	listReviewsByBookingUseCase *mocks.MockListReviewsByBookingUseCase
-	getSpotRatingsUseCase       *mocks.MockGetSpotRatingsUseCase
-	verifyBookingCodeUseCase    *mocks.MockVerifyBookingCodeUseCase
-	sendMessageUseCase          *mocks.MockSendMessageUseCase
-	listMessagesUseCase         *mocks.MockListMessagesUseCase
-	router                      chi.Router
-	location                    *time.Location
+	controller                     *gomock.Controller
+	listBookingsUseCase            *mocks.MockListBookingsUseCase
+	listBookingsByUserUseCase      *mocks.MockListBookingsByUserUseCase
+	createBookingUseCase           *mocks.MockCreateBookingUseCase
+	confirmBookingUseCase          *mocks.MockConfirmBookingUseCase
+	getBookableSpotsUseCase        *mocks.MockGetBookableSpotsUseCase
+	approveBookingUseCase          *mocks.MockApproveBookingUseCase
+	rejectBookingUseCase           *mocks.MockRejectBookingUseCase
+	cancelBookingUseCase           *mocks.MockCancelBookingUseCase
+	listBookingsDetailedUseCase    *mocks.MockListBookingsDetailedUseCase
+	getBookingUseCase              *mocks.MockGetBookingUseCase
+	submitReviewUseCase            *mocks.MockSubmitReviewUseCase
+	listReviewsByTargetUseCase     *mocks.MockListReviewsByTargetUseCase
+	listReviewsByBookingUseCase    *mocks.MockListReviewsByBookingUseCase
+	getSpotRatingsUseCase          *mocks.MockGetSpotRatingsUseCase
+	verifyBookingCodeUseCase       *mocks.MockVerifyBookingCodeUseCase
+	sendMessageUseCase             *mocks.MockSendMessageUseCase
+	listMessagesUseCase            *mocks.MockListMessagesUseCase
+	createTicketUseCase            *mocks.MockCreateTicketUseCase
+	listMyTicketsUseCase           *mocks.MockListMyTicketsUseCase
+	getTicketUseCase               *mocks.MockGetTicketUseCase
+	listTicketMessagesUseCase      *mocks.MockListTicketMessagesUseCase
+	addTicketMessageUseCase        *mocks.MockAddTicketMessageUseCase
+	listAdminTicketsUseCase        *mocks.MockListAdminTicketsUseCase
+	getAdminTicketUseCase          *mocks.MockGetAdminTicketUseCase
+	listAdminTicketMessagesUseCase *mocks.MockListAdminTicketMessagesUseCase
+	adminReplyUseCase              *mocks.MockAdminReplyUseCase
+	updateTicketStatusUseCase      *mocks.MockUpdateTicketStatusUseCase
+	router                         chi.Router
+	location                       *time.Location
 }
 
 const validParkingSpotID = "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"
@@ -68,6 +78,16 @@ func (s *handlerSuite) SetupTest() {
 	s.verifyBookingCodeUseCase = mocks.NewMockVerifyBookingCodeUseCase(s.controller)
 	s.sendMessageUseCase = mocks.NewMockSendMessageUseCase(s.controller)
 	s.listMessagesUseCase = mocks.NewMockListMessagesUseCase(s.controller)
+	s.createTicketUseCase = mocks.NewMockCreateTicketUseCase(s.controller)
+	s.listMyTicketsUseCase = mocks.NewMockListMyTicketsUseCase(s.controller)
+	s.getTicketUseCase = mocks.NewMockGetTicketUseCase(s.controller)
+	s.listTicketMessagesUseCase = mocks.NewMockListTicketMessagesUseCase(s.controller)
+	s.addTicketMessageUseCase = mocks.NewMockAddTicketMessageUseCase(s.controller)
+	s.listAdminTicketsUseCase = mocks.NewMockListAdminTicketsUseCase(s.controller)
+	s.getAdminTicketUseCase = mocks.NewMockGetAdminTicketUseCase(s.controller)
+	s.listAdminTicketMessagesUseCase = mocks.NewMockListAdminTicketMessagesUseCase(s.controller)
+	s.adminReplyUseCase = mocks.NewMockAdminReplyUseCase(s.controller)
+	s.updateTicketStatusUseCase = mocks.NewMockUpdateTicketStatusUseCase(s.controller)
 
 	location, err := time.LoadLocation("America/Argentina/Buenos_Aires")
 	s.Require().NoError(err)
@@ -83,6 +103,10 @@ func (s *handlerSuite) SetupTest() {
 		s.submitReviewUseCase, s.listReviewsByTargetUseCase, s.listReviewsByBookingUseCase,
 		s.getSpotRatingsUseCase, s.verifyBookingCodeUseCase,
 		s.sendMessageUseCase, s.listMessagesUseCase,
+		s.createTicketUseCase, s.listMyTicketsUseCase, s.getTicketUseCase,
+		s.listTicketMessagesUseCase, s.addTicketMessageUseCase,
+		s.listAdminTicketsUseCase, s.getAdminTicketUseCase, s.listAdminTicketMessagesUseCase,
+		s.adminReplyUseCase, s.updateTicketStatusUseCase,
 		s.location,
 	).RegisterRoutes(s.router)
 }

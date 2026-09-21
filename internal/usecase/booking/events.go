@@ -19,6 +19,7 @@ const (
 	RoutingKeyBookingConfirmed       = "booking.confirmed"
 	RoutingKeyBookingVerified        = "booking.verified"
 	RoutingKeyBookingMessageSent     = "booking.message_sent"
+	RoutingKeySupportTicketReplied   = "support.ticket_replied"
 )
 
 // EventPublisher publishes a domain event to the shared event bus under a routing key.
@@ -92,6 +93,34 @@ func newBookingMessageEvent(message entity.BookingMessage, spotTitle, spotID, re
 		SenderUserID:     message.SenderID,
 		RecipientUserID:  recipientID,
 		Body:             message.Body,
+	}
+}
+
+// supportTicketRepliedEvent is the wire shape of support.ticket_replied -- fired only when
+// ParkLink staff reply to a ticket (a user replying to their own ticket has no one to notify:
+// staff work off admin-dashboard, not push notifications). Self-contained like the other
+// booking.* events: notifications-service needs no follow-up lookup to build the push.
+type supportTicketRepliedEvent struct {
+	EventID         string    `json:"event_id"`
+	EventType       string    `json:"event_type"`
+	OccurredAt      time.Time `json:"occurred_at"`
+	TicketID        string    `json:"ticket_id"`
+	BookingID       string    `json:"booking_id"`
+	TicketSubject   string    `json:"ticket_subject"`
+	RecipientUserID string    `json:"recipient_user_id"`
+	Body            string    `json:"body"`
+}
+
+func newSupportTicketRepliedEvent(message entity.SupportTicketMessage, ticket entity.SupportTicket) supportTicketRepliedEvent {
+	return supportTicketRepliedEvent{
+		EventID:         uuid.NewString(),
+		EventType:       RoutingKeySupportTicketReplied,
+		OccurredAt:      time.Now().UTC(),
+		TicketID:        ticket.ID,
+		BookingID:       ticket.BookingID,
+		TicketSubject:   ticket.Subject,
+		RecipientUserID: ticket.CreatedBy,
+		Body:            message.Body,
 	}
 }
 
