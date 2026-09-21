@@ -36,24 +36,34 @@ type ListBookingsByUserUseCase interface {
 // Handler handles HTTP requests for listing and creating a parking spot's bookings, and
 // for checking which of a set of spots have no booking in a given time range.
 type Handler struct {
-	listBookingsUseCase         ListBookingsUseCase
-	listBookingsByUserUseCase   ListBookingsByUserUseCase
-	createBookingUseCase        CreateBookingUseCase
-	confirmBookingUseCase       ConfirmBookingUseCase
-	getBookableSpotsUseCase     GetBookableSpotsUseCase
-	approveBookingUseCase       ApproveBookingUseCase
-	rejectBookingUseCase        RejectBookingUseCase
-	cancelBookingUseCase        CancelBookingUseCase
-	listBookingsDetailedUseCase ListBookingsDetailedUseCase
-	getBookingUseCase           GetBookingUseCase
-	submitReviewUseCase         SubmitReviewUseCase
-	listReviewsByTargetUseCase  ListReviewsByTargetUseCase
-	listReviewsByBookingUseCase ListReviewsByBookingUseCase
-	getSpotRatingsUseCase       GetSpotRatingsUseCase
-	verifyBookingCodeUseCase    VerifyBookingCodeUseCase
-	sendMessageUseCase          SendMessageUseCase
-	listMessagesUseCase         ListMessagesUseCase
-	location                    *time.Location
+	listBookingsUseCase            ListBookingsUseCase
+	listBookingsByUserUseCase      ListBookingsByUserUseCase
+	createBookingUseCase           CreateBookingUseCase
+	confirmBookingUseCase          ConfirmBookingUseCase
+	getBookableSpotsUseCase        GetBookableSpotsUseCase
+	approveBookingUseCase          ApproveBookingUseCase
+	rejectBookingUseCase           RejectBookingUseCase
+	cancelBookingUseCase           CancelBookingUseCase
+	listBookingsDetailedUseCase    ListBookingsDetailedUseCase
+	getBookingUseCase              GetBookingUseCase
+	submitReviewUseCase            SubmitReviewUseCase
+	listReviewsByTargetUseCase     ListReviewsByTargetUseCase
+	listReviewsByBookingUseCase    ListReviewsByBookingUseCase
+	getSpotRatingsUseCase          GetSpotRatingsUseCase
+	verifyBookingCodeUseCase       VerifyBookingCodeUseCase
+	sendMessageUseCase             SendMessageUseCase
+	listMessagesUseCase            ListMessagesUseCase
+	createTicketUseCase            CreateTicketUseCase
+	listMyTicketsUseCase           ListMyTicketsUseCase
+	getTicketUseCase               GetTicketUseCase
+	listTicketMessagesUseCase      ListTicketMessagesUseCase
+	addTicketMessageUseCase        AddTicketMessageUseCase
+	listAdminTicketsUseCase        ListAdminTicketsUseCase
+	getAdminTicketUseCase          GetAdminTicketUseCase
+	listAdminTicketMessagesUseCase ListAdminTicketMessagesUseCase
+	adminReplyUseCase              AdminReplyUseCase
+	updateTicketStatusUseCase      UpdateTicketStatusUseCase
+	location                       *time.Location
 }
 
 func NewHandler(
@@ -74,27 +84,47 @@ func NewHandler(
 	verifyBookingCodeUseCase VerifyBookingCodeUseCase,
 	sendMessageUseCase SendMessageUseCase,
 	listMessagesUseCase ListMessagesUseCase,
+	createTicketUseCase CreateTicketUseCase,
+	listMyTicketsUseCase ListMyTicketsUseCase,
+	getTicketUseCase GetTicketUseCase,
+	listTicketMessagesUseCase ListTicketMessagesUseCase,
+	addTicketMessageUseCase AddTicketMessageUseCase,
+	listAdminTicketsUseCase ListAdminTicketsUseCase,
+	getAdminTicketUseCase GetAdminTicketUseCase,
+	listAdminTicketMessagesUseCase ListAdminTicketMessagesUseCase,
+	adminReplyUseCase AdminReplyUseCase,
+	updateTicketStatusUseCase UpdateTicketStatusUseCase,
 	location *time.Location,
 ) *Handler {
 	return &Handler{
-		listBookingsUseCase:         listBookingsUseCase,
-		listBookingsByUserUseCase:   listBookingsByUserUseCase,
-		createBookingUseCase:        createBookingUseCase,
-		confirmBookingUseCase:       confirmBookingUseCase,
-		getBookableSpotsUseCase:     getBookableSpotsUseCase,
-		approveBookingUseCase:       approveBookingUseCase,
-		rejectBookingUseCase:        rejectBookingUseCase,
-		cancelBookingUseCase:        cancelBookingUseCase,
-		listBookingsDetailedUseCase: listBookingsDetailedUseCase,
-		getBookingUseCase:           getBookingUseCase,
-		submitReviewUseCase:         submitReviewUseCase,
-		listReviewsByTargetUseCase:  listReviewsByTargetUseCase,
-		listReviewsByBookingUseCase: listReviewsByBookingUseCase,
-		getSpotRatingsUseCase:       getSpotRatingsUseCase,
-		verifyBookingCodeUseCase:    verifyBookingCodeUseCase,
-		sendMessageUseCase:          sendMessageUseCase,
-		listMessagesUseCase:         listMessagesUseCase,
-		location:                    location,
+		listBookingsUseCase:            listBookingsUseCase,
+		listBookingsByUserUseCase:      listBookingsByUserUseCase,
+		createBookingUseCase:           createBookingUseCase,
+		confirmBookingUseCase:          confirmBookingUseCase,
+		getBookableSpotsUseCase:        getBookableSpotsUseCase,
+		approveBookingUseCase:          approveBookingUseCase,
+		rejectBookingUseCase:           rejectBookingUseCase,
+		cancelBookingUseCase:           cancelBookingUseCase,
+		listBookingsDetailedUseCase:    listBookingsDetailedUseCase,
+		getBookingUseCase:              getBookingUseCase,
+		submitReviewUseCase:            submitReviewUseCase,
+		listReviewsByTargetUseCase:     listReviewsByTargetUseCase,
+		listReviewsByBookingUseCase:    listReviewsByBookingUseCase,
+		getSpotRatingsUseCase:          getSpotRatingsUseCase,
+		verifyBookingCodeUseCase:       verifyBookingCodeUseCase,
+		sendMessageUseCase:             sendMessageUseCase,
+		listMessagesUseCase:            listMessagesUseCase,
+		createTicketUseCase:            createTicketUseCase,
+		listMyTicketsUseCase:           listMyTicketsUseCase,
+		getTicketUseCase:               getTicketUseCase,
+		listTicketMessagesUseCase:      listTicketMessagesUseCase,
+		addTicketMessageUseCase:        addTicketMessageUseCase,
+		listAdminTicketsUseCase:        listAdminTicketsUseCase,
+		getAdminTicketUseCase:          getAdminTicketUseCase,
+		listAdminTicketMessagesUseCase: listAdminTicketMessagesUseCase,
+		adminReplyUseCase:              adminReplyUseCase,
+		updateTicketStatusUseCase:      updateTicketStatusUseCase,
+		location:                       location,
 	}
 }
 
@@ -117,6 +147,16 @@ func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Get("/bookings/{id}", handler.GetBookingEndpoint)
 	router.Get("/bookings/{id}/reviews", handler.ListBookingReviewsEndpoint)
 	router.Get("/bookings/{id}/messages", handler.ListMessagesEndpoint)
+	router.Post("/bookings/{id}/tickets", handler.CreateTicketEndpoint)
+	router.Get("/bookings/{id}/tickets", handler.ListMyTicketsEndpoint)
+	router.Get("/tickets/{id}", handler.GetTicketEndpoint)
+	router.Get("/tickets/{id}/messages", handler.ListTicketMessagesEndpoint)
+	router.Post("/tickets/{id}/messages", handler.AddTicketMessageEndpoint)
+	router.Get("/admin/tickets", handler.ListAdminTicketsEndpoint)
+	router.Get("/admin/tickets/{id}", handler.GetAdminTicketEndpoint)
+	router.Get("/admin/tickets/{id}/messages", handler.ListAdminTicketMessagesEndpoint)
+	router.Post("/admin/tickets/{id}/messages", handler.AdminReplyEndpoint)
+	router.Patch("/admin/tickets/{id}/status", handler.UpdateTicketStatusEndpoint)
 }
 
 func (handler *Handler) ListBookingsByUserEndpoint(responseWriter http.ResponseWriter, request *http.Request) {

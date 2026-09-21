@@ -81,6 +81,16 @@ func main() {
 	cancelBookingUseCase := ucbooking.NewCancelBookingUseCase(bookingRepository, paymentClient)
 	sendMessageUseCase := ucbooking.NewSendMessageUseCase(bookingRepository, parkingClient, bookingRepository, eventPublisher)
 	listMessagesUseCase := ucbooking.NewListMessagesUseCase(bookingRepository, parkingClient, bookingRepository)
+	createTicketUseCase := ucbooking.NewCreateTicketUseCase(bookingRepository, parkingClient, bookingRepository, bookingRepository)
+	listMyTicketsUseCase := ucbooking.NewListMyTicketsUseCase(bookingRepository, parkingClient, bookingRepository)
+	getTicketUseCase := ucbooking.NewGetTicketUseCase(bookingRepository)
+	listTicketMessagesUseCase := ucbooking.NewListTicketMessagesUseCase(bookingRepository, bookingRepository)
+	addTicketMessageUseCase := ucbooking.NewAddTicketMessageUseCase(bookingRepository, bookingRepository)
+	listAdminTicketsUseCase := ucbooking.NewListAdminTicketsUseCase(bookingRepository)
+	getAdminTicketUseCase := ucbooking.NewGetAdminTicketUseCase(bookingRepository, bookingRepository, parkingClient)
+	listAdminTicketMessagesUseCase := ucbooking.NewListAdminTicketMessagesUseCase(bookingRepository, bookingRepository)
+	adminReplyUseCase := ucbooking.NewAdminReplyUseCase(bookingRepository, bookingRepository, bookingRepository, eventPublisher)
+	updateTicketStatusUseCase := ucbooking.NewUpdateTicketStatusUseCase(bookingRepository)
 
 	// Router
 	router := chi.NewRouter()
@@ -98,6 +108,10 @@ func main() {
 		submitReviewUseCase, listReviewsByTargetUseCase, listReviewsByBookingUseCase,
 		getSpotRatingsUseCase, verifyBookingCodeUseCase,
 		sendMessageUseCase, listMessagesUseCase,
+		createTicketUseCase, listMyTicketsUseCase, getTicketUseCase,
+		listTicketMessagesUseCase, addTicketMessageUseCase,
+		listAdminTicketsUseCase, getAdminTicketUseCase, listAdminTicketMessagesUseCase,
+		adminReplyUseCase, updateTicketStatusUseCase,
 		buenosAiresLocation,
 	)
 
@@ -167,6 +181,16 @@ func loadHandlers(
 	verifyBookingCodeUseCase *ucbooking.VerifyBookingCodeUseCase,
 	sendMessageUseCase *ucbooking.SendMessageUseCase,
 	listMessagesUseCase *ucbooking.ListMessagesUseCase,
+	createTicketUseCase *ucbooking.CreateTicketUseCase,
+	listMyTicketsUseCase *ucbooking.ListMyTicketsUseCase,
+	getTicketUseCase *ucbooking.GetTicketUseCase,
+	listTicketMessagesUseCase *ucbooking.ListTicketMessagesUseCase,
+	addTicketMessageUseCase *ucbooking.AddTicketMessageUseCase,
+	listAdminTicketsUseCase *ucbooking.ListAdminTicketsUseCase,
+	getAdminTicketUseCase *ucbooking.GetAdminTicketUseCase,
+	listAdminTicketMessagesUseCase *ucbooking.ListAdminTicketMessagesUseCase,
+	adminReplyUseCase *ucbooking.AdminReplyUseCase,
+	updateTicketStatusUseCase *ucbooking.UpdateTicketStatusUseCase,
 	location *time.Location,
 ) {
 	handlers := []Handler{
@@ -179,6 +203,10 @@ func loadHandlers(
 			submitReviewUseCase, listReviewsByTargetUseCase, listReviewsByBookingUseCase,
 			getSpotRatingsUseCase, verifyBookingCodeUseCase,
 			sendMessageUseCase, listMessagesUseCase,
+			createTicketUseCase, listMyTicketsUseCase, getTicketUseCase,
+			listTicketMessagesUseCase, addTicketMessageUseCase,
+			listAdminTicketsUseCase, getAdminTicketUseCase, listAdminTicketMessagesUseCase,
+			adminReplyUseCase, updateTicketStatusUseCase,
 			location,
 		),
 	}
