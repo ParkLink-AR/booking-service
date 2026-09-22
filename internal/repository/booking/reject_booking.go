@@ -17,6 +17,7 @@ func (repository *Repository) RejectBooking(ctx context.Context, bookingID strin
 		SET
 			status                  = 'CANCELLED'::booking_status,
 			owner_response_deadline = NULL,
+			cancellation_reason     = $2,
 			updated_at              = now()
 		WHERE id     = $1
 		  AND status = 'PENDING_OWNER_APPROVAL'
@@ -24,8 +25,8 @@ func (repository *Repository) RejectBooking(ctx context.Context, bookingID strin
 			id, parking_spot_id, user_id,
 			lower(time_range), upper(time_range),
 			status, hold_expires_at, owner_response_deadline, amount, COALESCE(payment_id, ''), paid_at,
-			kind, created_at, updated_at
-	`, bookingID)
+			cancellation_reason, kind, created_at, updated_at
+	`, bookingID, constants.CancellationReasonOwnerRejected)
 
 	var b entity.Booking
 	var statusLabel, kindLabel string
@@ -33,7 +34,7 @@ func (repository *Repository) RejectBooking(ctx context.Context, bookingID strin
 		&b.ID, &b.ParkingSpotID, &b.UserID,
 		&b.Start, &b.End,
 		&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.PaymentID, &b.PaidAt,
-		&kindLabel, &b.CreatedAt, &b.UpdatedAt,
+		&b.CancellationReason, &kindLabel, &b.CreatedAt, &b.UpdatedAt,
 	); err != nil {
 		return entity.Booking{}, errors.NewNotFound("booking", bookingID)
 	}

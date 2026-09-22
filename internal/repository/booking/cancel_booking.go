@@ -16,16 +16,17 @@ func (repository *Repository) CancelBooking(ctx context.Context, bookingID strin
 	row := repository.database.QueryRowContext(ctx, `
 		UPDATE `+constants.BookingsTableName+`
 		SET
-			status     = 'CANCELLED'::booking_status,
-			updated_at = now()
+			status              = 'CANCELLED'::booking_status,
+			cancellation_reason = $2,
+			updated_at          = now()
 		WHERE id     = $1
 		  AND status IN ('CONFIRMED', 'PENDING_OWNER_APPROVAL')
 		RETURNING
 			id, parking_spot_id, user_id,
 			lower(time_range), upper(time_range),
 			status, hold_expires_at, owner_response_deadline, amount, COALESCE(payment_id, ''), paid_at,
-			kind, created_at, updated_at
-	`, bookingID)
+			cancellation_reason, kind, created_at, updated_at
+	`, bookingID, constants.CancellationReasonDriverCancelled)
 
 	var b entity.Booking
 	var statusLabel, kindLabel string
@@ -33,7 +34,7 @@ func (repository *Repository) CancelBooking(ctx context.Context, bookingID strin
 		&b.ID, &b.ParkingSpotID, &b.UserID,
 		&b.Start, &b.End,
 		&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.PaymentID, &b.PaidAt,
-		&kindLabel, &b.CreatedAt, &b.UpdatedAt,
+		&b.CancellationReason, &kindLabel, &b.CreatedAt, &b.UpdatedAt,
 	); err != nil {
 		return entity.Booking{}, errors.NewNotFound("booking", bookingID)
 	}

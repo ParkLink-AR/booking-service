@@ -200,6 +200,7 @@ func (handler *Handler) ListBookingsByUserEndpoint(responseWriter http.ResponseW
 			formatted := b.PaidAt.In(handler.location).Format(time.RFC3339)
 			r.PaidAt = &formatted
 		}
+		r.CancellationReason = b.CancellationReason
 		if includeCodes {
 			r.VerificationCode = b.VerificationCode
 			if b.VerifiedAt != nil {

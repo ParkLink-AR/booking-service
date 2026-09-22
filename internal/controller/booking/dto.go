@@ -50,7 +50,10 @@ type bookingResponse struct {
 	// regardless of its current status (e.g. EXPIRED, or CANCELLED before ever reaching
 	// PENDING_OWNER_APPROVAL).
 	PaidAt *string `json:"paid_at,omitempty"`
-	Kind   string  `json:"kind"`
+	// CancellationReason distinguishes why a CANCELLED booking got there -- see
+	// entity.Booking.CancellationReason. Absent for anything else.
+	CancellationReason *string `json:"cancellation_reason,omitempty"`
+	Kind               string  `json:"kind"`
 	// VerificationCode is only ever populated for the booking's own driver (see
 	// bookingResponseFromEntity's viewerID param) -- the owner enters this code after
 	// hearing it from the driver in person, so exposing it to the owner through any API
@@ -88,6 +91,7 @@ func bookingResponseFromEntity(booking entity.Booking, location *time.Location, 
 		formatted := booking.PaidAt.In(location).Format(time.RFC3339)
 		response.PaidAt = &formatted
 	}
+	response.CancellationReason = booking.CancellationReason
 	if viewerID != "" && viewerID == booking.UserID {
 		response.VerificationCode = booking.VerificationCode
 		if booking.VerifiedAt != nil {
@@ -110,7 +114,9 @@ type userBookingResponse struct {
 	PaymentID     string  `json:"payment_id,omitempty"`
 	// See bookingResponse.PaidAt.
 	PaidAt *string `json:"paid_at,omitempty"`
-	Kind   string  `json:"kind"`
+	// See bookingResponse.CancellationReason.
+	CancellationReason *string `json:"cancellation_reason,omitempty"`
+	Kind               string  `json:"kind"`
 	// Same visibility rule as bookingResponse.VerificationCode -- see
 	// ListBookingsByUserEndpoint, which only fills this in when the caller is asking
 	// about their own history.

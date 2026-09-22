@@ -168,6 +168,12 @@ func runMigrations(database *sql.DB) error {
 		-- by Mercado Pago, independent of updated_at (which every later transition also
 		-- bumps) -- see ConfirmBooking.
 		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
+
+		-- migrations/013: distinguishes why a booking ended up CANCELLED (driver
+		-- cancelled it themselves vs. the owner rejected it vs. the owner never
+		-- responded in time) -- see CancelBooking/RejectBooking/ExpireStalePendingApprovals.
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancellation_reason TEXT
+			CHECK (cancellation_reason IN ('OWNER_REJECTED', 'OWNER_EXPIRED', 'DRIVER_CANCELLED'));
 	`)
 	return err
 }

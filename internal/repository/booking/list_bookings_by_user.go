@@ -8,7 +8,9 @@ import (
 	"github.com/example/bookings-service/internal/domain/errors"
 )
 
-// ListBookingsByUser returns all bookings for a given user_id, ordered by start time descending.
+// ListBookingsByUser returns all bookings for a given user_id, most recently *created* first
+// -- not by start time, so a booking made just now for a far-future date still sorts above
+// one made earlier for a sooner date.
 func (repository *Repository) ListBookingsByUser(
 	ctx context.Context,
 	userID string,
@@ -16,11 +18,12 @@ func (repository *Repository) ListBookingsByUser(
 	query := `
 		SELECT id, parking_spot_id, user_id,
 		       lower(time_range), upper(time_range),
-		       status, hold_expires_at, amount, COALESCE(payment_id, ''), paid_at, kind,
+		       status, hold_expires_at, amount, COALESCE(payment_id, ''), paid_at,
+		       cancellation_reason, kind,
 		       verification_code, verification_attempts, verified_at, created_at, updated_at
 		FROM ` + constants.BookingsTableName + `
 		WHERE user_id = $1
-		ORDER BY lower(time_range) DESC
+		ORDER BY created_at DESC
 	`
 
 	rows, err := repository.database.QueryContext(ctx, query, userID)
@@ -37,7 +40,7 @@ func (repository *Repository) ListBookingsByUser(
 			&b.ID, &b.ParkingSpotID, &b.UserID,
 			&b.Start, &b.End,
 			&statusLabel, &b.HoldExpiresAt, &b.Amount, &b.PaymentID, &b.PaidAt,
-			&kindLabel, &b.VerificationCode, &b.VerificationAttempts, &b.VerifiedAt, &b.CreatedAt, &b.UpdatedAt,
+			&b.CancellationReason, &kindLabel, &b.VerificationCode, &b.VerificationAttempts, &b.VerifiedAt, &b.CreatedAt, &b.UpdatedAt,
 		); err != nil {
 			return nil, errors.NewInternalError("booking.ListBookingsByUser", err)
 		}

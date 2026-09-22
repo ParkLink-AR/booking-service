@@ -26,6 +26,13 @@ type Booking struct {
 	// trustworthy record of whether and when the money actually moved, independent of
 	// UpdatedAt (which every one of those transitions bumps). Nil before payment.
 	PaidAt *time.Time
+	// CancellationReason distinguishes *why* a CANCELLED booking got there --
+	// "OWNER_REJECTED" (RejectBooking), "OWNER_EXPIRED" (owner never responded in time,
+	// see ExpireStalePendingApprovals), or "DRIVER_CANCELLED" (the driver cancelled it
+	// themselves, see CancelBooking). Nil for any non-cancelled booking, and for a
+	// cancelled one predating this field. Without it, every CANCELLED booking looked
+	// identical from the driver's own cancellation vs. the owner's rejection.
+	CancellationReason *string
 	// VerificationCode is a 4-digit PIN generated the moment the booking reaches
 	// CONFIRMED (see entity.GenerateVerificationCode, called from
 	// ConfirmBookingUseCase/ApproveBookingUseCase). The driver reads it in the app and

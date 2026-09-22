@@ -30,4 +30,11 @@ const (
 	// no real payment to reference. Must match mobile's CASH_PAYMENT_ID
 	// (src/api/booking.ts).
 	CashPaymentID = "CASH"
+
+	// CancellationReasonOwnerRejected/OwnerExpired/DriverCancelled are the three ways a
+	// booking ends up CANCELLED -- see entity.Booking.CancellationReason and the CHECK
+	// constraint in migrations/013_add_cancellation_reason.sql.
+	CancellationReasonOwnerRejected   = "OWNER_REJECTED"
+	CancellationReasonOwnerExpired    = "OWNER_EXPIRED"
+	CancellationReasonDriverCancelled = "DRIVER_CANCELLED"
 )

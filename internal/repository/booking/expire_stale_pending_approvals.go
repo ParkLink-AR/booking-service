@@ -18,6 +18,7 @@ func (repository *Repository) ExpireStalePendingApprovals(ctx context.Context) (
 		SET
 			status                  = 'CANCELLED'::booking_status,
 			owner_response_deadline = NULL,
+			cancellation_reason     = $1,
 			updated_at              = now()
 		WHERE status                  = 'PENDING_OWNER_APPROVAL'
 		  AND owner_response_deadline < now()
@@ -25,8 +26,8 @@ func (repository *Repository) ExpireStalePendingApprovals(ctx context.Context) (
 			id, parking_spot_id, user_id,
 			lower(time_range), upper(time_range),
 			status, hold_expires_at, owner_response_deadline, amount, COALESCE(payment_id, ''), paid_at,
-			created_at, updated_at
-	`)
+			cancellation_reason, created_at, updated_at
+	`, constants.CancellationReasonOwnerExpired)
 	if err != nil {
 		return nil, errors.NewInternalError("booking.ExpireStalePendingApprovals", err)
 	}
@@ -40,7 +41,7 @@ func (repository *Repository) ExpireStalePendingApprovals(ctx context.Context) (
 			&b.ID, &b.ParkingSpotID, &b.UserID,
 			&b.Start, &b.End,
 			&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.PaymentID, &b.PaidAt,
-			&b.CreatedAt, &b.UpdatedAt,
+			&b.CancellationReason, &b.CreatedAt, &b.UpdatedAt,
 		); err != nil {
 			return nil, errors.NewInternalError("booking.ExpireStalePendingApprovals", err)
 		}
