@@ -163,6 +163,11 @@ func runMigrations(database *sql.DB) error {
 			created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 		);
 		CREATE INDEX IF NOT EXISTS idx_support_ticket_messages_ticket ON support_ticket_messages (ticket_id, created_at);
+
+		-- migrations/012: records the moment a booking's payment was actually confirmed
+		-- by Mercado Pago, independent of updated_at (which every later transition also
+		-- bumps) -- see ConfirmBooking.
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
 	`)
 	return err
 }

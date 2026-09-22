@@ -3,6 +3,7 @@ package booking
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -195,6 +196,10 @@ func (handler *Handler) ListBookingsByUserEndpoint(responseWriter http.ResponseW
 			formatted := b.HoldExpiresAt.In(handler.location).Format(time.RFC3339)
 			r.HoldExpiresAt = &formatted
 		}
+		if b.PaidAt != nil {
+			formatted := b.PaidAt.In(handler.location).Format(time.RFC3339)
+			r.PaidAt = &formatted
+		}
 		if includeCodes {
 			r.VerificationCode = b.VerificationCode
 			if b.VerifiedAt != nil {
@@ -277,9 +282,16 @@ func writeDomainError(responseWriter http.ResponseWriter, err error) {
 	case errors.IsConflict(err):
 		writeErrorCode(responseWriter, http.StatusConflict, "BOOKING_CONFLICT", err.Error())
 	case errors.IsForbidden(err):
-		writeErrorCode(responseWriter, http.StatusForbidden, "NOT_SPOT_OWNER", err.Error())
+		// Forbidden covers more than spot ownership now (e.g. CancelBookingUseCase
+		// rejects a caller who isn't the booking's own driver) -- the message already
+		// says which, so the code stays generic instead of lying about the reason.
+		writeErrorCode(responseWriter, http.StatusForbidden, "FORBIDDEN", err.Error())
 	case errors.IsUpstream(err):
-		writeErrorCode(responseWriter, http.StatusBadGateway, "PARKING_SERVICE_ERROR", err.Error())
+		code := "PARKING_SERVICE_ERROR"
+		if strings.HasPrefix(errors.UpstreamOp(err), "paymentclient") {
+			code = "PAYMENT_SERVICE_ERROR"
+		}
+		writeErrorCode(responseWriter, http.StatusBadGateway, code, err.Error())
 	default:
 		writeErrorCode(responseWriter, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
 	}

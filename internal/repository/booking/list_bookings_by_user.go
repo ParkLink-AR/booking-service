@@ -16,7 +16,7 @@ func (repository *Repository) ListBookingsByUser(
 	query := `
 		SELECT id, parking_spot_id, user_id,
 		       lower(time_range), upper(time_range),
-		       status, hold_expires_at, amount, COALESCE(payment_id, ''), kind,
+		       status, hold_expires_at, amount, COALESCE(payment_id, ''), paid_at, kind,
 		       verification_code, verification_attempts, verified_at, created_at, updated_at
 		FROM ` + constants.BookingsTableName + `
 		WHERE user_id = $1
@@ -36,7 +36,7 @@ func (repository *Repository) ListBookingsByUser(
 		if err := rows.Scan(
 			&b.ID, &b.ParkingSpotID, &b.UserID,
 			&b.Start, &b.End,
-			&statusLabel, &b.HoldExpiresAt, &b.Amount, &b.PaymentID,
+			&statusLabel, &b.HoldExpiresAt, &b.Amount, &b.PaymentID, &b.PaidAt,
 			&kindLabel, &b.VerificationCode, &b.VerificationAttempts, &b.VerifiedAt, &b.CreatedAt, &b.UpdatedAt,
 		); err != nil {
 			return nil, errors.NewInternalError("booking.ListBookingsByUser", err)

@@ -45,7 +45,12 @@ type bookingResponse struct {
 	HoldExpiresAt *string `json:"hold_expires_at,omitempty"`
 	Amount        int     `json:"amount"`
 	PaymentID     string  `json:"payment_id,omitempty"`
-	Kind          string  `json:"kind"`
+	// PaidAt is set once, the moment ConfirmBooking recorded the Mercado Pago payment --
+	// see entity.Booking.PaidAt. Absent (nil) means the booking was never actually paid,
+	// regardless of its current status (e.g. EXPIRED, or CANCELLED before ever reaching
+	// PENDING_OWNER_APPROVAL).
+	PaidAt *string `json:"paid_at,omitempty"`
+	Kind   string  `json:"kind"`
 	// VerificationCode is only ever populated for the booking's own driver (see
 	// bookingResponseFromEntity's viewerID param) -- the owner enters this code after
 	// hearing it from the driver in person, so exposing it to the owner through any API
@@ -79,6 +84,10 @@ func bookingResponseFromEntity(booking entity.Booking, location *time.Location, 
 		formatted := booking.HoldExpiresAt.In(location).Format(time.RFC3339)
 		response.HoldExpiresAt = &formatted
 	}
+	if booking.PaidAt != nil {
+		formatted := booking.PaidAt.In(location).Format(time.RFC3339)
+		response.PaidAt = &formatted
+	}
 	if viewerID != "" && viewerID == booking.UserID {
 		response.VerificationCode = booking.VerificationCode
 		if booking.VerifiedAt != nil {
@@ -99,7 +108,9 @@ type userBookingResponse struct {
 	HoldExpiresAt *string `json:"hold_expires_at,omitempty"`
 	Amount        int     `json:"amount"`
 	PaymentID     string  `json:"payment_id,omitempty"`
-	Kind          string  `json:"kind"`
+	// See bookingResponse.PaidAt.
+	PaidAt *string `json:"paid_at,omitempty"`
+	Kind   string  `json:"kind"`
 	// Same visibility rule as bookingResponse.VerificationCode -- see
 	// ListBookingsByUserEndpoint, which only fills this in when the caller is asking
 	// about their own history.

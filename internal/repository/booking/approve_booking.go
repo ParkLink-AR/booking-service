@@ -24,7 +24,7 @@ func (repository *Repository) ApproveBooking(ctx context.Context, bookingID, ver
 		RETURNING
 			id, parking_spot_id, user_id,
 			lower(time_range), upper(time_range),
-			status, hold_expires_at, owner_response_deadline, amount, COALESCE(payment_id, ''),
+			status, hold_expires_at, owner_response_deadline, amount, COALESCE(payment_id, ''), paid_at,
 			kind, verification_code, verification_attempts, verified_at, created_at, updated_at
 	`, bookingID, verificationCode)
 
@@ -33,7 +33,7 @@ func (repository *Repository) ApproveBooking(ctx context.Context, bookingID, ver
 	if err := row.Scan(
 		&b.ID, &b.ParkingSpotID, &b.UserID,
 		&b.Start, &b.End,
-		&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.PaymentID,
+		&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.PaymentID, &b.PaidAt,
 		&kindLabel, &b.VerificationCode, &b.VerificationAttempts, &b.VerifiedAt, &b.CreatedAt, &b.UpdatedAt,
 	); err != nil {
 		return entity.Booking{}, errors.NewNotFound("booking", bookingID)

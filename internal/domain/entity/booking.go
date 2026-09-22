@@ -20,6 +20,12 @@ type Booking struct {
 	OwnerResponseDeadline *time.Time
 	Amount                int
 	PaymentID             string
+	// PaidAt is set once, the moment ConfirmBooking records a successful Mercado Pago
+	// payment (PENDING_PAYMENT -> PENDING_OWNER_APPROVAL). It never changes afterward --
+	// approve/reject/cancel/verify all leave it untouched -- so it stays the one
+	// trustworthy record of whether and when the money actually moved, independent of
+	// UpdatedAt (which every one of those transitions bumps). Nil before payment.
+	PaidAt *time.Time
 	// VerificationCode is a 4-digit PIN generated the moment the booking reaches
 	// CONFIRMED (see entity.GenerateVerificationCode, called from
 	// ConfirmBookingUseCase/ApproveBookingUseCase). The driver reads it in the app and
