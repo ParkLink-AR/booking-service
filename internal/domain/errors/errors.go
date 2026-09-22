@@ -87,3 +87,15 @@ func InvalidInputCode(err error) string {
 	}
 	return ""
 }
+
+// UpstreamOp extracts the Op that identifies which downstream call failed (e.g.
+// "paymentclient.RefundPayment", "parkingclient.GetStayQuote"), or "" if err is not an
+// UpstreamError. Callers use this to report which service actually failed instead of
+// assuming it was always parking-service.
+func UpstreamOp(err error) string {
+	var target *UpstreamError
+	if errors.As(err, &target) {
+		return target.Op
+	}
+	return ""
+}
