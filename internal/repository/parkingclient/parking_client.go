@@ -85,6 +85,44 @@ func (client *Client) GetSpotOwnerID(ctx context.Context, spotID string) (string
 	return spot.OwnerID, nil
 }
 
+// ownedSpotResponse is the subset of parking-service's GET /users/{id}/parking-spots
+// response this client cares about -- just enough to collect the owner's spot ids.
+type ownedSpotResponse struct {
+	ID string `json:"id"`
+}
+
+// GetSpotIDsForOwner returns the ids of every parking spot owned by ownerID, used to build
+// GET /admin/owners/{id}/bookings -- the "reservations received across all of this owner's
+// spots" view. Calls parking-service's existing public GET /users/{id}/parking-spots
+// endpoint, same trust model as getSpot (no auth, same docker-network call).
+func (client *Client) GetSpotIDsForOwner(ctx context.Context, ownerID string) ([]string, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/users/%s/parking-spots", client.baseURL, ownerID), nil)
+	if err != nil {
+		return nil, errors.NewUpstream("parkingclient.GetSpotIDsForOwner", err)
+	}
+
+	response, err := client.httpClient.Do(request)
+	if err != nil {
+		return nil, errors.NewUpstream("parkingclient.GetSpotIDsForOwner", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return nil, errors.NewUpstream("parkingclient.GetSpotIDsForOwner", fmt.Errorf("unexpected status %d", response.StatusCode))
+	}
+
+	var spots []ownedSpotResponse
+	if err := json.NewDecoder(response.Body).Decode(&spots); err != nil {
+		return nil, errors.NewUpstream("parkingclient.GetSpotIDsForOwner", err)
+	}
+
+	ids := make([]string, len(spots))
+	for i, spot := range spots {
+		ids[i] = spot.ID
+	}
+	return ids, nil
+}
+
 // IsSpotActive reports whether a parking spot currently accepts new reservations. A spot
 // its owner paused (or deleted) keeps its existing bookings and detail page working --
 // this only gates the creation of a new one (see Service.CreateBooking).

@@ -20,6 +20,7 @@ const (
 	RoutingKeyBookingVerified        = "booking.verified"
 	RoutingKeyBookingMessageSent     = "booking.message_sent"
 	RoutingKeySupportTicketReplied   = "support.ticket_replied"
+	RoutingKeyPayoutPaid             = "payout.paid"
 )
 
 // EventPublisher publishes a domain event to the shared event bus under a routing key.
@@ -121,6 +122,34 @@ func newSupportTicketRepliedEvent(message entity.SupportTicketMessage, ticket en
 		TicketSubject:   ticket.Subject,
 		RecipientUserID: ticket.CreatedBy,
 		Body:            message.Body,
+	}
+}
+
+// payoutPaidEvent is the wire shape of payout.paid -- fired once ParkLink staff mark a
+// payout as PAID (see MarkPayoutPaidUseCase). Self-contained like every other event in this
+// file: notifications-service needs no follow-up lookup to tell the owner their transfer
+// went out and how much it was for.
+type payoutPaidEvent struct {
+	EventID          string    `json:"event_id"`
+	EventType        string    `json:"event_type"`
+	OccurredAt       time.Time `json:"occurred_at"`
+	PayoutID         string    `json:"payout_id"`
+	BookingID        string    `json:"booking_id"`
+	RecipientUserID  string    `json:"recipient_user_id"`
+	NetAmount        int       `json:"net_amount"`
+	ParkingSpotTitle string    `json:"parking_spot_title"`
+}
+
+func newPayoutPaidEvent(payout entity.Payout, spotTitle string) payoutPaidEvent {
+	return payoutPaidEvent{
+		EventID:          uuid.NewString(),
+		EventType:        RoutingKeyPayoutPaid,
+		OccurredAt:       time.Now().UTC(),
+		PayoutID:         payout.ID,
+		BookingID:        payout.BookingID,
+		RecipientUserID:  payout.OwnerID,
+		NetAmount:        payout.NetAmount,
+		ParkingSpotTitle: spotTitle,
 	}
 }
 

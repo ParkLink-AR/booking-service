@@ -174,6 +174,39 @@ func runMigrations(database *sql.DB) error {
 		-- responded in time) -- see CancelBooking/RejectBooking/ExpireStalePendingApprovals.
 		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancellation_reason TEXT
 			CHECK (cancellation_reason IN ('OWNER_REJECTED', 'OWNER_EXPIRED', 'DRIVER_CANCELLED'));
+
+		-- migrations/014: what ParkLink owes a parking spot's owner for a single completed,
+		-- paid booking, net of platform commission -- see usecase.GeneratePendingPayoutsUseCase
+		-- and usecase.MarkPayoutPaidUseCase.
+		CREATE TABLE IF NOT EXISTS payouts (
+			id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+			booking_id        UUID        NOT NULL UNIQUE REFERENCES bookings(id),
+			owner_id          UUID        NOT NULL,
+			payment_id        TEXT        NOT NULL,
+			gross_amount      INT         NOT NULL,
+			commission_amount INT         NOT NULL,
+			net_amount        INT         NOT NULL,
+			status            TEXT        NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'PAID')),
+			paid_at           TIMESTAMPTZ,
+			paid_by_admin_id  UUID,
+			proof_url         TEXT,
+			created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+		);
+		CREATE INDEX IF NOT EXISTS idx_payouts_status ON payouts (status);
+		CREATE INDEX IF NOT EXISTS idx_payouts_owner ON payouts (owner_id);
+
+		-- migrations/015: singleton row for ParkLink-wide settings the admin panel can
+		-- change without a deploy -- currently just the platform commission rate (basis
+		-- points; 500 = 5.00%).
+		CREATE TABLE IF NOT EXISTS platform_settings (
+			id                  BOOLEAN     PRIMARY KEY DEFAULT true CHECK (id),
+			commission_rate_bp  INT         NOT NULL DEFAULT 500,
+			updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_by_admin_id UUID
+		);
+		INSERT INTO platform_settings (id, commission_rate_bp)
+		VALUES (true, 500)
+		ON CONFLICT (id) DO NOTHING;
 	`)
 	return err
 }

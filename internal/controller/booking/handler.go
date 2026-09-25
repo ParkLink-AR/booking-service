@@ -64,6 +64,12 @@ type Handler struct {
 	listAdminTicketMessagesUseCase ListAdminTicketMessagesUseCase
 	adminReplyUseCase              AdminReplyUseCase
 	updateTicketStatusUseCase      UpdateTicketStatusUseCase
+	listAdminPayoutsUseCase        ListAdminPayoutsUseCase
+	getAdminPayoutUseCase          GetAdminPayoutUseCase
+	markPayoutPaidUseCase          MarkPayoutPaidUseCase
+	listOwnerBookingsUseCase       ListOwnerBookingsUseCase
+	getCommissionUseCase           GetCommissionUseCase
+	setCommissionUseCase           SetCommissionUseCase
 	location                       *time.Location
 }
 
@@ -95,6 +101,12 @@ func NewHandler(
 	listAdminTicketMessagesUseCase ListAdminTicketMessagesUseCase,
 	adminReplyUseCase AdminReplyUseCase,
 	updateTicketStatusUseCase UpdateTicketStatusUseCase,
+	listAdminPayoutsUseCase ListAdminPayoutsUseCase,
+	getAdminPayoutUseCase GetAdminPayoutUseCase,
+	markPayoutPaidUseCase MarkPayoutPaidUseCase,
+	listOwnerBookingsUseCase ListOwnerBookingsUseCase,
+	getCommissionUseCase GetCommissionUseCase,
+	setCommissionUseCase SetCommissionUseCase,
 	location *time.Location,
 ) *Handler {
 	return &Handler{
@@ -125,6 +137,12 @@ func NewHandler(
 		listAdminTicketMessagesUseCase: listAdminTicketMessagesUseCase,
 		adminReplyUseCase:              adminReplyUseCase,
 		updateTicketStatusUseCase:      updateTicketStatusUseCase,
+		listAdminPayoutsUseCase:        listAdminPayoutsUseCase,
+		getAdminPayoutUseCase:          getAdminPayoutUseCase,
+		markPayoutPaidUseCase:          markPayoutPaidUseCase,
+		listOwnerBookingsUseCase:       listOwnerBookingsUseCase,
+		getCommissionUseCase:           getCommissionUseCase,
+		setCommissionUseCase:           setCommissionUseCase,
 		location:                       location,
 	}
 }
@@ -158,6 +176,12 @@ func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Get("/admin/tickets/{id}/messages", handler.ListAdminTicketMessagesEndpoint)
 	router.Post("/admin/tickets/{id}/messages", handler.AdminReplyEndpoint)
 	router.Patch("/admin/tickets/{id}/status", handler.UpdateTicketStatusEndpoint)
+	router.Get("/admin/payouts", handler.ListAdminPayoutsEndpoint)
+	router.Get("/admin/payouts/{id}", handler.GetAdminPayoutEndpoint)
+	router.Post("/admin/payouts/{id}/mark-paid", handler.MarkPayoutPaidEndpoint)
+	router.Get("/admin/owners/{id}/bookings", handler.ListOwnerBookingsEndpoint)
+	router.Get("/admin/settings/commission", handler.GetCommissionEndpoint)
+	router.Put("/admin/settings/commission", handler.SetCommissionEndpoint)
 }
 
 func (handler *Handler) ListBookingsByUserEndpoint(responseWriter http.ResponseWriter, request *http.Request) {

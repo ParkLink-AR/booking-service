@@ -20,6 +20,7 @@ import (
 	"github.com/example/bookings-service/internal/repository/messaging"
 	"github.com/example/bookings-service/internal/repository/parkingclient"
 	"github.com/example/bookings-service/internal/repository/paymentclient"
+	"github.com/example/bookings-service/internal/repository/storage"
 	bookingservice "github.com/example/bookings-service/internal/service/booking"
 	ucbooking "github.com/example/bookings-service/internal/usecase/booking"
 )
@@ -59,6 +60,17 @@ func main() {
 		envOrDefault("PAYMENT_SERVICE_URL", "http://localhost:8004"),
 		os.Getenv("INTERNAL_SERVICE_KEY"),
 	)
+	storageClient, err := storage.NewClient(
+		context.Background(),
+		envOrDefault("R2_ACCOUNT_ID", ""),
+		envOrDefault("R2_BUCKET_NAME", ""),
+		envOrDefault("R2_PUBLIC_URL", ""),
+		envOrDefault("R2_ACCESS_KEY_ID", ""),
+		envOrDefault("R2_SECRET_ACCESS_KEY", ""),
+	)
+	if err != nil {
+		log.Fatalf("build storage client: %v", err)
+	}
 
 	// Services
 	bookingService := bookingservice.NewService(bookingRepository, parkingClient, buenosAiresLocation, holdDuration())
@@ -91,6 +103,13 @@ func main() {
 	listAdminTicketMessagesUseCase := ucbooking.NewListAdminTicketMessagesUseCase(bookingRepository, bookingRepository)
 	adminReplyUseCase := ucbooking.NewAdminReplyUseCase(bookingRepository, bookingRepository, bookingRepository, eventPublisher)
 	updateTicketStatusUseCase := ucbooking.NewUpdateTicketStatusUseCase(bookingRepository)
+	generatePendingPayoutsUseCase := ucbooking.NewGeneratePendingPayoutsUseCase(bookingRepository, bookingRepository, bookingRepository, parkingClient)
+	listAdminPayoutsUseCase := ucbooking.NewListAdminPayoutsUseCase(bookingRepository)
+	getAdminPayoutUseCase := ucbooking.NewGetAdminPayoutUseCase(bookingRepository)
+	markPayoutPaidUseCase := ucbooking.NewMarkPayoutPaidUseCase(bookingRepository, bookingRepository, bookingRepository, parkingClient, storageClient, eventPublisher)
+	listOwnerBookingsUseCase := ucbooking.NewListOwnerBookingsUseCase(parkingClient, bookingRepository)
+	getCommissionUseCase := ucbooking.NewGetCommissionUseCase(bookingRepository)
+	setCommissionUseCase := ucbooking.NewSetCommissionUseCase(bookingRepository)
 
 	// Router
 	router := chi.NewRouter()
@@ -112,6 +131,8 @@ func main() {
 		listTicketMessagesUseCase, addTicketMessageUseCase,
 		listAdminTicketsUseCase, getAdminTicketUseCase, listAdminTicketMessagesUseCase,
 		adminReplyUseCase, updateTicketStatusUseCase,
+		listAdminPayoutsUseCase, getAdminPayoutUseCase, markPayoutPaidUseCase,
+		listOwnerBookingsUseCase, getCommissionUseCase, setCommissionUseCase,
 		buenosAiresLocation,
 	)
 
@@ -133,6 +154,10 @@ func main() {
 	// Background job: mark CONFIRMED bookings COMPLETED once their time window has
 	// passed -- this is what makes a stay "over" and triggers the review prompts.
 	go runCompletionSweepJob(ctx, bookingRepository, logger)
+
+	// Background job: turn every booking that's been COMPLETED and paid for at least 24h
+	// into a PENDING payout row for ParkLink staff to review and mark paid.
+	go runPayoutEligibilityJob(ctx, generatePendingPayoutsUseCase, logger)
 
 	port := envOrDefault("HTTP_PORT", constants.DefaultHTTPPort)
 	server := &http.Server{Addr: ":" + port, Handler: router}
@@ -191,6 +216,12 @@ func loadHandlers(
 	listAdminTicketMessagesUseCase *ucbooking.ListAdminTicketMessagesUseCase,
 	adminReplyUseCase *ucbooking.AdminReplyUseCase,
 	updateTicketStatusUseCase *ucbooking.UpdateTicketStatusUseCase,
+	listAdminPayoutsUseCase *ucbooking.ListAdminPayoutsUseCase,
+	getAdminPayoutUseCase *ucbooking.GetAdminPayoutUseCase,
+	markPayoutPaidUseCase *ucbooking.MarkPayoutPaidUseCase,
+	listOwnerBookingsUseCase *ucbooking.ListOwnerBookingsUseCase,
+	getCommissionUseCase *ucbooking.GetCommissionUseCase,
+	setCommissionUseCase *ucbooking.SetCommissionUseCase,
 	location *time.Location,
 ) {
 	handlers := []Handler{
@@ -207,6 +238,8 @@ func loadHandlers(
 			listTicketMessagesUseCase, addTicketMessageUseCase,
 			listAdminTicketsUseCase, getAdminTicketUseCase, listAdminTicketMessagesUseCase,
 			adminReplyUseCase, updateTicketStatusUseCase,
+			listAdminPayoutsUseCase, getAdminPayoutUseCase, markPayoutPaidUseCase,
+			listOwnerBookingsUseCase, getCommissionUseCase, setCommissionUseCase,
 			location,
 		),
 	}
@@ -281,6 +314,27 @@ func runCompletionSweepJob(ctx context.Context, repo *bookingrepository.Reposito
 				logger.Error("completion sweep job failed", zap.Error(err))
 			} else if n > 0 {
 				logger.Info("marked bookings completed", zap.Int64("count", n))
+			}
+		}
+	}
+}
+
+// runPayoutEligibilityJob ticks every holdExpiryInterval and turns every booking that's been
+// COMPLETED and paid for at least 24h into a PENDING payout row -- see
+// GeneratePendingPayoutsUseCase for why one booking's failure never blocks the rest.
+func runPayoutEligibilityJob(ctx context.Context, useCase *ucbooking.GeneratePendingPayoutsUseCase, logger *zap.Logger) {
+	ticker := time.NewTicker(holdExpiryInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			created, err := useCase.Execute(ctx)
+			if err != nil {
+				logger.Error("payout eligibility job failed", zap.Error(err))
+			} else if created > 0 {
+				logger.Info("generated pending payouts", zap.Int("count", created))
 			}
 		}
 	}

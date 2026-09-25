@@ -53,6 +53,12 @@ type handlerSuite struct {
 	listAdminTicketMessagesUseCase *mocks.MockListAdminTicketMessagesUseCase
 	adminReplyUseCase              *mocks.MockAdminReplyUseCase
 	updateTicketStatusUseCase      *mocks.MockUpdateTicketStatusUseCase
+	listAdminPayoutsUseCase        *mocks.MockListAdminPayoutsUseCase
+	getAdminPayoutUseCase          *mocks.MockGetAdminPayoutUseCase
+	markPayoutPaidUseCase          *mocks.MockMarkPayoutPaidUseCase
+	listOwnerBookingsUseCase       *mocks.MockListOwnerBookingsUseCase
+	getCommissionUseCase           *mocks.MockGetCommissionUseCase
+	setCommissionUseCase           *mocks.MockSetCommissionUseCase
 	router                         chi.Router
 	location                       *time.Location
 }
@@ -88,6 +94,12 @@ func (s *handlerSuite) SetupTest() {
 	s.listAdminTicketMessagesUseCase = mocks.NewMockListAdminTicketMessagesUseCase(s.controller)
 	s.adminReplyUseCase = mocks.NewMockAdminReplyUseCase(s.controller)
 	s.updateTicketStatusUseCase = mocks.NewMockUpdateTicketStatusUseCase(s.controller)
+	s.listAdminPayoutsUseCase = mocks.NewMockListAdminPayoutsUseCase(s.controller)
+	s.getAdminPayoutUseCase = mocks.NewMockGetAdminPayoutUseCase(s.controller)
+	s.markPayoutPaidUseCase = mocks.NewMockMarkPayoutPaidUseCase(s.controller)
+	s.listOwnerBookingsUseCase = mocks.NewMockListOwnerBookingsUseCase(s.controller)
+	s.getCommissionUseCase = mocks.NewMockGetCommissionUseCase(s.controller)
+	s.setCommissionUseCase = mocks.NewMockSetCommissionUseCase(s.controller)
 
 	location, err := time.LoadLocation("America/Argentina/Buenos_Aires")
 	s.Require().NoError(err)
@@ -107,6 +119,8 @@ func (s *handlerSuite) SetupTest() {
 		s.listTicketMessagesUseCase, s.addTicketMessageUseCase,
 		s.listAdminTicketsUseCase, s.getAdminTicketUseCase, s.listAdminTicketMessagesUseCase,
 		s.adminReplyUseCase, s.updateTicketStatusUseCase,
+		s.listAdminPayoutsUseCase, s.getAdminPayoutUseCase, s.markPayoutPaidUseCase,
+		s.listOwnerBookingsUseCase, s.getCommissionUseCase, s.setCommissionUseCase,
 		s.location,
 	).RegisterRoutes(s.router)
 }
@@ -124,6 +138,16 @@ func (s *handlerSuite) doGet(path string) *httptest.ResponseRecorder {
 
 func (s *handlerSuite) doPost(path, body string) *httptest.ResponseRecorder {
 	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	recorder := httptest.NewRecorder()
+	s.router.ServeHTTP(recorder, request)
+	return recorder
+}
+
+func (s *handlerSuite) doWithHeaders(method, path, body string, headers map[string]string) *httptest.ResponseRecorder {
+	request := httptest.NewRequest(method, path, strings.NewReader(body))
+	for key, value := range headers {
+		request.Header.Set(key, value)
+	}
 	recorder := httptest.NewRecorder()
 	s.router.ServeHTTP(recorder, request)
 	return recorder
@@ -212,4 +236,36 @@ func (s *handlerSuite) TestListBookingsEndpoint_UsecaseInvalidDateRange() {
 
 	s.Equal(http.StatusBadRequest, recorder.Code)
 	s.Contains(recorder.Body.String(), "INVALID_DATE_RANGE")
+}
+
+func (s *handlerSuite) TestSetCommissionEndpoint_RejectsWithoutSuperadminRole() {
+	recorder := s.doWithHeaders(http.MethodPut, "/admin/settings/commission", `{"commission_rate_bp":700}`, map[string]string{
+		"X-User-Id":    "admin-1",
+		"X-Admin-Role": "ADMIN",
+	})
+
+	s.Equal(http.StatusForbidden, recorder.Code)
+	s.Contains(recorder.Body.String(), "FORBIDDEN")
+}
+
+func (s *handlerSuite) TestSetCommissionEndpoint_RejectsMissingAdminRoleHeader() {
+	recorder := s.doWithHeaders(http.MethodPut, "/admin/settings/commission", `{"commission_rate_bp":700}`, map[string]string{
+		"X-User-Id": "admin-1",
+	})
+
+	s.Equal(http.StatusForbidden, recorder.Code)
+}
+
+func (s *handlerSuite) TestSetCommissionEndpoint_SucceedsForSuperadmin() {
+	s.setCommissionUseCase.EXPECT().
+		Execute(gomock.Any(), 700, "admin-1").
+		Return(entity.PlatformSettings{CommissionRateBP: 700}, nil)
+
+	recorder := s.doWithHeaders(http.MethodPut, "/admin/settings/commission", `{"commission_rate_bp":700}`, map[string]string{
+		"X-User-Id":    "admin-1",
+		"X-Admin-Role": "SUPERADMIN",
+	})
+
+	s.Equal(http.StatusOK, recorder.Code)
+	s.Contains(recorder.Body.String(), "700")
 }
