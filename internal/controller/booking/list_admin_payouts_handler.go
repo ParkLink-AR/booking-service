@@ -12,7 +12,17 @@ import (
 
 // ListAdminPayoutsUseCase is the interface consumed by this handler for GET /admin/payouts.
 type ListAdminPayoutsUseCase interface {
-	Execute(ctx context.Context, status *enum.PayoutStatus) ([]entity.Payout, error)
+	Execute(ctx context.Context, status *enum.PayoutStatus, ownerID *string) ([]entity.Payout, error)
+}
+
+// parseOptionalOwnerID returns nil when raw is empty (the query param was omitted) -- unlike
+// path params elsewhere in this package, this one isn't UUID-validated: an unrecognized owner
+// id simply yields an empty result set, no different from a typo'd status.
+func parseOptionalOwnerID(raw string) *string {
+	if raw == "" {
+		return nil
+	}
+	return &raw
 }
 
 // parseOptionalPayoutStatus maps the ?status= query param ("pending"/"paid", lowercase to
@@ -40,7 +50,9 @@ func (handler *Handler) ListAdminPayoutsEndpoint(responseWriter http.ResponseWri
 		return
 	}
 
-	payouts, err := handler.listAdminPayoutsUseCase.Execute(request.Context(), status)
+	ownerID := parseOptionalOwnerID(request.URL.Query().Get("owner_id"))
+
+	payouts, err := handler.listAdminPayoutsUseCase.Execute(request.Context(), status, ownerID)
 	if err != nil {
 		writeDomainError(responseWriter, err)
 		return

@@ -106,10 +106,18 @@ func main() {
 	generatePendingPayoutsUseCase := ucbooking.NewGeneratePendingPayoutsUseCase(bookingRepository, bookingRepository, bookingRepository, parkingClient)
 	listAdminPayoutsUseCase := ucbooking.NewListAdminPayoutsUseCase(bookingRepository)
 	getAdminPayoutUseCase := ucbooking.NewGetAdminPayoutUseCase(bookingRepository)
-	markPayoutPaidUseCase := ucbooking.NewMarkPayoutPaidUseCase(bookingRepository, bookingRepository, bookingRepository, parkingClient, storageClient, eventPublisher)
 	listOwnerBookingsUseCase := ucbooking.NewListOwnerBookingsUseCase(parkingClient, bookingRepository)
 	getCommissionUseCase := ucbooking.NewGetCommissionUseCase(bookingRepository)
 	setCommissionUseCase := ucbooking.NewSetCommissionUseCase(bookingRepository)
+	getOwnerPendingBalancesUseCase := ucbooking.NewGetOwnerPendingBalancesUseCase(bookingRepository)
+	draftSettlementUseCase := ucbooking.NewDraftSettlementUseCase(bookingRepository)
+	confirmSettlementUseCase := ucbooking.NewConfirmSettlementUseCase(bookingRepository, bookingRepository, storageClient, eventPublisher)
+	cancelSettlementUseCase := ucbooking.NewCancelSettlementUseCase(bookingRepository)
+	getSettlementUseCase := ucbooking.NewGetSettlementUseCase(bookingRepository, bookingRepository)
+	listAdminSettlementsUseCase := ucbooking.NewListAdminSettlementsUseCase(bookingRepository)
+	listSettlementsByOwnerUseCase := ucbooking.NewListSettlementsByOwnerUseCase(bookingRepository)
+	getOwnSettlementUseCase := ucbooking.NewGetOwnSettlementUseCase(bookingRepository, bookingRepository)
+	listTicketsByUserUseCase := ucbooking.NewListTicketsByUserUseCase(bookingRepository)
 
 	// Router
 	router := chi.NewRouter()
@@ -131,8 +139,12 @@ func main() {
 		listTicketMessagesUseCase, addTicketMessageUseCase,
 		listAdminTicketsUseCase, getAdminTicketUseCase, listAdminTicketMessagesUseCase,
 		adminReplyUseCase, updateTicketStatusUseCase,
-		listAdminPayoutsUseCase, getAdminPayoutUseCase, markPayoutPaidUseCase,
+		listAdminPayoutsUseCase, getAdminPayoutUseCase,
 		listOwnerBookingsUseCase, getCommissionUseCase, setCommissionUseCase,
+		getOwnerPendingBalancesUseCase, draftSettlementUseCase, confirmSettlementUseCase,
+		cancelSettlementUseCase, getSettlementUseCase, listAdminSettlementsUseCase,
+		listSettlementsByOwnerUseCase, getOwnSettlementUseCase,
+		listTicketsByUserUseCase,
 		buenosAiresLocation,
 	)
 
@@ -218,10 +230,18 @@ func loadHandlers(
 	updateTicketStatusUseCase *ucbooking.UpdateTicketStatusUseCase,
 	listAdminPayoutsUseCase *ucbooking.ListAdminPayoutsUseCase,
 	getAdminPayoutUseCase *ucbooking.GetAdminPayoutUseCase,
-	markPayoutPaidUseCase *ucbooking.MarkPayoutPaidUseCase,
 	listOwnerBookingsUseCase *ucbooking.ListOwnerBookingsUseCase,
 	getCommissionUseCase *ucbooking.GetCommissionUseCase,
 	setCommissionUseCase *ucbooking.SetCommissionUseCase,
+	getOwnerPendingBalancesUseCase *ucbooking.GetOwnerPendingBalancesUseCase,
+	draftSettlementUseCase *ucbooking.DraftSettlementUseCase,
+	confirmSettlementUseCase *ucbooking.ConfirmSettlementUseCase,
+	cancelSettlementUseCase *ucbooking.CancelSettlementUseCase,
+	getSettlementUseCase *ucbooking.GetSettlementUseCase,
+	listAdminSettlementsUseCase *ucbooking.ListAdminSettlementsUseCase,
+	listSettlementsByOwnerUseCase *ucbooking.ListSettlementsByOwnerUseCase,
+	getOwnSettlementUseCase *ucbooking.GetOwnSettlementUseCase,
+	listTicketsByUserUseCase *ucbooking.ListTicketsByUserUseCase,
 	location *time.Location,
 ) {
 	handlers := []Handler{
@@ -238,8 +258,12 @@ func loadHandlers(
 			listTicketMessagesUseCase, addTicketMessageUseCase,
 			listAdminTicketsUseCase, getAdminTicketUseCase, listAdminTicketMessagesUseCase,
 			adminReplyUseCase, updateTicketStatusUseCase,
-			listAdminPayoutsUseCase, getAdminPayoutUseCase, markPayoutPaidUseCase,
+			listAdminPayoutsUseCase, getAdminPayoutUseCase,
 			listOwnerBookingsUseCase, getCommissionUseCase, setCommissionUseCase,
+			getOwnerPendingBalancesUseCase, draftSettlementUseCase, confirmSettlementUseCase,
+			cancelSettlementUseCase, getSettlementUseCase, listAdminSettlementsUseCase,
+			listSettlementsByOwnerUseCase, getOwnSettlementUseCase,
+			listTicketsByUserUseCase,
 			location,
 		),
 	}

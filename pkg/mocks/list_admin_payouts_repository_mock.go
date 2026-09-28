@@ -42,16 +42,16 @@ func (m *MockPayoutLister) EXPECT() *MockPayoutListerMockRecorder {
 }
 
 // ListPayouts mocks base method.
-func (m *MockPayoutLister) ListPayouts(ctx context.Context, status *enum.PayoutStatus) ([]entity.Payout, error) {
+func (m *MockPayoutLister) ListPayouts(ctx context.Context, status *enum.PayoutStatus, ownerID *string) ([]entity.Payout, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListPayouts", ctx, status)
+	ret := m.ctrl.Call(m, "ListPayouts", ctx, status, ownerID)
 	ret0, _ := ret[0].([]entity.Payout)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListPayouts indicates an expected call of ListPayouts.
-func (mr *MockPayoutListerMockRecorder) ListPayouts(ctx, status any) *gomock.Call {
+func (mr *MockPayoutListerMockRecorder) ListPayouts(ctx, status, ownerID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPayouts", reflect.TypeOf((*MockPayoutLister)(nil).ListPayouts), ctx, status)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPayouts", reflect.TypeOf((*MockPayoutLister)(nil).ListPayouts), ctx, status, ownerID)
 }

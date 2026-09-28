@@ -10,8 +10,12 @@ import (
 // paid booking, net of platform commission. There is exactly one payout per booking (see the
 // UNIQUE constraint on booking_id in migrations/014_create_payouts.sql) -- created once the
 // booking has been COMPLETED and paid for at least 24h (see
-// usecase.GeneratePendingPayoutsUseCase), and transitioned PENDING -> PAID by ParkLink staff
-// once the bank transfer has actually gone out (see usecase.MarkPayoutPaidUseCase).
+// usecase.GeneratePendingPayoutsUseCase). Payouts are never paid out individually anymore: an
+// admin drafts a Settlement that sweeps up every payout currently unattached for that owner
+// (see usecase.DraftSettlementUseCase), then confirms it once the bank transfer has actually
+// gone out (see usecase.ConfirmSettlementUseCase) -- confirmation is what flips Status to PAID
+// and stamps PaidAt/PaidByAdminID/ProofURL here, mirroring the values recorded on the
+// Settlement itself.
 type Payout struct {
 	ID        string
 	BookingID string
@@ -28,15 +32,32 @@ type Payout struct {
 	// NetAmount is what actually gets transferred to the owner: GrossAmount - CommissionAmount.
 	NetAmount int
 	Status    enum.PayoutStatus
-	// PaidAt/PaidByAdminID/ProofURL are all set together, once, by MarkPayoutPaidUseCase --
-	// nil until the payout leaves PENDING.
+	// SettlementID is set once a Settlement draft has swept this payout up (see
+	// usecase.DraftSettlementUseCase) -- nil while the payout is unattached, which is exactly
+	// the set GetOwnerPendingBalances/a future draft consider available. A payout can have a
+	// non-nil SettlementID while Status is still PENDING (drafted but not yet confirmed);
+	// Status only flips to PAID once usecase.ConfirmSettlementUseCase runs.
+	SettlementID *string
+	// PaidAt/PaidByAdminID/ProofURL are all set together, once, by ConfirmSettlementUseCase,
+	// mirroring the owning Settlement's own values -- nil until the payout leaves PENDING.
 	PaidAt        *time.Time
 	PaidByAdminID *string
 	// ProofURL points at the bank-transfer proof image ParkLink staff optionally attach
-	// when marking the payout paid, uploaded to R2 (see internal/repository/storage). Nil
+	// when confirming the settlement, uploaded to R2 (see internal/repository/storage). Nil
 	// when no proof was attached.
 	ProofURL  *string
 	CreatedAt time.Time
+}
+
+// OwnerPendingBalance is one row per owner with at least one unattached (not yet part of any
+// Settlement draft) payout -- powers GET /admin/owners/pending-balances, the admin-panel
+// screen an admin uses to decide who to settle next. See
+// internal/repository/booking/get_owner_pending_balances.go.
+type OwnerPendingBalance struct {
+	OwnerID          string
+	PendingNetAmount int
+	PendingCount     int
+	OldestPendingAt  time.Time
 }
 
 // PlatformSettings holds ParkLink-wide configuration the admin panel can change without a

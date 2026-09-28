@@ -9,10 +9,10 @@ import (
 
 //go:generate go tool mockgen -destination=../../../pkg/mocks/list_admin_payouts_repository_mock.go -package=mocks -source=./list_admin_payouts_usecase.go
 
-// PayoutLister returns every payout, optionally filtered by status. Implemented by
-// internal/repository/booking.
+// PayoutLister returns every payout, optionally filtered by status and/or owner id.
+// Implemented by internal/repository/booking.
 type PayoutLister interface {
-	ListPayouts(ctx context.Context, status *enum.PayoutStatus) ([]entity.Payout, error)
+	ListPayouts(ctx context.Context, status *enum.PayoutStatus, ownerID *string) ([]entity.Payout, error)
 }
 
 // ListAdminPayoutsUseCase powers GET /admin/payouts. There's no per-caller ownership check
@@ -26,6 +26,6 @@ func NewListAdminPayoutsUseCase(payouts PayoutLister) *ListAdminPayoutsUseCase {
 	return &ListAdminPayoutsUseCase{payouts: payouts}
 }
 
-func (uc *ListAdminPayoutsUseCase) Execute(ctx context.Context, status *enum.PayoutStatus) ([]entity.Payout, error) {
-	return uc.payouts.ListPayouts(ctx, status)
+func (uc *ListAdminPayoutsUseCase) Execute(ctx context.Context, status *enum.PayoutStatus, ownerID *string) ([]entity.Payout, error) {
+	return uc.payouts.ListPayouts(ctx, status, ownerID)
 }

@@ -42,16 +42,16 @@ func (m *MockListAdminPayoutsUseCase) EXPECT() *MockListAdminPayoutsUseCaseMockR
 }
 
 // Execute mocks base method.
-func (m *MockListAdminPayoutsUseCase) Execute(ctx context.Context, status *enum.PayoutStatus) ([]entity.Payout, error) {
+func (m *MockListAdminPayoutsUseCase) Execute(ctx context.Context, status *enum.PayoutStatus, ownerID *string) ([]entity.Payout, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Execute", ctx, status)
+	ret := m.ctrl.Call(m, "Execute", ctx, status, ownerID)
 	ret0, _ := ret[0].([]entity.Payout)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Execute indicates an expected call of Execute.
-func (mr *MockListAdminPayoutsUseCaseMockRecorder) Execute(ctx, status any) *gomock.Call {
+func (mr *MockListAdminPayoutsUseCaseMockRecorder) Execute(ctx, status, ownerID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockListAdminPayoutsUseCase)(nil).Execute), ctx, status)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockListAdminPayoutsUseCase)(nil).Execute), ctx, status, ownerID)
 }

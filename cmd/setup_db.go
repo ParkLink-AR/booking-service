@@ -177,7 +177,7 @@ func runMigrations(database *sql.DB) error {
 
 		-- migrations/014: what ParkLink owes a parking spot's owner for a single completed,
 		-- paid booking, net of platform commission -- see usecase.GeneratePendingPayoutsUseCase
-		-- and usecase.MarkPayoutPaidUseCase.
+		-- and (since migrations/016/017) usecase.DraftSettlementUseCase/ConfirmSettlementUseCase.
 		CREATE TABLE IF NOT EXISTS payouts (
 			id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
 			booking_id        UUID        NOT NULL UNIQUE REFERENCES bookings(id),
@@ -207,6 +207,33 @@ func runMigrations(database *sql.DB) error {
 		INSERT INTO platform_settings (id, commission_rate_bp)
 		VALUES (true, 500)
 		ON CONFLICT (id) DO NOTHING;
+
+		-- migrations/016: a single payout event to a parking-spot owner, covering every
+		-- payout that was unattached for them at the moment an admin drafted it -- see
+		-- usecase.DraftSettlementUseCase and usecase.ConfirmSettlementUseCase. Two-phase:
+		-- PENDING (drafted, amount frozen, nothing has moved yet) -> PAID (an admin
+		-- confirmed the bank transfer actually went out).
+		CREATE TABLE IF NOT EXISTS settlements (
+			id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+			owner_id            UUID        NOT NULL,
+			gross_amount        INT         NOT NULL,
+			commission_amount   INT         NOT NULL,
+			net_amount          INT         NOT NULL,
+			status              TEXT        NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'PAID')),
+			proof_url           TEXT,
+			paid_at             TIMESTAMPTZ,
+			paid_by_admin_id    UUID,
+			created_by_admin_id UUID        NOT NULL,
+			created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+		);
+		CREATE INDEX IF NOT EXISTS idx_settlements_owner ON settlements (owner_id);
+		CREATE INDEX IF NOT EXISTS idx_settlements_status ON settlements (status);
+
+		-- migrations/017: links an individual payout to the settlement draft that swept it
+		-- up -- non-null as soon as a payout is drafted into a settlement, regardless of
+		-- whether that settlement has been confirmed yet.
+		ALTER TABLE payouts ADD COLUMN IF NOT EXISTS settlement_id UUID REFERENCES settlements(id);
+		CREATE INDEX IF NOT EXISTS idx_payouts_settlement ON payouts (settlement_id);
 	`)
 	return err
 }

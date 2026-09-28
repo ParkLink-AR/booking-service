@@ -66,10 +66,18 @@ type Handler struct {
 	updateTicketStatusUseCase      UpdateTicketStatusUseCase
 	listAdminPayoutsUseCase        ListAdminPayoutsUseCase
 	getAdminPayoutUseCase          GetAdminPayoutUseCase
-	markPayoutPaidUseCase          MarkPayoutPaidUseCase
 	listOwnerBookingsUseCase       ListOwnerBookingsUseCase
 	getCommissionUseCase           GetCommissionUseCase
 	setCommissionUseCase           SetCommissionUseCase
+	getOwnerPendingBalancesUseCase GetOwnerPendingBalancesUseCase
+	draftSettlementUseCase         DraftSettlementUseCase
+	confirmSettlementUseCase       ConfirmSettlementUseCase
+	cancelSettlementUseCase        CancelSettlementUseCase
+	getSettlementUseCase           GetSettlementUseCase
+	listAdminSettlementsUseCase    ListAdminSettlementsUseCase
+	listSettlementsByOwnerUseCase  ListSettlementsByOwnerUseCase
+	getOwnSettlementUseCase        GetOwnSettlementUseCase
+	listTicketsByUserUseCase       ListTicketsByUserUseCase
 	location                       *time.Location
 }
 
@@ -103,10 +111,18 @@ func NewHandler(
 	updateTicketStatusUseCase UpdateTicketStatusUseCase,
 	listAdminPayoutsUseCase ListAdminPayoutsUseCase,
 	getAdminPayoutUseCase GetAdminPayoutUseCase,
-	markPayoutPaidUseCase MarkPayoutPaidUseCase,
 	listOwnerBookingsUseCase ListOwnerBookingsUseCase,
 	getCommissionUseCase GetCommissionUseCase,
 	setCommissionUseCase SetCommissionUseCase,
+	getOwnerPendingBalancesUseCase GetOwnerPendingBalancesUseCase,
+	draftSettlementUseCase DraftSettlementUseCase,
+	confirmSettlementUseCase ConfirmSettlementUseCase,
+	cancelSettlementUseCase CancelSettlementUseCase,
+	getSettlementUseCase GetSettlementUseCase,
+	listAdminSettlementsUseCase ListAdminSettlementsUseCase,
+	listSettlementsByOwnerUseCase ListSettlementsByOwnerUseCase,
+	getOwnSettlementUseCase GetOwnSettlementUseCase,
+	listTicketsByUserUseCase ListTicketsByUserUseCase,
 	location *time.Location,
 ) *Handler {
 	return &Handler{
@@ -139,10 +155,18 @@ func NewHandler(
 		updateTicketStatusUseCase:      updateTicketStatusUseCase,
 		listAdminPayoutsUseCase:        listAdminPayoutsUseCase,
 		getAdminPayoutUseCase:          getAdminPayoutUseCase,
-		markPayoutPaidUseCase:          markPayoutPaidUseCase,
 		listOwnerBookingsUseCase:       listOwnerBookingsUseCase,
 		getCommissionUseCase:           getCommissionUseCase,
 		setCommissionUseCase:           setCommissionUseCase,
+		getOwnerPendingBalancesUseCase: getOwnerPendingBalancesUseCase,
+		draftSettlementUseCase:         draftSettlementUseCase,
+		confirmSettlementUseCase:       confirmSettlementUseCase,
+		cancelSettlementUseCase:        cancelSettlementUseCase,
+		getSettlementUseCase:           getSettlementUseCase,
+		listAdminSettlementsUseCase:    listAdminSettlementsUseCase,
+		listSettlementsByOwnerUseCase:  listSettlementsByOwnerUseCase,
+		getOwnSettlementUseCase:        getOwnSettlementUseCase,
+		listTicketsByUserUseCase:       listTicketsByUserUseCase,
 		location:                       location,
 	}
 }
@@ -153,6 +177,7 @@ func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Get(parkingSpotsBasePath+"/{id}/reviews", handler.ListSpotReviewsEndpoint)
 	router.Get("/users/{id}/bookings/history", handler.ListBookingsByUserEndpoint)
 	router.Get("/users/{id}/reviews", handler.ListUserReviewsEndpoint)
+	router.Get("/users/{id}/tickets", handler.ListTicketsByUserEndpoint)
 	router.Post("/bookings", handler.CreateBookingEndpoint)
 	router.Post(parkingSpotsBasePath+"/bookable", handler.GetBookableSpotsEndpoint)
 	router.Post(parkingSpotsBasePath+"/ratings", handler.GetSpotRatingsEndpoint)
@@ -178,10 +203,17 @@ func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Patch("/admin/tickets/{id}/status", handler.UpdateTicketStatusEndpoint)
 	router.Get("/admin/payouts", handler.ListAdminPayoutsEndpoint)
 	router.Get("/admin/payouts/{id}", handler.GetAdminPayoutEndpoint)
-	router.Post("/admin/payouts/{id}/mark-paid", handler.MarkPayoutPaidEndpoint)
 	router.Get("/admin/owners/{id}/bookings", handler.ListOwnerBookingsEndpoint)
 	router.Get("/admin/settings/commission", handler.GetCommissionEndpoint)
 	router.Put("/admin/settings/commission", handler.SetCommissionEndpoint)
+	router.Get("/admin/owners/pending-balances", handler.GetOwnerPendingBalancesEndpoint)
+	router.Post("/admin/owners/{id}/settlements", handler.DraftSettlementEndpoint)
+	router.Post("/admin/settlements/{id}/confirm", handler.ConfirmSettlementEndpoint)
+	router.Post("/admin/settlements/{id}/cancel", handler.CancelSettlementEndpoint)
+	router.Get("/admin/settlements", handler.ListAdminSettlementsEndpoint)
+	router.Get("/admin/settlements/{id}", handler.GetAdminSettlementEndpoint)
+	router.Get("/users/{id}/settlements", handler.ListSettlementsByUserEndpoint)
+	router.Get("/settlements/{id}", handler.GetSettlementEndpoint)
 }
 
 func (handler *Handler) ListBookingsByUserEndpoint(responseWriter http.ResponseWriter, request *http.Request) {

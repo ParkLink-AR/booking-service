@@ -8,6 +8,10 @@ const (
 	// platform_settings row (commission rate, etc -- see migrations/015).
 	PlatformSettingsTableName = "platform_settings"
 
+	// SettlementsTableName is the PostgreSQL table backing the settlement repository -- see
+	// migrations/016_create_settlements.sql and entity.Settlement.
+	SettlementsTableName = "settlements"
+
 	// DefaultCommissionRateBP is the fallback commission rate (5.00%, in basis points).
 	// migrations/015_create_platform_settings.sql seeds this same value into the single
 	// platform_settings row, so this constant is only ever used as a defensive fallback if

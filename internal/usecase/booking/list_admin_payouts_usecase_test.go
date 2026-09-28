@@ -38,9 +38,9 @@ func (s *listAdminPayoutsUseCaseSuite) TearDownTest() {
 
 func (s *listAdminPayoutsUseCaseSuite) TestExecute_NoFilter_ReturnsWhateverTheRepositoryReturns() {
 	want := []entity.Payout{{ID: "p1"}, {ID: "p2"}}
-	s.payouts.EXPECT().ListPayouts(gomock.Any(), (*enum.PayoutStatus)(nil)).Return(want, nil)
+	s.payouts.EXPECT().ListPayouts(gomock.Any(), (*enum.PayoutStatus)(nil), (*string)(nil)).Return(want, nil)
 
-	got, err := s.useCase.Execute(s.context, nil)
+	got, err := s.useCase.Execute(s.context, nil, nil)
 
 	s.Require().NoError(err)
 	s.Equal(want, got)
@@ -49,9 +49,20 @@ func (s *listAdminPayoutsUseCaseSuite) TestExecute_NoFilter_ReturnsWhateverTheRe
 func (s *listAdminPayoutsUseCaseSuite) TestExecute_WithStatusFilter_PassesItThrough() {
 	status := enum.PayoutStatusPaid
 	want := []entity.Payout{{ID: "p1", Status: enum.PayoutStatusPaid}}
-	s.payouts.EXPECT().ListPayouts(gomock.Any(), &status).Return(want, nil)
+	s.payouts.EXPECT().ListPayouts(gomock.Any(), &status, (*string)(nil)).Return(want, nil)
 
-	got, err := s.useCase.Execute(s.context, &status)
+	got, err := s.useCase.Execute(s.context, &status, nil)
+
+	s.Require().NoError(err)
+	s.Equal(want, got)
+}
+
+func (s *listAdminPayoutsUseCaseSuite) TestExecute_WithOwnerIDFilter_PassesItThrough() {
+	ownerID := "owner-1"
+	want := []entity.Payout{{ID: "p1", OwnerID: ownerID}}
+	s.payouts.EXPECT().ListPayouts(gomock.Any(), (*enum.PayoutStatus)(nil), &ownerID).Return(want, nil)
+
+	got, err := s.useCase.Execute(s.context, nil, &ownerID)
 
 	s.Require().NoError(err)
 	s.Equal(want, got)

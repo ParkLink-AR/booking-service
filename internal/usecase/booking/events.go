@@ -20,7 +20,7 @@ const (
 	RoutingKeyBookingVerified        = "booking.verified"
 	RoutingKeyBookingMessageSent     = "booking.message_sent"
 	RoutingKeySupportTicketReplied   = "support.ticket_replied"
-	RoutingKeyPayoutPaid             = "payout.paid"
+	RoutingKeySettlementPaid         = "settlement.paid"
 )
 
 // EventPublisher publishes a domain event to the shared event bus under a routing key.
@@ -125,31 +125,30 @@ func newSupportTicketRepliedEvent(message entity.SupportTicketMessage, ticket en
 	}
 }
 
-// payoutPaidEvent is the wire shape of payout.paid -- fired once ParkLink staff mark a
-// payout as PAID (see MarkPayoutPaidUseCase). Self-contained like every other event in this
-// file: notifications-service needs no follow-up lookup to tell the owner their transfer
-// went out and how much it was for.
-type payoutPaidEvent struct {
-	EventID          string    `json:"event_id"`
-	EventType        string    `json:"event_type"`
-	OccurredAt       time.Time `json:"occurred_at"`
-	PayoutID         string    `json:"payout_id"`
-	BookingID        string    `json:"booking_id"`
-	RecipientUserID  string    `json:"recipient_user_id"`
-	NetAmount        int       `json:"net_amount"`
-	ParkingSpotTitle string    `json:"parking_spot_title"`
+// settlementPaidEvent is the wire shape of settlement.paid -- fired once an admin confirms a
+// settlement's bank transfer actually went out (see ConfirmSettlementUseCase), never at draft
+// time. Self-contained like every other event in this file: notifications-service builds the
+// push without a follow-up lookup. bookingCount is how many payouts this settlement covered,
+// for copy like "cobraste $X por 4 reservas".
+type settlementPaidEvent struct {
+	EventID         string    `json:"event_id"`
+	EventType       string    `json:"event_type"`
+	OccurredAt      time.Time `json:"occurred_at"`
+	SettlementID    string    `json:"settlement_id"`
+	RecipientUserID string    `json:"recipient_user_id"`
+	NetAmount       int       `json:"net_amount"`
+	BookingCount    int       `json:"booking_count"`
 }
 
-func newPayoutPaidEvent(payout entity.Payout, spotTitle string) payoutPaidEvent {
-	return payoutPaidEvent{
-		EventID:          uuid.NewString(),
-		EventType:        RoutingKeyPayoutPaid,
-		OccurredAt:       time.Now().UTC(),
-		PayoutID:         payout.ID,
-		BookingID:        payout.BookingID,
-		RecipientUserID:  payout.OwnerID,
-		NetAmount:        payout.NetAmount,
-		ParkingSpotTitle: spotTitle,
+func newSettlementPaidEvent(settlement entity.Settlement, bookingCount int) settlementPaidEvent {
+	return settlementPaidEvent{
+		EventID:         uuid.NewString(),
+		EventType:       RoutingKeySettlementPaid,
+		OccurredAt:      time.Now().UTC(),
+		SettlementID:    settlement.ID,
+		RecipientUserID: settlement.OwnerID,
+		NetAmount:       settlement.NetAmount,
+		BookingCount:    bookingCount,
 	}
 }
 

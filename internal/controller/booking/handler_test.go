@@ -1,6 +1,7 @@
 package booking_test
 
 import (
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -55,10 +56,18 @@ type handlerSuite struct {
 	updateTicketStatusUseCase      *mocks.MockUpdateTicketStatusUseCase
 	listAdminPayoutsUseCase        *mocks.MockListAdminPayoutsUseCase
 	getAdminPayoutUseCase          *mocks.MockGetAdminPayoutUseCase
-	markPayoutPaidUseCase          *mocks.MockMarkPayoutPaidUseCase
 	listOwnerBookingsUseCase       *mocks.MockListOwnerBookingsUseCase
 	getCommissionUseCase           *mocks.MockGetCommissionUseCase
 	setCommissionUseCase           *mocks.MockSetCommissionUseCase
+	getOwnerPendingBalancesUseCase *mocks.MockGetOwnerPendingBalancesUseCase
+	draftSettlementUseCase         *mocks.MockDraftSettlementUseCase
+	confirmSettlementUseCase       *mocks.MockConfirmSettlementUseCase
+	cancelSettlementUseCase        *mocks.MockCancelSettlementUseCase
+	getSettlementUseCase           *mocks.MockGetSettlementUseCase
+	listAdminSettlementsUseCase    *mocks.MockListAdminSettlementsUseCase
+	listSettlementsByOwnerUseCase  *mocks.MockListSettlementsByOwnerUseCase
+	getOwnSettlementUseCase        *mocks.MockGetOwnSettlementUseCase
+	listTicketsByUserUseCase       *mocks.MockListTicketsByUserUseCase
 	router                         chi.Router
 	location                       *time.Location
 }
@@ -96,10 +105,18 @@ func (s *handlerSuite) SetupTest() {
 	s.updateTicketStatusUseCase = mocks.NewMockUpdateTicketStatusUseCase(s.controller)
 	s.listAdminPayoutsUseCase = mocks.NewMockListAdminPayoutsUseCase(s.controller)
 	s.getAdminPayoutUseCase = mocks.NewMockGetAdminPayoutUseCase(s.controller)
-	s.markPayoutPaidUseCase = mocks.NewMockMarkPayoutPaidUseCase(s.controller)
 	s.listOwnerBookingsUseCase = mocks.NewMockListOwnerBookingsUseCase(s.controller)
 	s.getCommissionUseCase = mocks.NewMockGetCommissionUseCase(s.controller)
 	s.setCommissionUseCase = mocks.NewMockSetCommissionUseCase(s.controller)
+	s.getOwnerPendingBalancesUseCase = mocks.NewMockGetOwnerPendingBalancesUseCase(s.controller)
+	s.draftSettlementUseCase = mocks.NewMockDraftSettlementUseCase(s.controller)
+	s.confirmSettlementUseCase = mocks.NewMockConfirmSettlementUseCase(s.controller)
+	s.cancelSettlementUseCase = mocks.NewMockCancelSettlementUseCase(s.controller)
+	s.getSettlementUseCase = mocks.NewMockGetSettlementUseCase(s.controller)
+	s.listAdminSettlementsUseCase = mocks.NewMockListAdminSettlementsUseCase(s.controller)
+	s.listSettlementsByOwnerUseCase = mocks.NewMockListSettlementsByOwnerUseCase(s.controller)
+	s.getOwnSettlementUseCase = mocks.NewMockGetOwnSettlementUseCase(s.controller)
+	s.listTicketsByUserUseCase = mocks.NewMockListTicketsByUserUseCase(s.controller)
 
 	location, err := time.LoadLocation("America/Argentina/Buenos_Aires")
 	s.Require().NoError(err)
@@ -119,8 +136,12 @@ func (s *handlerSuite) SetupTest() {
 		s.listTicketMessagesUseCase, s.addTicketMessageUseCase,
 		s.listAdminTicketsUseCase, s.getAdminTicketUseCase, s.listAdminTicketMessagesUseCase,
 		s.adminReplyUseCase, s.updateTicketStatusUseCase,
-		s.listAdminPayoutsUseCase, s.getAdminPayoutUseCase, s.markPayoutPaidUseCase,
+		s.listAdminPayoutsUseCase, s.getAdminPayoutUseCase,
 		s.listOwnerBookingsUseCase, s.getCommissionUseCase, s.setCommissionUseCase,
+		s.getOwnerPendingBalancesUseCase, s.draftSettlementUseCase, s.confirmSettlementUseCase,
+		s.cancelSettlementUseCase, s.getSettlementUseCase, s.listAdminSettlementsUseCase,
+		s.listSettlementsByOwnerUseCase, s.getOwnSettlementUseCase,
+		s.listTicketsByUserUseCase,
 		s.location,
 	).RegisterRoutes(s.router)
 }
@@ -145,6 +166,25 @@ func (s *handlerSuite) doPost(path, body string) *httptest.ResponseRecorder {
 
 func (s *handlerSuite) doWithHeaders(method, path, body string, headers map[string]string) *httptest.ResponseRecorder {
 	request := httptest.NewRequest(method, path, strings.NewReader(body))
+	for key, value := range headers {
+		request.Header.Set(key, value)
+	}
+	recorder := httptest.NewRecorder()
+	s.router.ServeHTTP(recorder, request)
+	return recorder
+}
+
+// doPostMultipartNoProof issues a POST with a valid but empty multipart/form-data body (no
+// "proof" field) -- the shape a confirm-settlement request without a proof image takes on the
+// wire; FormFile("proof") sees http.ErrMissingFile, which both settlement endpoints that parse
+// multipart forms treat as "no proof supplied", not an error.
+func (s *handlerSuite) doPostMultipartNoProof(path string, headers map[string]string) *httptest.ResponseRecorder {
+	var body strings.Builder
+	writer := multipart.NewWriter(&body)
+	s.Require().NoError(writer.Close())
+
+	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body.String()))
+	request.Header.Set("Content-Type", writer.FormDataContentType())
 	for key, value := range headers {
 		request.Header.Set(key, value)
 	}
@@ -268,4 +308,214 @@ func (s *handlerSuite) TestSetCommissionEndpoint_SucceedsForSuperadmin() {
 
 	s.Equal(http.StatusOK, recorder.Code)
 	s.Contains(recorder.Body.String(), "700")
+}
+
+func (s *handlerSuite) TestListAdminPayoutsEndpoint_WithOwnerIDFilter_PassesItThrough() {
+	ownerID := "owner-1"
+	s.listAdminPayoutsUseCase.EXPECT().Execute(gomock.Any(), (*enum.PayoutStatus)(nil), &ownerID).
+		Return([]entity.Payout{{ID: "p1", OwnerID: ownerID}}, nil)
+
+	recorder := s.doGet("/admin/payouts?owner_id=" + ownerID)
+
+	s.Equal(http.StatusOK, recorder.Code)
+	s.Contains(recorder.Body.String(), "p1")
+}
+
+func (s *handlerSuite) TestListAdminPayoutsEndpoint_NoFilters() {
+	s.listAdminPayoutsUseCase.EXPECT().Execute(gomock.Any(), (*enum.PayoutStatus)(nil), (*string)(nil)).
+		Return([]entity.Payout{{ID: "p1"}}, nil)
+
+	recorder := s.doGet("/admin/payouts")
+
+	s.Equal(http.StatusOK, recorder.Code)
+}
+
+func (s *handlerSuite) TestGetOwnerPendingBalancesEndpoint_Success() {
+	s.getOwnerPendingBalancesUseCase.EXPECT().Execute(gomock.Any()).
+		Return([]entity.OwnerPendingBalance{{OwnerID: "owner-1", PendingNetAmount: 9500, PendingCount: 1}}, nil)
+
+	recorder := s.doGet("/admin/owners/pending-balances")
+
+	s.Equal(http.StatusOK, recorder.Code)
+	s.Contains(recorder.Body.String(), "owner-1")
+}
+
+func (s *handlerSuite) TestDraftSettlementEndpoint_Success() {
+	s.draftSettlementUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID, "admin-1").
+		Return(entity.Settlement{ID: "settlement-1", OwnerID: validParkingSpotID}, []entity.Payout{{ID: "p1"}}, nil)
+
+	recorder := s.doWithHeaders(http.MethodPost, "/admin/owners/"+validParkingSpotID+"/settlements", "", map[string]string{
+		"X-User-Id": "admin-1",
+	})
+
+	s.Equal(http.StatusCreated, recorder.Code)
+	s.Contains(recorder.Body.String(), "settlement-1")
+}
+
+func (s *handlerSuite) TestDraftSettlementEndpoint_MissingUserID() {
+	recorder := s.doPost("/admin/owners/"+validParkingSpotID+"/settlements", "")
+
+	s.Equal(http.StatusBadRequest, recorder.Code)
+	s.Contains(recorder.Body.String(), "MISSING_USER_ID")
+}
+
+func (s *handlerSuite) TestDraftSettlementEndpoint_InvalidOwnerID() {
+	recorder := s.doWithHeaders(http.MethodPost, "/admin/owners/not-a-uuid/settlements", "", map[string]string{
+		"X-User-Id": "admin-1",
+	})
+
+	s.Equal(http.StatusBadRequest, recorder.Code)
+	s.Contains(recorder.Body.String(), "INVALID_OWNER_ID")
+}
+
+func (s *handlerSuite) TestDraftSettlementEndpoint_NothingToSettle() {
+	s.draftSettlementUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID, "admin-1").
+		Return(entity.Settlement{}, nil, errors.NewInvalidInput("NOTHING_TO_SETTLE", "el propietario no tiene pagos pendientes"))
+
+	recorder := s.doWithHeaders(http.MethodPost, "/admin/owners/"+validParkingSpotID+"/settlements", "", map[string]string{
+		"X-User-Id": "admin-1",
+	})
+
+	s.Equal(http.StatusBadRequest, recorder.Code)
+	s.Contains(recorder.Body.String(), "NOTHING_TO_SETTLE")
+}
+
+func (s *handlerSuite) TestConfirmSettlementEndpoint_NoProof_Success() {
+	s.confirmSettlementUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID, "admin-1", []byte(nil), "").
+		Return(entity.Settlement{ID: validParkingSpotID}, []entity.Payout{{ID: "p1"}}, nil)
+
+	recorder := s.doPostMultipartNoProof("/admin/settlements/"+validParkingSpotID+"/confirm", map[string]string{
+		"X-User-Id": "admin-1",
+	})
+
+	s.Equal(http.StatusOK, recorder.Code)
+}
+
+func (s *handlerSuite) TestConfirmSettlementEndpoint_AlreadyConfirmed() {
+	s.confirmSettlementUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID, "admin-1", []byte(nil), "").
+		Return(entity.Settlement{}, nil, errors.NewConflict("esta liquidación ya fue confirmada"))
+
+	recorder := s.doPostMultipartNoProof("/admin/settlements/"+validParkingSpotID+"/confirm", map[string]string{
+		"X-User-Id": "admin-1",
+	})
+
+	s.Equal(http.StatusConflict, recorder.Code)
+	s.Contains(recorder.Body.String(), "ALREADY_CONFIRMED")
+}
+
+func (s *handlerSuite) TestConfirmSettlementEndpoint_NotFound() {
+	s.confirmSettlementUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID, "admin-1", []byte(nil), "").
+		Return(entity.Settlement{}, nil, errors.NewNotFound("settlement", validParkingSpotID))
+
+	recorder := s.doPostMultipartNoProof("/admin/settlements/"+validParkingSpotID+"/confirm", map[string]string{
+		"X-User-Id": "admin-1",
+	})
+
+	s.Equal(http.StatusNotFound, recorder.Code)
+	s.Contains(recorder.Body.String(), "SETTLEMENT_NOT_FOUND")
+}
+
+func (s *handlerSuite) TestCancelSettlementEndpoint_Success() {
+	s.cancelSettlementUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID).Return(nil)
+
+	recorder := s.doPost("/admin/settlements/"+validParkingSpotID+"/cancel", "")
+
+	s.Equal(http.StatusNoContent, recorder.Code)
+}
+
+func (s *handlerSuite) TestCancelSettlementEndpoint_AlreadyConfirmed() {
+	s.cancelSettlementUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID).
+		Return(errors.NewConflict("esta liquidación ya fue confirmada y no se puede cancelar"))
+
+	recorder := s.doPost("/admin/settlements/"+validParkingSpotID+"/cancel", "")
+
+	s.Equal(http.StatusConflict, recorder.Code)
+	s.Contains(recorder.Body.String(), "ALREADY_CONFIRMED")
+}
+
+func (s *handlerSuite) TestCancelSettlementEndpoint_NotFound() {
+	s.cancelSettlementUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID).
+		Return(errors.NewNotFound("settlement", validParkingSpotID))
+
+	recorder := s.doPost("/admin/settlements/"+validParkingSpotID+"/cancel", "")
+
+	s.Equal(http.StatusNotFound, recorder.Code)
+	s.Contains(recorder.Body.String(), "SETTLEMENT_NOT_FOUND")
+}
+
+func (s *handlerSuite) TestListAdminSettlementsEndpoint_Success() {
+	s.listAdminSettlementsUseCase.EXPECT().Execute(gomock.Any(), (*enum.SettlementStatus)(nil)).
+		Return([]entity.Settlement{{ID: "s1"}}, nil)
+
+	recorder := s.doGet("/admin/settlements")
+
+	s.Equal(http.StatusOK, recorder.Code)
+	s.Contains(recorder.Body.String(), "s1")
+}
+
+func (s *handlerSuite) TestListAdminSettlementsEndpoint_InvalidStatus() {
+	recorder := s.doGet("/admin/settlements?status=bogus")
+
+	s.Equal(http.StatusBadRequest, recorder.Code)
+	s.Contains(recorder.Body.String(), "INVALID_STATUS")
+}
+
+func (s *handlerSuite) TestGetAdminSettlementEndpoint_Success() {
+	s.getSettlementUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID).
+		Return(entity.Settlement{ID: validParkingSpotID}, []entity.Payout{{ID: "p1"}}, nil)
+
+	recorder := s.doGet("/admin/settlements/" + validParkingSpotID)
+
+	s.Equal(http.StatusOK, recorder.Code)
+	s.Contains(recorder.Body.String(), "p1")
+}
+
+func (s *handlerSuite) TestGetAdminSettlementEndpoint_NotFound() {
+	s.getSettlementUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID).
+		Return(entity.Settlement{}, nil, errors.NewNotFound("settlement", validParkingSpotID))
+
+	recorder := s.doGet("/admin/settlements/" + validParkingSpotID)
+
+	s.Equal(http.StatusNotFound, recorder.Code)
+	s.Contains(recorder.Body.String(), "SETTLEMENT_NOT_FOUND")
+}
+
+func (s *handlerSuite) TestListSettlementsByUserEndpoint_Success() {
+	s.listSettlementsByOwnerUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID).
+		Return([]entity.Settlement{{ID: "s1"}}, nil)
+
+	recorder := s.doGet("/users/" + validParkingSpotID + "/settlements")
+
+	s.Equal(http.StatusOK, recorder.Code)
+	s.Contains(recorder.Body.String(), "s1")
+}
+
+func (s *handlerSuite) TestGetSettlementEndpoint_MissingUserID() {
+	recorder := s.doGet("/settlements/" + validParkingSpotID)
+
+	s.Equal(http.StatusBadRequest, recorder.Code)
+	s.Contains(recorder.Body.String(), "MISSING_USER_ID")
+}
+
+func (s *handlerSuite) TestGetSettlementEndpoint_NotTheOwner_Forbidden() {
+	s.getOwnSettlementUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID, "someone-else").
+		Return(entity.Settlement{}, nil, errors.NewForbidden("no sos el dueño de esta liquidación"))
+
+	recorder := s.doWithHeaders(http.MethodGet, "/settlements/"+validParkingSpotID, "", map[string]string{
+		"X-User-Id": "someone-else",
+	})
+
+	s.Equal(http.StatusForbidden, recorder.Code)
+}
+
+func (s *handlerSuite) TestGetSettlementEndpoint_Success() {
+	s.getOwnSettlementUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID, "owner-1").
+		Return(entity.Settlement{ID: validParkingSpotID, OwnerID: "owner-1"}, []entity.Payout{{ID: "p1"}}, nil)
+
+	recorder := s.doWithHeaders(http.MethodGet, "/settlements/"+validParkingSpotID, "", map[string]string{
+		"X-User-Id": "owner-1",
+	})
+
+	s.Equal(http.StatusOK, recorder.Code)
+	s.Contains(recorder.Body.String(), "p1")
 }

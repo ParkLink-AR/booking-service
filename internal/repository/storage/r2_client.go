@@ -17,11 +17,10 @@ import (
 	"github.com/example/bookings-service/internal/domain/errors"
 )
 
-// Client uploads objects to Cloudflare R2 (S3-compatible) -- payout proof images live under
-// `payout-proofs/{ownerId}/{paymentId}.{ext}`, one folder per owner (so every proof for a
-// given owner sits together) named by the booking's payment reference (so a proof is
-// identifiable without joining back to bookings/payouts). Mirrors how parking-service keys
-// photos under `parking-spots/{spotId}/`.
+// Client uploads objects to Cloudflare R2 (S3-compatible) -- settlement proof images live
+// under `payout-proofs/{ownerId}/{settlementId}.{ext}` (see usecase.ConfirmSettlementUseCase),
+// one folder per owner so every proof for a given owner sits together. Mirrors how
+// parking-service keys photos under `parking-spots/{spotId}/`.
 type Client struct {
 	s3Client  *s3.Client
 	bucket    string
@@ -64,24 +63,25 @@ func extensionFor(contentType string) string {
 	return subtype
 }
 
-// UploadPayoutProof uploads a bank-transfer proof image for a payout to ownerID's folder,
-// named after paymentID (the booking's Mercado Pago payment reference), and returns its
-// public URL. Used by MarkPayoutPaidUseCase -- a failed upload aborts the whole mark-paid
-// call, so the payout is never marked PAID without whatever proof the admin attached.
-// Re-uploading a proof for the same payment reference overwrites the previous object at
-// that key -- acceptable since a payout can only be marked paid once (see MarkPayoutPaid's
-// PENDING-only WHERE clause), so this path is never written twice for the same payout.
-func (client *Client) UploadPayoutProof(ctx context.Context, ownerID, paymentID, contentType string, data []byte) (string, error) {
-	key := fmt.Sprintf("payout-proofs/%s/%s.%s", ownerID, paymentID, extensionFor(contentType))
+// UploadPayoutProof uploads a bank-transfer proof image to ownerID's folder, named after key
+// (the settlement's own id -- see usecase.ConfirmSettlementUseCase, which is the only caller
+// left of this method now that payouts settle in batches), and returns its public URL. A
+// failed upload aborts the whole confirm call, so a settlement is never confirmed PAID
+// without whatever proof the admin attached. Re-uploading a proof for the same settlement
+// overwrites the previous object at that key -- acceptable since a settlement can only be
+// confirmed once (see ConfirmSettlement's PENDING-only check), so this path is never written
+// twice for the same settlement.
+func (client *Client) UploadPayoutProof(ctx context.Context, ownerID, key, contentType string, data []byte) (string, error) {
+	objectKey := fmt.Sprintf("payout-proofs/%s/%s.%s", ownerID, key, extensionFor(contentType))
 
 	if _, err := client.s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(client.bucket),
-		Key:         aws.String(key),
+		Key:         aws.String(objectKey),
 		Body:        bytes.NewReader(data),
 		ContentType: aws.String(contentType),
 	}); err != nil {
 		return "", errors.NewInternalError("storage.UploadPayoutProof", err)
 	}
 
-	return fmt.Sprintf("%s/%s", client.publicURL, key), nil
+	return fmt.Sprintf("%s/%s", client.publicURL, objectKey), nil
 }
