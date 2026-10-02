@@ -68,15 +68,19 @@ func (s *getOwnSettlementUseCaseSuite) TestExecute_NotTheOwner_RejectsWithForbid
 	s.True(errors.IsForbidden(err))
 }
 
-func (s *getOwnSettlementUseCaseSuite) TestExecute_StillPending_HiddenFromOwnerAsNotFound() {
+// A still-PENDING draft (admin already prepared it, hasn't confirmed payment yet) is visible
+// to its own owner too, same as a PAID one -- the owner sees "being prepared" in the meantime.
+func (s *getOwnSettlementUseCaseSuite) TestExecute_StillPending_VisibleToOwner() {
 	want := entity.Settlement{ID: s.settlementID, OwnerID: s.ownerID, Status: enum.SettlementStatusPending}
+	wantPayouts := []entity.Payout{{ID: "p1"}}
 	s.settlements.EXPECT().GetSettlementByID(gomock.Any(), s.settlementID).Return(want, nil)
+	s.payouts.EXPECT().ListPayoutsBySettlement(gomock.Any(), s.settlementID).Return(wantPayouts, nil)
 
 	got, gotPayouts, err := s.useCase.Execute(s.context, s.settlementID, s.ownerID)
 
-	s.Equal(entity.Settlement{}, got)
-	s.Nil(gotPayouts)
-	s.True(errors.IsNotFound(err))
+	s.Require().NoError(err)
+	s.Equal(want, got)
+	s.Equal(wantPayouts, gotPayouts)
 }
 
 func (s *getOwnSettlementUseCaseSuite) TestExecute_PayoutsLookupFails_PropagatesError() {

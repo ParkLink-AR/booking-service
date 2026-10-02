@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/example/bookings-service/internal/domain/entity"
-	"github.com/example/bookings-service/internal/domain/enum"
 	"github.com/example/bookings-service/internal/domain/errors"
 )
 
@@ -13,11 +12,9 @@ import (
 // GetOwnSettlementUseCase powers GET /settlements/{id} -- the owner's own self-service detail
 // view. Unlike GetSettlementUseCase (admin), this is reachable by any logged-in user's token,
 // so it enforces that the caller is the settlement's own owner -- a ForbiddenError, same
-// convention as this codebase's other "not yours" checks (see e.g. GetTicketUseCase). It also
-// never reveals a still-PENDING draft to its own owner: an owner has no reason to see a
-// settlement an admin hasn't confirmed yet, since it isn't "their money released" until
-// confirmation -- surfaced as NotFoundError, since as far as the owner's own view is
-// concerned nothing settleable exists there yet.
+// convention as this codebase's other "not yours" checks (see e.g. GetTicketUseCase). A still-
+// PENDING draft is visible here too (see ListSettlementsByOwnerUseCase) -- the owner sees it as
+// "being prepared" until ConfirmSettlementUseCase flips it to PAID.
 type GetOwnSettlementUseCase struct {
 	settlements SettlementGetter
 	payouts     PayoutsBySettlementLister
@@ -34,9 +31,6 @@ func (uc *GetOwnSettlementUseCase) Execute(ctx context.Context, settlementID, ca
 	}
 	if callerID != settlement.OwnerID {
 		return entity.Settlement{}, nil, errors.NewForbidden("no sos el dueño de esta liquidación")
-	}
-	if settlement.Status != enum.SettlementStatusPaid {
-		return entity.Settlement{}, nil, errors.NewNotFound("settlement", settlementID)
 	}
 	payouts, err := uc.payouts.ListPayoutsBySettlement(ctx, settlementID)
 	if err != nil {

@@ -39,13 +39,15 @@ func (s *listSettlementsByOwnerUseCaseSuite) TearDownTest() {
 	s.controller.Finish()
 }
 
-// TestExecute_AlwaysFiltersToPaid proves the self-service list can never surface a
-// drafted-but-unconfirmed settlement to its own owner -- it always passes SettlementStatusPaid
-// to the repository, regardless of what statuses might exist for this owner.
-func (s *listSettlementsByOwnerUseCaseSuite) TestExecute_AlwaysFiltersToPaid() {
-	paid := enum.SettlementStatusPaid
-	want := []entity.Settlement{{ID: "s1", OwnerID: s.ownerID, Status: enum.SettlementStatusPaid}}
-	s.settlements.EXPECT().ListSettlementsByOwner(gomock.Any(), s.ownerID, &paid).Return(want, nil)
+// TestExecute_ReturnsAllStatusesUnfiltered proves the self-service list surfaces both a
+// still-PENDING draft and a confirmed PAID settlement to their own owner -- it passes no status
+// filter to the repository, so the owner can see "being prepared" as well as "paid".
+func (s *listSettlementsByOwnerUseCaseSuite) TestExecute_ReturnsAllStatusesUnfiltered() {
+	want := []entity.Settlement{
+		{ID: "s1", OwnerID: s.ownerID, Status: enum.SettlementStatusPending},
+		{ID: "s2", OwnerID: s.ownerID, Status: enum.SettlementStatusPaid},
+	}
+	s.settlements.EXPECT().ListSettlementsByOwner(gomock.Any(), s.ownerID, (*enum.SettlementStatus)(nil)).Return(want, nil)
 
 	got, err := s.useCase.Execute(s.context, s.ownerID)
 

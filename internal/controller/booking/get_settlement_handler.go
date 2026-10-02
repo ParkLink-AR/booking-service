@@ -21,7 +21,8 @@ type GetOwnSettlementUseCase interface {
 // GetSettlementEndpoint is the owner's own self-service settlement detail view. Unlike
 // GetAdminSettlementEndpoint, this is reachable by any logged-in user's token (not
 // gateway-ADMIN-gated), so it MUST check the caller owns the settlement -- enforced by
-// GetOwnSettlementUseCase, which also hides a still-PENDING draft from its own owner.
+// GetOwnSettlementUseCase. A still-PENDING draft is returned here too, so the owner can see
+// "being prepared" ahead of confirmation.
 func (handler *Handler) GetSettlementEndpoint(responseWriter http.ResponseWriter, request *http.Request) {
 	settlementID := chi.URLParam(request, "id")
 	if _, err := uuid.Parse(settlementID); err != nil {

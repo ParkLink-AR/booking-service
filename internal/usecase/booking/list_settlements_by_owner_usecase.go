@@ -16,9 +16,10 @@ type OwnerSettlementLister interface {
 }
 
 // ListSettlementsByOwnerUseCase powers GET /users/{id}/settlements -- the owner's own
-// self-service "Finanzas" history. Always filters to PAID: a drafted-but-unconfirmed
-// settlement isn't "their money released" yet, so it has no reason to appear in an owner's
-// own list, same reasoning as GetOwnSettlementUseCase's detail view.
+// self-service "Finanzas" history. Returns both PENDING and PAID settlements, unfiltered: an
+// admin drafting a settlement (DraftSettlementUseCase) is a visible, owner-facing event --
+// the owner should see "we're preparing your payout" as soon as it happens, not only once it's
+// confirmed PAID. Same reasoning applies to GetOwnSettlementUseCase's detail view.
 type ListSettlementsByOwnerUseCase struct {
 	settlements OwnerSettlementLister
 }
@@ -28,6 +29,5 @@ func NewListSettlementsByOwnerUseCase(settlements OwnerSettlementLister) *ListSe
 }
 
 func (uc *ListSettlementsByOwnerUseCase) Execute(ctx context.Context, ownerID string) ([]entity.Settlement, error) {
-	paid := enum.SettlementStatusPaid
-	return uc.settlements.ListSettlementsByOwner(ctx, ownerID, &paid)
+	return uc.settlements.ListSettlementsByOwner(ctx, ownerID, nil)
 }
