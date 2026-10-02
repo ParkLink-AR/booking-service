@@ -42,8 +42,8 @@ func (service *Service) CreateBooking(ctx context.Context, input entity.CreateBo
 		return entity.Booking{}, errors.NewInvalidInput("INVALID_DATE_RANGE", "start must be before end")
 	}
 
-	start, end, amount := input.Start, input.End, input.Amount
-	var ownerAmount int
+	start, end := input.Start, input.End
+	var amount, ownerAmount int
 
 	if input.Kind == enum.BookingKindStay {
 		quote, err := service.priceStay(ctx, input)
