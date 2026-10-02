@@ -1,0 +1,13 @@
+-- The owner's own price at the moment this booking was priced (see Service.priceHourly/
+-- priceStay), before the platform commission was added on top for the driver -- amount
+-- is that inclusive total. Stored once at creation time so a later admin change to the
+-- commission rate can never retroactively change what an already-made booking's owner is
+-- paid out: GeneratePendingPayoutsUseCase reads this instead of re-deriving the owner's
+-- cut from `amount` at whatever rate happens to be configured when the payout sweep runs,
+-- which could be days after the booking (and any number of rate changes) later.
+--
+-- Nullable: a booking created before this column existed has no way to recover what rate
+-- was actually in effect for it -- GeneratePendingPayoutsUseCase falls back to backing the
+-- commission out of `amount` at today's rate for those, same as it did for every booking
+-- before this migration.
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS owner_amount INT;

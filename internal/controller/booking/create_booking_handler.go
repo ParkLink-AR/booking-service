@@ -48,9 +48,10 @@ func (handler *Handler) CreateBookingEndpoint(responseWriter http.ResponseWriter
 		return
 	}
 	// Empty Kind means a client built before STAY existed -- default to HOURLY so it keeps
-	// working unchanged. A STAY booking's Amount is never trusted from the request body (see
-	// Service.CreateBooking), but it's still required here to be positive for HOURLY, which
-	// still has no server-side price of its own to check it against.
+	// working unchanged. Neither kind's Amount is actually trusted from the request body
+	// anymore (see Service.CreateBooking, priceStay/priceHourly) -- HOURLY still requires
+	// it to be positive here purely as a request-shape check, kept for backwards
+	// compatibility with clients still sending their own (now-ignored) estimate.
 	kindLabel := body.Kind
 	if kindLabel == "" {
 		kindLabel = "HOURLY"

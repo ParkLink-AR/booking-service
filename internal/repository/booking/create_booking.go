@@ -68,10 +68,10 @@ func (repository *Repository) CreateBooking(ctx context.Context, booking entity.
 
 	row := tx.QueryRowContext(ctx, `
 		INSERT INTO `+constants.BookingsTableName+`
-			(parking_spot_id, user_id, time_range, status, hold_expires_at, amount, capacity, kind)
-		VALUES ($1, $2, tstzrange($3, $4, '[)'), $5::booking_status, $6, $7, $8, $9)
+			(parking_spot_id, user_id, time_range, status, hold_expires_at, amount, owner_amount, capacity, kind)
+		VALUES ($1, $2, tstzrange($3, $4, '[)'), $5::booking_status, $6, $7, $8, $9, $10)
 		RETURNING id, created_at, updated_at
-	`, booking.ParkingSpotID, booking.UserID, booking.Start, booking.End, booking.Status.String(), booking.HoldExpiresAt, booking.Amount, capacity, booking.Kind.String())
+	`, booking.ParkingSpotID, booking.UserID, booking.Start, booking.End, booking.Status.String(), booking.HoldExpiresAt, booking.Amount, booking.OwnerAmount, capacity, booking.Kind.String())
 
 	var id string
 	var createdAt, updatedAt time.Time

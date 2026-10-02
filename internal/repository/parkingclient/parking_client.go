@@ -22,9 +22,10 @@ import (
 // spotResponse is the subset of parking-service's GET /parking-spots/{id}
 // response this client cares about.
 type spotResponse struct {
-	OwnerID string `json:"ownerId"`
-	Title   string `json:"title"`
-	Status  string `json:"status"`
+	OwnerID      string   `json:"ownerId"`
+	Title        string   `json:"title"`
+	Status       string   `json:"status"`
+	PricePerHour *float64 `json:"pricePerHour"`
 }
 
 // Client calls parking-service directly inside the docker network, the same
@@ -121,6 +122,21 @@ func (client *Client) GetSpotIDsForOwner(ctx context.Context, ownerID string) ([
 		ids[i] = spot.ID
 	}
 	return ids, nil
+}
+
+// GetHourlyPrice returns the owner's own hourly rate for a spot (what the owner
+// receives per hour, before the platform commission is added on top for the
+// driver -- see Service.priceHourly). Returns an error if the spot has no
+// hourly rate configured (stay-only spots have a nil pricePerHour).
+func (client *Client) GetHourlyPrice(ctx context.Context, spotID string) (float64, error) {
+	spot, err := client.getSpot(ctx, spotID)
+	if err != nil {
+		return 0, err
+	}
+	if spot.PricePerHour == nil {
+		return 0, errors.NewInvalidInput("HOURLY_NOT_AVAILABLE", "this parking spot does not accept hourly bookings")
+	}
+	return *spot.PricePerHour, nil
 }
 
 // IsSpotActive reports whether a parking spot currently accepts new reservations. A spot

@@ -72,7 +72,19 @@ func (uc *GeneratePendingPayoutsUseCase) Execute(ctx context.Context) (int, erro
 			continue
 		}
 
-		commission := b.Amount * settings.CommissionRateBP / 10000
+		// b.OwnerAmount is the owner's own price as it was fixed at booking creation time
+		// (see Service.priceHourly/priceStay) -- using it directly means a commission-rate
+		// change made any time after this booking was created (even between booking and
+		// this sweep running) can never retroactively change its payout. Only a booking
+		// that predates the owner_amount column (nil) falls back to backing the owner's
+		// cut out of b.Amount at *today's* rate, same approximation this usecase always
+		// used before that column existed.
+		var commission int
+		if b.OwnerAmount != nil {
+			commission = b.Amount - *b.OwnerAmount
+		} else {
+			commission = b.Amount * settings.CommissionRateBP / (10000 + settings.CommissionRateBP)
+		}
 		_, err = uc.payouts.CreatePayout(ctx, entity.Payout{
 			BookingID:        b.ID,
 			OwnerID:          spot.OwnerID,

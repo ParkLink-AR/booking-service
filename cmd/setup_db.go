@@ -234,6 +234,14 @@ func runMigrations(database *sql.DB) error {
 		-- whether that settlement has been confirmed yet.
 		ALTER TABLE payouts ADD COLUMN IF NOT EXISTS settlement_id UUID REFERENCES settlements(id);
 		CREATE INDEX IF NOT EXISTS idx_payouts_settlement ON payouts (settlement_id);
+
+		-- migrations/018: the owner's own price at the moment this booking was priced,
+		-- before the platform commission was added on top for the driver -- stored once so
+		-- a later admin change to the commission rate can never retroactively change what
+		-- an already-made booking's owner gets paid out. Nullable: a booking from before
+		-- this column existed has no way to recover what rate was actually in effect for
+		-- it (see GeneratePendingPayoutsUseCase's fallback for that case).
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS owner_amount INT;
 	`)
 	return err
 }

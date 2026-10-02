@@ -206,6 +206,10 @@ func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Get("/admin/owners/{id}/bookings", handler.ListOwnerBookingsEndpoint)
 	router.Get("/admin/settings/commission", handler.GetCommissionEndpoint)
 	router.Put("/admin/settings/commission", handler.SetCommissionEndpoint)
+	// Same read, exposed at a non-admin path: mobile needs the current commission rate to
+	// show a price breakdown (owner receives X, driver pays X + commission) when creating a
+	// spot and when viewing one, without requiring admin auth.
+	router.Get("/settings/commission", handler.GetCommissionEndpoint)
 	router.Get("/admin/owners/pending-balances", handler.GetOwnerPendingBalancesEndpoint)
 	router.Post("/admin/owners/{id}/settlements", handler.DraftSettlementEndpoint)
 	router.Post("/admin/settlements/{id}/confirm", handler.ConfirmSettlementEndpoint)

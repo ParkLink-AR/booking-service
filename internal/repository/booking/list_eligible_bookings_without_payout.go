@@ -18,7 +18,7 @@ func (repository *Repository) ListEligibleBookingsWithoutPayout(ctx context.Cont
 		SELECT
 			b.id, b.parking_spot_id, b.user_id,
 			lower(b.time_range), upper(b.time_range),
-			b.status, b.hold_expires_at, b.owner_response_deadline, b.amount, COALESCE(b.payment_id, ''), b.paid_at,
+			b.status, b.hold_expires_at, b.owner_response_deadline, b.amount, b.owner_amount, COALESCE(b.payment_id, ''), b.paid_at,
 			b.cancellation_reason, b.kind, b.verification_code, b.verification_attempts, b.verified_at,
 			b.created_at, b.updated_at
 		FROM `+constants.BookingsTableName+` b
@@ -41,7 +41,7 @@ func (repository *Repository) ListEligibleBookingsWithoutPayout(ctx context.Cont
 		if err := rows.Scan(
 			&b.ID, &b.ParkingSpotID, &b.UserID,
 			&b.Start, &b.End,
-			&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.PaymentID, &b.PaidAt,
+			&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.OwnerAmount, &b.PaymentID, &b.PaidAt,
 			&b.CancellationReason, &kindLabel, &b.VerificationCode, &b.VerificationAttempts, &b.VerifiedAt,
 			&b.CreatedAt, &b.UpdatedAt,
 		); err != nil {

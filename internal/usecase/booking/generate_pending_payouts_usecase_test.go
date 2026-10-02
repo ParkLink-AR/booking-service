@@ -95,9 +95,47 @@ func (s *generatePendingPayoutsUseCaseSuite) TestExecute_ComputesCommissionAtCon
 	s.Equal("b1", captured.BookingID)
 	s.Equal("owner1", captured.OwnerID)
 	s.Equal("mp-payment-123", captured.PaymentID)
+	// b.Amount (10000) is the driver's inclusive total -- the owner's price plus 5%
+	// commission already added on top at booking time. Backing the commission out of
+	// that total (rate/(10000+rate), not a straight rate/10000 cut of it) is what makes
+	// NetAmount land on the owner's original ~9524, not short them a second 5% on top of
+	// the one already collected from the driver: 10000*500/10500 = 476 (int division).
 	s.Equal(10000, captured.GrossAmount)
+	s.Equal(476, captured.CommissionAmount)
+	s.Equal(9524, captured.NetAmount)
+}
+
+// A booking created with the owner_amount column populated must have its payout derived
+// from that stored value, never from whatever commission rate happens to be configured
+// when this sweep runs -- otherwise an admin raising/lowering the rate after the booking
+// was made would retroactively change what its owner gets paid. The rate returned here
+// (2000bp = 20%) would back out a very different commission than OwnerAmount implies,
+// proving it's ignored for this booking.
+func (s *generatePendingPayoutsUseCaseSuite) TestExecute_UsesStoredOwnerAmount_IgnoresCurrentRate() {
+	ownerAmount := 10000
+	s.bookings.EXPECT().ListEligibleBookingsWithoutPayout(gomock.Any()).
+		Return([]entity.Booking{{
+			ID: "b1", ParkingSpotID: "spot1", Amount: 10500, OwnerAmount: &ownerAmount, PaymentID: "mp-payment-123",
+		}}, nil)
+	s.settings.EXPECT().GetCommissionRate(gomock.Any()).
+		Return(entity.PlatformSettings{CommissionRateBP: 2000}, nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), "spot1").
+		Return(entity.SpotDetails{OwnerID: "owner1", Title: "Cochera"}, nil)
+
+	var captured entity.Payout
+	s.payouts.EXPECT().CreatePayout(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, payout entity.Payout) (entity.Payout, error) {
+			captured = payout
+			return payout, nil
+		})
+
+	created, err := s.useCase.Execute(s.context)
+
+	s.Require().NoError(err)
+	s.Equal(1, created)
+	s.Equal(10500, captured.GrossAmount)
 	s.Equal(500, captured.CommissionAmount)
-	s.Equal(9500, captured.NetAmount)
+	s.Equal(10000, captured.NetAmount)
 }
 
 func (s *generatePendingPayoutsUseCaseSuite) TestExecute_OneFailingSpotLookup_DoesNotStopTheRest() {

@@ -19,7 +19,13 @@ type Booking struct {
 	// to approve/reject before the sweep auto-cancels and refunds it.
 	OwnerResponseDeadline *time.Time
 	Amount                int
-	PaymentID             string
+	// OwnerAmount is the owner's own price at the moment this booking was priced (see
+	// Service.priceHourly/priceStay) -- Amount minus whatever platform commission was
+	// added on top for the driver, fixed at creation time so a later admin change to the
+	// commission rate never retroactively changes an already-made booking's payout (see
+	// GeneratePendingPayoutsUseCase). Nil for a booking that predates this field.
+	OwnerAmount *int
+	PaymentID   string
 	// PaidAt is set once, the moment ConfirmBooking records a successful Mercado Pago
 	// payment (PENDING_PAYMENT -> PENDING_OWNER_APPROVAL). It never changes afterward --
 	// approve/reject/cancel/verify all leave it untouched -- so it stays the one

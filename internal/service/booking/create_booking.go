@@ -2,6 +2,7 @@ package booking
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"github.com/example/bookings-service/internal/domain/entity"
@@ -15,7 +16,10 @@ import (
 //     or deleted spot must reject any new reservation, even though its already-existing
 //     bookings keep working), then that the requested range falls within the parking
 //     spot's published hours (input.ParkingSpotSchedule, provided by the caller --
-//     booking-service does not fetch this itself), same as before this Kind existed.
+//     booking-service does not fetch this itself), same as before this Kind existed. Its
+//     Amount is priced the same way a STAY is (see priceHourly): never trusted from
+//     input, so a modified client can't substitute a cheaper price or skip the platform
+//     commission that gets added on top of the owner's own rate.
 //   - STAY skips both of those checks and instead asks parking-service for a quote (see
 //     priceStay): that lookup only ever finds an active spot, so a paused or deleted one
 //     surfaces the same rejection there, and the spot's owner-configured stay terms decide
@@ -39,13 +43,14 @@ func (service *Service) CreateBooking(ctx context.Context, input entity.CreateBo
 	}
 
 	start, end, amount := input.Start, input.End, input.Amount
+	var ownerAmount int
 
 	if input.Kind == enum.BookingKindStay {
 		quote, err := service.priceStay(ctx, input)
 		if err != nil {
 			return entity.Booking{}, err
 		}
-		start, end, amount = quote.Start, quote.End, quote.Amount
+		start, end, amount, ownerAmount = quote.Start, quote.End, quote.Amount, quote.OwnerAmount
 		// A stay whose check-in instant already passed by the time this
 		// request lands (e.g. driver picked "today at 09:00" and it's now
 		// 09:03) still needs to book from right now, not from the already-past
@@ -71,6 +76,12 @@ func (service *Service) CreateBooking(ctx context.Context, input entity.CreateBo
 			return entity.Booking{}, errors.NewInvalidInput("OUTSIDE_PUBLISHED_HOURS",
 				"requested time is outside the parking spot's published hours")
 		}
+
+		priced, err := service.priceHourly(ctx, input)
+		if err != nil {
+			return entity.Booking{}, err
+		}
+		amount, ownerAmount = priced.TotalAmount, priced.OwnerAmount
 	}
 
 	capacity := input.Capacity
@@ -95,6 +106,7 @@ func (service *Service) CreateBooking(ctx context.Context, input entity.CreateBo
 		Status:        enum.BookingStatusPendingPayment,
 		HoldExpiresAt: &holdExpiresAt,
 		Amount:        amount,
+		OwnerAmount:   &ownerAmount,
 		Capacity:      capacity,
 		Kind:          input.Kind,
 	}
@@ -106,6 +118,10 @@ type stayQuote struct {
 	Start  time.Time
 	End    time.Time
 	Amount int
+	// OwnerAmount is quote.Amount before addCommission adds the platform's cut --
+	// the owner's own rate, stored on the booking so a later commission-rate change
+	// can never retroactively change what this booking pays out (see Booking.OwnerAmount).
+	OwnerAmount int
 }
 
 // priceStay resolves a STAY booking's authoritative range and amount by asking
@@ -114,7 +130,9 @@ type stayQuote struct {
 // location) are what "start date"/"check-in time" mean to the driver. input.StayEndDate is
 // the calendar date they picked to check out -- parking-service applies the same check-in
 // hour to it (a stay runs in 24h periods from check-in, not midnight to midnight) and
-// returns the exact start/end instants and amount, never trusted from input.
+// returns the exact start/end instants and amount, never trusted from input. The quoted
+// amount is the owner's own rate (what they're set up to receive in full) -- addCommission
+// adds the platform's cut on top of it, same as priceHourly below.
 func (service *Service) priceStay(ctx context.Context, input entity.CreateBookingInput) (stayQuote, error) {
 	localStart := input.Start.In(service.location)
 	startDate := localStart.Format("2006-01-02")
@@ -134,5 +152,49 @@ func (service *Service) priceStay(ctx context.Context, input entity.CreateBookin
 		return stayQuote{}, errors.NewUpstream("priceStay", err)
 	}
 
-	return stayQuote{Start: start, End: end, Amount: quote.Amount}, nil
+	amount, err := service.addCommission(ctx, quote.Amount)
+	if err != nil {
+		return stayQuote{}, err
+	}
+
+	return stayQuote{Start: start, End: end, Amount: amount, OwnerAmount: quote.Amount}, nil
+}
+
+// hourlyPricing is priceHourly's result: the owner's own rate alongside the amount the
+// driver actually pays once the platform's commission is added on top (see addCommission).
+type hourlyPricing struct {
+	OwnerAmount int
+	TotalAmount int
+}
+
+// priceHourly resolves an HOURLY booking's authoritative amount from the spot's own
+// owner-set hourly rate (never trusted from input, same reasoning as priceStay) times the
+// requested duration, in centavos -- same rounding convention as parking-service's own
+// stay quote. addCommission then adds the platform's cut on top.
+func (service *Service) priceHourly(ctx context.Context, input entity.CreateBookingInput) (hourlyPricing, error) {
+	pricePerHour, err := service.parkingClient.GetHourlyPrice(ctx, input.ParkingSpotID)
+	if err != nil {
+		return hourlyPricing{}, err
+	}
+	hours := input.End.Sub(input.Start).Hours()
+	ownerAmount := int(math.Round(pricePerHour * hours * 100))
+	totalAmount, err := service.addCommission(ctx, ownerAmount)
+	if err != nil {
+		return hourlyPricing{}, err
+	}
+	return hourlyPricing{OwnerAmount: ownerAmount, TotalAmount: totalAmount}, nil
+}
+
+// addCommission adds the platform's current commission rate on top of ownerAmount (what
+// the spot's owner is set up to receive in full) to get what the driver actually pays.
+// GeneratePendingPayoutsUseCase backs the owner's share out of this same total at payout
+// time, using the same rate, so NetAmount still ends up being exactly ownerAmount -- the
+// owner always receives 100% of their own listed price, never the booking's gross total.
+func (service *Service) addCommission(ctx context.Context, ownerAmount int) (int, error) {
+	settings, err := service.commissionRates.GetCommissionRate(ctx)
+	if err != nil {
+		return 0, err
+	}
+	commission := ownerAmount * settings.CommissionRateBP / 10000
+	return ownerAmount + commission, nil
 }

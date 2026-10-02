@@ -26,6 +26,7 @@ type serviceSuite struct {
 	controller        *gomock.Controller
 	bookingRepository *mocks.MockBookingRepository
 	parkingClient     *mocks.MockParkingClient
+	commissionRates   *mocks.MockCommissionRateReader
 	service           *booking.Service
 	context           context.Context
 	location          *time.Location
@@ -36,12 +37,13 @@ func (s *serviceSuite) SetupTest() {
 	s.controller = gomock.NewController(s.T())
 	s.bookingRepository = mocks.NewMockBookingRepository(s.controller)
 	s.parkingClient = mocks.NewMockParkingClient(s.controller)
+	s.commissionRates = mocks.NewMockCommissionRateReader(s.controller)
 
 	location, err := time.LoadLocation("America/Argentina/Buenos_Aires")
 	s.Require().NoError(err)
 	s.location = location
 
-	s.service = booking.NewService(s.bookingRepository, s.parkingClient, location, testHoldDuration)
+	s.service = booking.NewService(s.bookingRepository, s.parkingClient, s.commissionRates, location, testHoldDuration)
 	s.context = context.Background()
 	s.parkingSpotID = "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"
 }

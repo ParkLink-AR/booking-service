@@ -126,6 +126,21 @@ func (m *MockParkingClient) EXPECT() *MockParkingClientMockRecorder {
 	return m.recorder
 }
 
+// GetHourlyPrice mocks base method.
+func (m *MockParkingClient) GetHourlyPrice(ctx context.Context, spotID string) (float64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetHourlyPrice", ctx, spotID)
+	ret0, _ := ret[0].(float64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetHourlyPrice indicates an expected call of GetHourlyPrice.
+func (mr *MockParkingClientMockRecorder) GetHourlyPrice(ctx, spotID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHourlyPrice", reflect.TypeOf((*MockParkingClient)(nil).GetHourlyPrice), ctx, spotID)
+}
+
 // GetStayQuote mocks base method.
 func (m *MockParkingClient) GetStayQuote(ctx context.Context, spotID, startDate, endDate string, startHour int) (parkingclient.StayQuote, error) {
 	m.ctrl.T.Helper()
@@ -154,4 +169,42 @@ func (m *MockParkingClient) IsSpotActive(ctx context.Context, spotID string) (bo
 func (mr *MockParkingClientMockRecorder) IsSpotActive(ctx, spotID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsSpotActive", reflect.TypeOf((*MockParkingClient)(nil).IsSpotActive), ctx, spotID)
+}
+
+// MockCommissionRateReader is a mock of CommissionRateReader interface.
+type MockCommissionRateReader struct {
+	ctrl     *gomock.Controller
+	recorder *MockCommissionRateReaderMockRecorder
+}
+
+// MockCommissionRateReaderMockRecorder is the mock recorder for MockCommissionRateReader.
+type MockCommissionRateReaderMockRecorder struct {
+	mock *MockCommissionRateReader
+}
+
+// NewMockCommissionRateReader creates a new mock instance.
+func NewMockCommissionRateReader(ctrl *gomock.Controller) *MockCommissionRateReader {
+	mock := &MockCommissionRateReader{ctrl: ctrl}
+	mock.recorder = &MockCommissionRateReaderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockCommissionRateReader) EXPECT() *MockCommissionRateReaderMockRecorder {
+	return m.recorder
+}
+
+// GetCommissionRate mocks base method.
+func (m *MockCommissionRateReader) GetCommissionRate(ctx context.Context) (entity.PlatformSettings, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCommissionRate", ctx)
+	ret0, _ := ret[0].(entity.PlatformSettings)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCommissionRate indicates an expected call of GetCommissionRate.
+func (mr *MockCommissionRateReaderMockRecorder) GetCommissionRate(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCommissionRate", reflect.TypeOf((*MockCommissionRateReader)(nil).GetCommissionRate), ctx)
 }

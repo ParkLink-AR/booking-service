@@ -25,11 +25,21 @@ type BookingRepository interface {
 }
 
 // ParkingClient is the subset of parkingclient.Client this service needs: pricing and
-// validating a "stay" booking against the spot's owner-configured stay terms, and checking
-// whether a spot accepts new reservations at all.
+// validating a "stay" booking against the spot's owner-configured stay terms, the owner's
+// hourly rate for an "hourly" booking, and checking whether a spot accepts new reservations
+// at all.
 type ParkingClient interface {
 	GetStayQuote(ctx context.Context, spotID, startDate, endDate string, startHour int) (parkingclient.StayQuote, error)
+	GetHourlyPrice(ctx context.Context, spotID string) (float64, error)
 	IsSpotActive(ctx context.Context, spotID string) (bool, error)
+}
+
+// CommissionRateReader reads the platform's current commission settings -- same shape as
+// usecase.CommissionRateGetter, declared separately here per this codebase's
+// consumer-defines-the-interface convention (service must not import the usecase package).
+// Implemented by internal/repository/booking.
+type CommissionRateReader interface {
+	GetCommissionRate(ctx context.Context) (entity.PlatformSettings, error)
 }
 
 // Service owns the business logic for a parking spot's bookings: listing them grouped by
@@ -39,6 +49,7 @@ type ParkingClient interface {
 type Service struct {
 	bookingRepository BookingRepository
 	parkingClient     ParkingClient
+	commissionRates   CommissionRateReader
 	location          *time.Location
 	holdDuration      time.Duration
 }
@@ -46,12 +57,14 @@ type Service struct {
 func NewService(
 	bookingRepository BookingRepository,
 	parkingClient ParkingClient,
+	commissionRates CommissionRateReader,
 	location *time.Location,
 	holdDuration time.Duration,
 ) *Service {
 	return &Service{
 		bookingRepository: bookingRepository,
 		parkingClient:     parkingClient,
+		commissionRates:   commissionRates,
 		location:          location,
 		holdDuration:      holdDuration,
 	}
