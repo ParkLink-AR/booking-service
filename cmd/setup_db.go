@@ -242,6 +242,15 @@ func runMigrations(database *sql.DB) error {
 		-- this column existed has no way to recover what rate was actually in effect for
 		-- it (see GeneratePendingPayoutsUseCase's fallback for that case).
 		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS owner_amount INT;
+
+		-- migrations/019: an entirely optional snapshot of whichever vehicle (if any) the
+		-- driver picked from their own saved list at booking time -- copied in, not a live
+		-- reference, so editing/deleting that saved vehicle later never changes an
+		-- already-made booking's record.
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS vehicle_plate TEXT;
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS vehicle_brand TEXT;
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS vehicle_model TEXT;
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS vehicle_country TEXT;
 	`)
 	return err
 }

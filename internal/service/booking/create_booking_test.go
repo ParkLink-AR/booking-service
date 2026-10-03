@@ -65,6 +65,52 @@ func (s *serviceSuite) TestCreateBooking_Success() {
 	s.Equal("created-id", got.ID)
 }
 
+// An optional vehicle snapshot, when the driver picked one, is copied onto the booking
+// verbatim -- see Service.CreateBooking. A booking with no vehicle picked (the Success test
+// above) leaves all four fields nil.
+func (s *serviceSuite) TestCreateBooking_WithVehicle_CopiesSnapshotOntoBooking() {
+	start := s.localDate(18).Add(10 * time.Hour)
+	end := s.localDate(18).Add(11 * time.Hour)
+	input := entity.CreateBookingInput{
+		ParkingSpotID:       s.parkingSpotID,
+		ParkingSpotSchedule: tuesdaySchedule,
+		UserID:              "11111111-1111-1111-1111-111111111111",
+		Start:               start,
+		End:                 end,
+		Amount:              5000,
+		VehiclePlate:        "AB123CD",
+		VehicleBrand:        "Toyota",
+		VehicleModel:        "Corolla",
+		VehicleCountry:      "AR",
+	}
+
+	s.parkingClient.EXPECT().IsSpotActive(gomock.Any(), s.parkingSpotID).Return(true, nil)
+	s.parkingClient.EXPECT().GetHourlyPrice(gomock.Any(), s.parkingSpotID).Return(100.0, nil)
+	s.commissionRates.EXPECT().GetCommissionRate(gomock.Any()).Return(entity.PlatformSettings{CommissionRateBP: 500}, nil)
+	s.bookingRepository.EXPECT().
+		GetActiveBookingsInRange(gomock.Any(), s.parkingSpotID, start.UTC(), end.UTC()).
+		Return(nil, nil)
+	s.bookingRepository.EXPECT().
+		CreateBooking(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ any, booking entity.Booking) (entity.Booking, error) {
+			s.Require().NotNil(booking.VehiclePlate)
+			s.Equal("AB123CD", *booking.VehiclePlate)
+			s.Require().NotNil(booking.VehicleBrand)
+			s.Equal("Toyota", *booking.VehicleBrand)
+			s.Require().NotNil(booking.VehicleModel)
+			s.Equal("Corolla", *booking.VehicleModel)
+			s.Require().NotNil(booking.VehicleCountry)
+			s.Equal("AR", *booking.VehicleCountry)
+			booking.ID = "created-id"
+			return booking, nil
+		})
+
+	got, err := s.service.CreateBooking(s.context, input)
+
+	s.Require().NoError(err)
+	s.Equal("created-id", got.ID)
+}
+
 func (s *serviceSuite) TestCreateBooking_InvalidDateRange() {
 	start := s.localDate(18).Add(11 * time.Hour)
 	end := s.localDate(18).Add(10 * time.Hour)

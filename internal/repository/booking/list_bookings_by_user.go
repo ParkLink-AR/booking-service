@@ -20,7 +20,8 @@ func (repository *Repository) ListBookingsByUser(
 		       lower(time_range), upper(time_range),
 		       status, hold_expires_at, amount, COALESCE(payment_id, ''), paid_at,
 		       cancellation_reason, kind,
-		       verification_code, verification_attempts, verified_at, created_at, updated_at
+		       verification_code, verification_attempts, verified_at, created_at, updated_at,
+		       vehicle_plate, vehicle_brand, vehicle_model, vehicle_country
 		FROM ` + constants.BookingsTableName + `
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -41,6 +42,7 @@ func (repository *Repository) ListBookingsByUser(
 			&b.Start, &b.End,
 			&statusLabel, &b.HoldExpiresAt, &b.Amount, &b.PaymentID, &b.PaidAt,
 			&b.CancellationReason, &kindLabel, &b.VerificationCode, &b.VerificationAttempts, &b.VerifiedAt, &b.CreatedAt, &b.UpdatedAt,
+			&b.VehiclePlate, &b.VehicleBrand, &b.VehicleModel, &b.VehicleCountry,
 		); err != nil {
 			return nil, errors.NewInternalError("booking.ListBookingsByUser", err)
 		}

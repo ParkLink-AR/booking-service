@@ -97,6 +97,12 @@ func (handler *Handler) CreateBookingEndpoint(responseWriter http.ResponseWriter
 		Kind:                kind,
 		StayEndDate:         body.StayEndDate,
 	}
+	if body.Vehicle != nil {
+		input.VehiclePlate = body.Vehicle.Plate
+		input.VehicleBrand = body.Vehicle.Brand
+		input.VehicleModel = body.Vehicle.Model
+		input.VehicleCountry = body.Vehicle.Country
+	}
 
 	created, err := handler.createBookingUseCase.Execute(request.Context(), input)
 	if err != nil {

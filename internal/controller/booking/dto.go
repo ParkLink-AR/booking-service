@@ -33,6 +33,17 @@ type createBookingRequest struct {
 	Kind        string             `json:"kind,omitempty"`
 	StayEndDate string             `json:"stay_end_date,omitempty"`
 	ParkingSpot parkingSpotRequest `json:"parking_spot"`
+	// Vehicle is entirely optional -- the driver may not have picked (or saved) one. When
+	// present, every field is expected to be non-empty (mobile only ever sends this object
+	// when all four are set together -- see CreateBookingInput.VehiclePlate).
+	Vehicle *vehicleRequest `json:"vehicle,omitempty"`
+}
+
+type vehicleRequest struct {
+	Plate   string `json:"plate"`
+	Brand   string `json:"brand"`
+	Model   string `json:"model"`
+	Country string `json:"country"`
 }
 
 type bookingResponse struct {
@@ -61,6 +72,26 @@ type bookingResponse struct {
 	VerificationCode *string `json:"verification_code,omitempty"`
 	VerifiedAt       *string `json:"verified_at,omitempty"`
 	UpdatedAt        string  `json:"updated_at"`
+	// Vehicle is nil when the driver didn't pick one for this booking (entirely optional --
+	// see entity.Booking.VehiclePlate). Visible to both the driver and the owner, unlike
+	// VerificationCode -- showing the owner which plate to expect is the whole point.
+	Vehicle *vehicleResponse `json:"vehicle,omitempty"`
+}
+
+type vehicleResponse struct {
+	Plate   string `json:"plate"`
+	Brand   string `json:"brand"`
+	Model   string `json:"model"`
+	Country string `json:"country"`
+}
+
+// vehicleResponseFromEntity builds a *vehicleResponse from a booking's vehicle snapshot
+// fields, or nil if none was set -- shared by every response DTO that carries one.
+func vehicleResponseFromEntity(plate, brand, model, country *string) *vehicleResponse {
+	if plate == nil {
+		return nil
+	}
+	return &vehicleResponse{Plate: *plate, Brand: *brand, Model: *model, Country: *country}
 }
 
 // bookingResponseFromEntity maps a booking to the wire format, rendering every timestamp
@@ -82,6 +113,7 @@ func bookingResponseFromEntity(booking entity.Booking, location *time.Location, 
 		PaymentID:     booking.PaymentID,
 		Kind:          booking.Kind.String(),
 		UpdatedAt:     booking.UpdatedAt.In(location).Format(time.RFC3339),
+		Vehicle:       vehicleResponseFromEntity(booking.VehiclePlate, booking.VehicleBrand, booking.VehicleModel, booking.VehicleCountry),
 	}
 	if booking.HoldExpiresAt != nil {
 		formatted := booking.HoldExpiresAt.In(location).Format(time.RFC3339)
@@ -123,6 +155,8 @@ type userBookingResponse struct {
 	VerificationCode *string `json:"verification_code,omitempty"`
 	VerifiedAt       *string `json:"verified_at,omitempty"`
 	UpdatedAt        string  `json:"updated_at"`
+	// See bookingResponse.Vehicle.
+	Vehicle *vehicleResponse `json:"vehicle,omitempty"`
 }
 
 type bookingWindowResponse struct {

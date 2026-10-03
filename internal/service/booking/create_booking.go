@@ -110,6 +110,14 @@ func (service *Service) CreateBooking(ctx context.Context, input entity.CreateBo
 		Capacity:      capacity,
 		Kind:          input.Kind,
 	}
+	// Entirely optional, and never partially set -- the controller only forwards a vehicle
+	// when all four fields were sent together (see createBookingRequest.Vehicle).
+	if input.VehiclePlate != "" {
+		booking.VehiclePlate = &input.VehiclePlate
+		booking.VehicleBrand = &input.VehicleBrand
+		booking.VehicleModel = &input.VehicleModel
+		booking.VehicleCountry = &input.VehicleCountry
+	}
 
 	return service.bookingRepository.CreateBooking(ctx, booking)
 }

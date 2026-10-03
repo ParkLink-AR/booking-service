@@ -62,6 +62,16 @@ type Booking struct {
 	Kind      enum.BookingKind
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	// VehiclePlate/Brand/Model/Country are an entirely optional snapshot of whichever
+	// vehicle (if any) the driver picked from their own saved list (see auth-service's
+	// /users/{id}/vehicles) at the moment this booking was created -- copied in, not a
+	// live reference, so later editing or deleting that saved vehicle never changes an
+	// already-made booking's record. All four are nil together (no vehicle picked) or set
+	// together (never partially set).
+	VehiclePlate   *string
+	VehicleBrand   *string
+	VehicleModel   *string
+	VehicleCountry *string
 }
 
 // CreateBookingInput carries the data needed to create a new booking, threaded from the
@@ -88,4 +98,11 @@ type CreateBookingInput struct {
 	// calendar date (YYYY-MM-DD) the stay ends, e.g. "2026-09-23" for a stay starting on
 	// Start's calendar date and running 9 days. Ignored for an hourly booking.
 	StayEndDate string
+	// VehiclePlate/Brand/Model/Country are optional -- empty means the driver didn't pick a
+	// saved vehicle for this booking. Never partially set: the controller only forwards them
+	// when all four were sent together (see createBookingRequest).
+	VehiclePlate   string
+	VehicleBrand   string
+	VehicleModel   string
+	VehicleCountry string
 }
