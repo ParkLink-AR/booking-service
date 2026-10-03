@@ -20,10 +20,11 @@ type PayoutsBySettlementLister interface {
 type GetSettlementUseCase struct {
 	settlements SettlementGetter
 	payouts     PayoutsBySettlementLister
+	proofURLs   ProofURLResolver
 }
 
-func NewGetSettlementUseCase(settlements SettlementGetter, payouts PayoutsBySettlementLister) *GetSettlementUseCase {
-	return &GetSettlementUseCase{settlements: settlements, payouts: payouts}
+func NewGetSettlementUseCase(settlements SettlementGetter, payouts PayoutsBySettlementLister, proofURLs ProofURLResolver) *GetSettlementUseCase {
+	return &GetSettlementUseCase{settlements: settlements, payouts: payouts, proofURLs: proofURLs}
 }
 
 func (uc *GetSettlementUseCase) Execute(ctx context.Context, settlementID string) (entity.Settlement, []entity.Payout, error) {
@@ -33,6 +34,9 @@ func (uc *GetSettlementUseCase) Execute(ctx context.Context, settlementID string
 	}
 	payouts, err := uc.payouts.ListPayoutsBySettlement(ctx, settlementID)
 	if err != nil {
+		return entity.Settlement{}, nil, err
+	}
+	if err := resolveSettlementProofURL(ctx, uc.proofURLs, &settlement); err != nil {
 		return entity.Settlement{}, nil, err
 	}
 	return settlement, payouts, nil

@@ -19,13 +19,23 @@ type PayoutLister interface {
 // here -- the gateway only lets this route through for a caller whose JWT carries
 // role:"admin", so every payout is fair game.
 type ListAdminPayoutsUseCase struct {
-	payouts PayoutLister
+	payouts   PayoutLister
+	proofURLs ProofURLResolver
 }
 
-func NewListAdminPayoutsUseCase(payouts PayoutLister) *ListAdminPayoutsUseCase {
-	return &ListAdminPayoutsUseCase{payouts: payouts}
+func NewListAdminPayoutsUseCase(payouts PayoutLister, proofURLs ProofURLResolver) *ListAdminPayoutsUseCase {
+	return &ListAdminPayoutsUseCase{payouts: payouts, proofURLs: proofURLs}
 }
 
 func (uc *ListAdminPayoutsUseCase) Execute(ctx context.Context, status *enum.PayoutStatus, ownerID *string) ([]entity.Payout, error) {
-	return uc.payouts.ListPayouts(ctx, status, ownerID)
+	payouts, err := uc.payouts.ListPayouts(ctx, status, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range payouts {
+		if err := resolvePayoutProofURL(ctx, uc.proofURLs, &payouts[i]); err != nil {
+			return nil, err
+		}
+	}
+	return payouts, nil
 }

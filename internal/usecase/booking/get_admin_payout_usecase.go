@@ -15,13 +15,21 @@ type PayoutGetter interface {
 
 // GetAdminPayoutUseCase powers GET /admin/payouts/{id}.
 type GetAdminPayoutUseCase struct {
-	payouts PayoutGetter
+	payouts   PayoutGetter
+	proofURLs ProofURLResolver
 }
 
-func NewGetAdminPayoutUseCase(payouts PayoutGetter) *GetAdminPayoutUseCase {
-	return &GetAdminPayoutUseCase{payouts: payouts}
+func NewGetAdminPayoutUseCase(payouts PayoutGetter, proofURLs ProofURLResolver) *GetAdminPayoutUseCase {
+	return &GetAdminPayoutUseCase{payouts: payouts, proofURLs: proofURLs}
 }
 
 func (uc *GetAdminPayoutUseCase) Execute(ctx context.Context, payoutID string) (entity.Payout, error) {
-	return uc.payouts.GetPayoutByID(ctx, payoutID)
+	payout, err := uc.payouts.GetPayoutByID(ctx, payoutID)
+	if err != nil {
+		return entity.Payout{}, err
+	}
+	if err := resolvePayoutProofURL(ctx, uc.proofURLs, &payout); err != nil {
+		return entity.Payout{}, err
+	}
+	return payout, nil
 }

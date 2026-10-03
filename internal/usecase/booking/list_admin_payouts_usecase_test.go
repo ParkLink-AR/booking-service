@@ -21,6 +21,7 @@ type listAdminPayoutsUseCaseSuite struct {
 	suite.Suite
 	controller *gomock.Controller
 	payouts    *mocks.MockPayoutLister
+	proofURLs  *mocks.MockProofURLResolver
 	useCase    *booking.ListAdminPayoutsUseCase
 	context    context.Context
 }
@@ -28,7 +29,8 @@ type listAdminPayoutsUseCaseSuite struct {
 func (s *listAdminPayoutsUseCaseSuite) SetupTest() {
 	s.controller = gomock.NewController(s.T())
 	s.payouts = mocks.NewMockPayoutLister(s.controller)
-	s.useCase = booking.NewListAdminPayoutsUseCase(s.payouts)
+	s.proofURLs = mocks.NewMockProofURLResolver(s.controller)
+	s.useCase = booking.NewListAdminPayoutsUseCase(s.payouts, s.proofURLs)
 	s.context = context.Background()
 }
 
@@ -66,4 +68,19 @@ func (s *listAdminPayoutsUseCaseSuite) TestExecute_WithOwnerIDFilter_PassesItThr
 
 	s.Require().NoError(err)
 	s.Equal(want, got)
+}
+
+func (s *listAdminPayoutsUseCaseSuite) TestExecute_ResolvesProofURLForEachPayout() {
+	proofKey := "payout-proofs/owner1/settlement1.jpg"
+	presignedURL := "https://r2.example.com/signed?sig=abc"
+	want := []entity.Payout{{ID: "p1", ProofURL: &proofKey}, {ID: "p2"}}
+	s.payouts.EXPECT().ListPayouts(gomock.Any(), (*enum.PayoutStatus)(nil), (*string)(nil)).Return(want, nil)
+	s.proofURLs.EXPECT().ResolveProofURL(gomock.Any(), proofKey).Return(presignedURL, nil)
+
+	got, err := s.useCase.Execute(s.context, nil, nil)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(got[0].ProofURL)
+	s.Equal(presignedURL, *got[0].ProofURL)
+	s.Nil(got[1].ProofURL)
 }

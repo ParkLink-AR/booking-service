@@ -22,6 +22,7 @@ type getSettlementUseCaseSuite struct {
 	controller  *gomock.Controller
 	settlements *mocks.MockSettlementGetter
 	payouts     *mocks.MockPayoutsBySettlementLister
+	proofURLs   *mocks.MockProofURLResolver
 	useCase     *booking.GetSettlementUseCase
 	context     context.Context
 
@@ -32,7 +33,8 @@ func (s *getSettlementUseCaseSuite) SetupTest() {
 	s.controller = gomock.NewController(s.T())
 	s.settlements = mocks.NewMockSettlementGetter(s.controller)
 	s.payouts = mocks.NewMockPayoutsBySettlementLister(s.controller)
-	s.useCase = booking.NewGetSettlementUseCase(s.settlements, s.payouts)
+	s.proofURLs = mocks.NewMockProofURLResolver(s.controller)
+	s.useCase = booking.NewGetSettlementUseCase(s.settlements, s.payouts, s.proofURLs)
 	s.context = context.Background()
 	s.settlementID = "11111111-1111-1111-1111-111111111111"
 }
@@ -52,6 +54,21 @@ func (s *getSettlementUseCaseSuite) TestExecute_Found_ReturnsSettlementAndPayout
 	s.Require().NoError(err)
 	s.Equal(want, got)
 	s.Equal(wantPayouts, gotPayouts)
+}
+
+func (s *getSettlementUseCaseSuite) TestExecute_WithProof_ResolvesProofURL() {
+	proofKey := "payout-proofs/owner1/" + s.settlementID + ".jpg"
+	presignedURL := "https://r2.example.com/signed?sig=abc"
+	want := entity.Settlement{ID: s.settlementID, ProofURL: &proofKey}
+	s.settlements.EXPECT().GetSettlementByID(gomock.Any(), s.settlementID).Return(want, nil)
+	s.payouts.EXPECT().ListPayoutsBySettlement(gomock.Any(), s.settlementID).Return(nil, nil)
+	s.proofURLs.EXPECT().ResolveProofURL(gomock.Any(), proofKey).Return(presignedURL, nil)
+
+	got, _, err := s.useCase.Execute(s.context, s.settlementID)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(got.ProofURL)
+	s.Equal(presignedURL, *got.ProofURL)
 }
 
 func (s *getSettlementUseCaseSuite) TestExecute_PayoutsLookupFails_PropagatesError() {

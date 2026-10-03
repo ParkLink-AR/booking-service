@@ -25,6 +25,7 @@ type confirmSettlementUseCaseSuite struct {
 	settlementGetter *mocks.MockSettlementGetter
 	settlements      *mocks.MockSettlementConfirmer
 	storage          *mocks.MockSettlementStorageService
+	proofURLs        *mocks.MockProofURLResolver
 	events           *mocks.MockEventPublisher
 	useCase          *booking.ConfirmSettlementUseCase
 	context          context.Context
@@ -39,8 +40,9 @@ func (s *confirmSettlementUseCaseSuite) SetupTest() {
 	s.settlementGetter = mocks.NewMockSettlementGetter(s.controller)
 	s.settlements = mocks.NewMockSettlementConfirmer(s.controller)
 	s.storage = mocks.NewMockSettlementStorageService(s.controller)
+	s.proofURLs = mocks.NewMockProofURLResolver(s.controller)
 	s.events = mocks.NewMockEventPublisher(s.controller)
-	s.useCase = booking.NewConfirmSettlementUseCase(s.settlementGetter, s.settlements, s.storage, s.events)
+	s.useCase = booking.NewConfirmSettlementUseCase(s.settlementGetter, s.settlements, s.storage, s.proofURLs, s.events)
 	s.context = context.Background()
 
 	s.settlementID = "11111111-1111-1111-1111-111111111111"
@@ -85,20 +87,28 @@ func (s *confirmSettlementUseCaseSuite) TestExecute_NoProof_ConfirmsAndPublishes
 
 func (s *confirmSettlementUseCaseSuite) TestExecute_WithProof_UploadsThenConfirms() {
 	proofData := []byte("fake-image-bytes")
-	proofURL := "https://cdn.example.com/payout-proofs/" + s.ownerID + "/" + s.settlementID + ".jpg"
+	// UploadPayoutProof now returns a bare object key (the proof bucket is private -- there's
+	// no public URL to hand back), and the use case resolves it into something loadable (a
+	// presigned URL here) before returning the confirmed settlement.
+	proofKey := "payout-proofs/" + s.ownerID + "/" + s.settlementID + ".jpg"
+	presignedURL := "https://r2.example.com/signed?sig=abc"
+	confirmed := s.paidSettlement()
+	confirmed.ProofURL = &proofKey
 
 	s.settlementGetter.EXPECT().GetSettlementByID(gomock.Any(), s.settlementID).
 		Return(entity.Settlement{ID: s.settlementID, OwnerID: s.ownerID}, nil)
 	s.storage.EXPECT().UploadPayoutProof(gomock.Any(), s.ownerID, s.settlementID, "image/jpeg", proofData).
-		Return(proofURL, nil)
-	s.settlements.EXPECT().ConfirmSettlement(gomock.Any(), s.settlementID, s.adminID, &proofURL).
-		Return(s.paidSettlement(), []entity.Payout{{ID: "p1"}}, nil)
+		Return(proofKey, nil)
+	s.settlements.EXPECT().ConfirmSettlement(gomock.Any(), s.settlementID, s.adminID, &proofKey).
+		Return(confirmed, []entity.Payout{{ID: "p1"}}, nil)
+	s.proofURLs.EXPECT().ResolveProofURL(gomock.Any(), proofKey).Return(presignedURL, nil)
 	s.events.EXPECT().Publish(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 	got, gotPayouts, err := s.useCase.Execute(s.context, s.settlementID, s.adminID, proofData, "image/jpeg")
 
 	s.Require().NoError(err)
-	s.Equal(s.paidSettlement(), got)
+	s.Require().NotNil(got.ProofURL)
+	s.Equal(presignedURL, *got.ProofURL)
 	s.Len(gotPayouts, 1)
 }
 

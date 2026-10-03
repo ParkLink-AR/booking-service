@@ -21,12 +21,22 @@ type SettlementLister interface {
 // admins only, same as ListAdminPayoutsUseCase.
 type ListAdminSettlementsUseCase struct {
 	settlements SettlementLister
+	proofURLs   ProofURLResolver
 }
 
-func NewListAdminSettlementsUseCase(settlements SettlementLister) *ListAdminSettlementsUseCase {
-	return &ListAdminSettlementsUseCase{settlements: settlements}
+func NewListAdminSettlementsUseCase(settlements SettlementLister, proofURLs ProofURLResolver) *ListAdminSettlementsUseCase {
+	return &ListAdminSettlementsUseCase{settlements: settlements, proofURLs: proofURLs}
 }
 
 func (uc *ListAdminSettlementsUseCase) Execute(ctx context.Context, status *enum.SettlementStatus) ([]entity.Settlement, error) {
-	return uc.settlements.ListSettlements(ctx, status)
+	settlements, err := uc.settlements.ListSettlements(ctx, status)
+	if err != nil {
+		return nil, err
+	}
+	for i := range settlements {
+		if err := resolveSettlementProofURL(ctx, uc.proofURLs, &settlements[i]); err != nil {
+			return nil, err
+		}
+	}
+	return settlements, nil
 }

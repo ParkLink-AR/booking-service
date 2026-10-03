@@ -18,10 +18,11 @@ import (
 type GetOwnSettlementUseCase struct {
 	settlements SettlementGetter
 	payouts     PayoutsBySettlementLister
+	proofURLs   ProofURLResolver
 }
 
-func NewGetOwnSettlementUseCase(settlements SettlementGetter, payouts PayoutsBySettlementLister) *GetOwnSettlementUseCase {
-	return &GetOwnSettlementUseCase{settlements: settlements, payouts: payouts}
+func NewGetOwnSettlementUseCase(settlements SettlementGetter, payouts PayoutsBySettlementLister, proofURLs ProofURLResolver) *GetOwnSettlementUseCase {
+	return &GetOwnSettlementUseCase{settlements: settlements, payouts: payouts, proofURLs: proofURLs}
 }
 
 func (uc *GetOwnSettlementUseCase) Execute(ctx context.Context, settlementID, callerID string) (entity.Settlement, []entity.Payout, error) {
@@ -34,6 +35,9 @@ func (uc *GetOwnSettlementUseCase) Execute(ctx context.Context, settlementID, ca
 	}
 	payouts, err := uc.payouts.ListPayoutsBySettlement(ctx, settlementID)
 	if err != nil {
+		return entity.Settlement{}, nil, err
+	}
+	if err := resolveSettlementProofURL(ctx, uc.proofURLs, &settlement); err != nil {
 		return entity.Settlement{}, nil, err
 	}
 	return settlement, payouts, nil

@@ -42,6 +42,7 @@ type ConfirmSettlementUseCase struct {
 	settlementGetter SettlementGetter
 	settlements      SettlementConfirmer
 	storage          SettlementStorageService
+	proofURLs        ProofURLResolver
 	events           EventPublisher
 }
 
@@ -49,10 +50,11 @@ func NewConfirmSettlementUseCase(
 	settlementGetter SettlementGetter,
 	settlements SettlementConfirmer,
 	storage SettlementStorageService,
+	proofURLs ProofURLResolver,
 	events EventPublisher,
 ) *ConfirmSettlementUseCase {
 	return &ConfirmSettlementUseCase{
-		settlementGetter: settlementGetter, settlements: settlements, storage: storage, events: events,
+		settlementGetter: settlementGetter, settlements: settlements, storage: storage, proofURLs: proofURLs, events: events,
 	}
 }
 
@@ -78,6 +80,9 @@ func (uc *ConfirmSettlementUseCase) Execute(
 
 	settlement, payouts, err := uc.settlements.ConfirmSettlement(ctx, settlementID, adminUserID, proofURL)
 	if err != nil {
+		return entity.Settlement{}, nil, err
+	}
+	if err := resolveSettlementProofURL(ctx, uc.proofURLs, &settlement); err != nil {
 		return entity.Settlement{}, nil, err
 	}
 

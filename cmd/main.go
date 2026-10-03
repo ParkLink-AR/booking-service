@@ -63,8 +63,7 @@ func main() {
 	storageClient, err := storage.NewClient(
 		context.Background(),
 		envOrDefault("R2_ACCOUNT_ID", ""),
-		envOrDefault("R2_BUCKET_NAME", ""),
-		envOrDefault("R2_PUBLIC_URL", ""),
+		envOrDefault("R2_PAYOUT_PROOFS_BUCKET_NAME", ""),
 		envOrDefault("R2_ACCESS_KEY_ID", ""),
 		envOrDefault("R2_SECRET_ACCESS_KEY", ""),
 	)
@@ -104,19 +103,19 @@ func main() {
 	adminReplyUseCase := ucbooking.NewAdminReplyUseCase(bookingRepository, bookingRepository, bookingRepository, eventPublisher)
 	updateTicketStatusUseCase := ucbooking.NewUpdateTicketStatusUseCase(bookingRepository)
 	generatePendingPayoutsUseCase := ucbooking.NewGeneratePendingPayoutsUseCase(bookingRepository, bookingRepository, bookingRepository, parkingClient)
-	listAdminPayoutsUseCase := ucbooking.NewListAdminPayoutsUseCase(bookingRepository)
-	getAdminPayoutUseCase := ucbooking.NewGetAdminPayoutUseCase(bookingRepository)
+	listAdminPayoutsUseCase := ucbooking.NewListAdminPayoutsUseCase(bookingRepository, storageClient)
+	getAdminPayoutUseCase := ucbooking.NewGetAdminPayoutUseCase(bookingRepository, storageClient)
 	listOwnerBookingsUseCase := ucbooking.NewListOwnerBookingsUseCase(parkingClient, bookingRepository)
 	getCommissionUseCase := ucbooking.NewGetCommissionUseCase(bookingRepository)
 	setCommissionUseCase := ucbooking.NewSetCommissionUseCase(bookingRepository)
 	getOwnerPendingBalancesUseCase := ucbooking.NewGetOwnerPendingBalancesUseCase(bookingRepository)
 	draftSettlementUseCase := ucbooking.NewDraftSettlementUseCase(bookingRepository)
-	confirmSettlementUseCase := ucbooking.NewConfirmSettlementUseCase(bookingRepository, bookingRepository, storageClient, eventPublisher)
+	confirmSettlementUseCase := ucbooking.NewConfirmSettlementUseCase(bookingRepository, bookingRepository, storageClient, storageClient, eventPublisher)
 	cancelSettlementUseCase := ucbooking.NewCancelSettlementUseCase(bookingRepository)
-	getSettlementUseCase := ucbooking.NewGetSettlementUseCase(bookingRepository, bookingRepository)
-	listAdminSettlementsUseCase := ucbooking.NewListAdminSettlementsUseCase(bookingRepository)
-	listSettlementsByOwnerUseCase := ucbooking.NewListSettlementsByOwnerUseCase(bookingRepository)
-	getOwnSettlementUseCase := ucbooking.NewGetOwnSettlementUseCase(bookingRepository, bookingRepository)
+	getSettlementUseCase := ucbooking.NewGetSettlementUseCase(bookingRepository, bookingRepository, storageClient)
+	listAdminSettlementsUseCase := ucbooking.NewListAdminSettlementsUseCase(bookingRepository, storageClient)
+	listSettlementsByOwnerUseCase := ucbooking.NewListSettlementsByOwnerUseCase(bookingRepository, storageClient)
+	getOwnSettlementUseCase := ucbooking.NewGetOwnSettlementUseCase(bookingRepository, bookingRepository, storageClient)
 	listTicketsByUserUseCase := ucbooking.NewListTicketsByUserUseCase(bookingRepository)
 
 	// Router

@@ -22,12 +22,22 @@ type OwnerSettlementLister interface {
 // confirmed PAID. Same reasoning applies to GetOwnSettlementUseCase's detail view.
 type ListSettlementsByOwnerUseCase struct {
 	settlements OwnerSettlementLister
+	proofURLs   ProofURLResolver
 }
 
-func NewListSettlementsByOwnerUseCase(settlements OwnerSettlementLister) *ListSettlementsByOwnerUseCase {
-	return &ListSettlementsByOwnerUseCase{settlements: settlements}
+func NewListSettlementsByOwnerUseCase(settlements OwnerSettlementLister, proofURLs ProofURLResolver) *ListSettlementsByOwnerUseCase {
+	return &ListSettlementsByOwnerUseCase{settlements: settlements, proofURLs: proofURLs}
 }
 
 func (uc *ListSettlementsByOwnerUseCase) Execute(ctx context.Context, ownerID string) ([]entity.Settlement, error) {
-	return uc.settlements.ListSettlementsByOwner(ctx, ownerID, nil)
+	settlements, err := uc.settlements.ListSettlementsByOwner(ctx, ownerID, nil)
+	if err != nil {
+		return nil, err
+	}
+	for i := range settlements {
+		if err := resolveSettlementProofURL(ctx, uc.proofURLs, &settlements[i]); err != nil {
+			return nil, err
+		}
+	}
+	return settlements, nil
 }
