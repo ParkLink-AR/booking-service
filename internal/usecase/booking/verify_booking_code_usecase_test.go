@@ -3,7 +3,9 @@ package booking_test
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
@@ -62,7 +64,61 @@ func (s *verifyBookingCodeUseCaseSuite) confirmedBooking() entity.Booking {
 		UserID:           s.driverID,
 		Status:           enum.BookingStatusConfirmed,
 		VerificationCode: &code,
+		// Inside the verification window: started 10 minutes ago, ends in an hour.
+		Start: time.Now().Add(-10 * time.Minute),
+		End:   time.Now().Add(time.Hour),
 	}
+}
+
+func (s *verifyBookingCodeUseCaseSuite) TestExecute_BeforeWindowOpens_Rejected() {
+	early := s.confirmedBooking()
+	early.Start = time.Now().Add(2 * time.Hour)
+	early.End = early.Start.Add(time.Hour)
+
+	s.verifier.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(early, nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), s.spotID).
+		Return(entity.SpotDetails{OwnerID: s.ownerID}, nil)
+
+	_, err := s.useCase.Execute(s.context, s.bookingID, s.ownerID, s.code)
+
+	var invalid *errors.InvalidInputError
+	s.Require().True(stderrors.As(err, &invalid))
+	s.Equal("VERIFICATION_NOT_OPEN_YET", invalid.Code)
+}
+
+func (s *verifyBookingCodeUseCaseSuite) TestExecute_WithinThirtyMinutesBeforeStart_Allowed() {
+	soon := s.confirmedBooking()
+	soon.Start = time.Now().Add(20 * time.Minute)
+	soon.End = soon.Start.Add(time.Hour)
+	verified := soon
+	verified.Status = enum.BookingStatusInProgress
+
+	s.verifier.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(soon, nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), s.spotID).
+		Return(entity.SpotDetails{OwnerID: s.ownerID}, nil)
+	s.verifier.EXPECT().VerifyBookingCode(gomock.Any(), s.bookingID, s.code).Return(verified, nil)
+	s.events.EXPECT().Publish(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+
+	got, err := s.useCase.Execute(s.context, s.bookingID, s.ownerID, s.code)
+
+	s.Require().NoError(err)
+	s.Equal(enum.BookingStatusInProgress, got.Status)
+}
+
+func (s *verifyBookingCodeUseCaseSuite) TestExecute_AfterBookingEnded_Rejected() {
+	ended := s.confirmedBooking()
+	ended.Start = time.Now().Add(-2 * time.Hour)
+	ended.End = time.Now().Add(-time.Minute)
+
+	s.verifier.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(ended, nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), s.spotID).
+		Return(entity.SpotDetails{OwnerID: s.ownerID}, nil)
+
+	_, err := s.useCase.Execute(s.context, s.bookingID, s.ownerID, s.code)
+
+	var invalid *errors.InvalidInputError
+	s.Require().True(stderrors.As(err, &invalid))
+	s.Equal("VERIFICATION_WINDOW_CLOSED", invalid.Code)
 }
 
 func (s *verifyBookingCodeUseCaseSuite) TestExecute_OwnerEntersCorrectCode_TransitionsAndPublishesToDriver() {

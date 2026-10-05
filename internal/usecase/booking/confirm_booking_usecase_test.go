@@ -3,6 +3,7 @@ package booking_test
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
 	"testing"
 	"time"
 
@@ -31,6 +32,7 @@ type confirmBookingUseCaseSuite struct {
 
 	bookingID string
 	paymentID string
+	amount    int
 	spotID    string
 	driverID  string
 	ownerID   string
@@ -46,6 +48,7 @@ func (s *confirmBookingUseCaseSuite) SetupTest() {
 
 	s.bookingID = "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"
 	s.paymentID = "pay-123"
+	s.amount = 150000
 	s.spotID = "11111111-1111-1111-1111-111111111111"
 	s.driverID = "22222222-2222-2222-2222-222222222222"
 	s.ownerID = "33333333-3333-3333-3333-333333333333"
@@ -56,7 +59,11 @@ func (s *confirmBookingUseCaseSuite) TearDownTest() {
 }
 
 func (s *confirmBookingUseCaseSuite) pendingBooking() entity.Booking {
-	return entity.Booking{ID: s.bookingID, ParkingSpotID: s.spotID, UserID: s.driverID}
+	holdExpiresAt := time.Now().Add(5 * time.Minute)
+	return entity.Booking{
+		ID: s.bookingID, ParkingSpotID: s.spotID, UserID: s.driverID,
+		Status: enum.BookingStatusPendingPayment, HoldExpiresAt: &holdExpiresAt, Amount: s.amount,
+	}
 }
 
 // captureEvent records the single Publish call the use case is expected to make.
@@ -93,7 +100,7 @@ func (s *confirmBookingUseCaseSuite) TestExecute_GoesToPendingApprovalAndPublish
 	var gotPayload map[string]any
 	s.captureEvent(&gotKey, &gotPayload)
 
-	got, err := s.useCase.Execute(s.context, s.bookingID, s.paymentID)
+	got, err := s.useCase.Execute(s.context, s.bookingID, s.paymentID, s.amount)
 
 	s.Require().NoError(err)
 	s.Equal(confirmed, got)
@@ -118,7 +125,7 @@ func (s *confirmBookingUseCaseSuite) TestExecute_PublishFailureIsSwallowed() {
 		Return(confirmed, nil)
 	s.events.EXPECT().Publish(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.NewUpstream("rabbitmq", context.DeadlineExceeded))
 
-	got, err := s.useCase.Execute(s.context, s.bookingID, s.paymentID)
+	got, err := s.useCase.Execute(s.context, s.bookingID, s.paymentID, s.amount)
 
 	s.Require().NoError(err)
 	s.Equal(confirmed, got)
@@ -129,8 +136,92 @@ func (s *confirmBookingUseCaseSuite) TestExecute_SpotLookupError_NoConfirmNoPubl
 	s.spots.EXPECT().GetSpotDetails(gomock.Any(), s.spotID).
 		Return(entity.SpotDetails{}, errors.NewUpstream("parkingclient", context.DeadlineExceeded))
 
-	got, err := s.useCase.Execute(s.context, s.bookingID, s.paymentID)
+	got, err := s.useCase.Execute(s.context, s.bookingID, s.paymentID, s.amount)
 
 	s.Equal(entity.Booking{}, got)
 	s.True(errors.IsUpstream(err))
+}
+
+func (s *confirmBookingUseCaseSuite) assertCode(err error, code string) {
+	var invalid *errors.InvalidInputError
+	s.Require().True(stderrors.As(err, &invalid), "expected InvalidInputError, got %v", err)
+	s.Equal(code, invalid.Code)
+}
+
+func (s *confirmBookingUseCaseSuite) TestExecute_SamePaymentAgain_IsIdempotent() {
+	paidAt := time.Now()
+	confirmed := s.pendingBooking()
+	confirmed.Status = enum.BookingStatusPendingOwnerApproval
+	confirmed.PaymentID = s.paymentID
+	confirmed.PaidAt = &paidAt
+	s.confirmer.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(confirmed, nil)
+
+	got, err := s.useCase.Execute(s.context, s.bookingID, s.paymentID, s.amount)
+
+	s.Require().NoError(err)
+	s.Equal(confirmed, got)
+}
+
+func (s *confirmBookingUseCaseSuite) TestExecute_HoldElapsed_RejectedAsHoldExpired() {
+	late := s.pendingBooking()
+	elapsed := time.Now().Add(-time.Minute)
+	late.HoldExpiresAt = &elapsed
+	s.confirmer.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(late, nil)
+
+	_, err := s.useCase.Execute(s.context, s.bookingID, s.paymentID, s.amount)
+
+	s.assertCode(err, booking.ConfirmErrorHoldExpired)
+}
+
+func (s *confirmBookingUseCaseSuite) TestExecute_ExpiredBooking_RejectedAsHoldExpired() {
+	expired := s.pendingBooking()
+	expired.Status = enum.BookingStatusExpired
+	s.confirmer.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(expired, nil)
+
+	_, err := s.useCase.Execute(s.context, s.bookingID, s.paymentID, s.amount)
+
+	s.assertCode(err, booking.ConfirmErrorHoldExpired)
+}
+
+func (s *confirmBookingUseCaseSuite) TestExecute_WrongAmount_RejectedAsAmountMismatch() {
+	s.confirmer.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(s.pendingBooking(), nil)
+
+	_, err := s.useCase.Execute(s.context, s.bookingID, s.paymentID, 100)
+
+	s.assertCode(err, booking.ConfirmErrorAmountMismatch)
+}
+
+func (s *confirmBookingUseCaseSuite) TestExecute_PaidWithAnotherPayment_RejectedAsNotPayable() {
+	paidAt := time.Now()
+	other := s.pendingBooking()
+	other.Status = enum.BookingStatusPendingOwnerApproval
+	other.PaymentID = "pay-other"
+	other.PaidAt = &paidAt
+	s.confirmer.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(other, nil)
+
+	_, err := s.useCase.Execute(s.context, s.bookingID, s.paymentID, s.amount)
+
+	s.assertCode(err, booking.ConfirmErrorNotPayable)
+}
+
+func (s *confirmBookingUseCaseSuite) TestExecute_LostRaceToSamePayment_ReturnsConfirmed() {
+	paidAt := time.Now()
+	confirmed := s.pendingBooking()
+	confirmed.Status = enum.BookingStatusPendingOwnerApproval
+	confirmed.PaymentID = s.paymentID
+	confirmed.PaidAt = &paidAt
+
+	gomock.InOrder(
+		s.confirmer.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(s.pendingBooking(), nil),
+		s.confirmer.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(confirmed, nil),
+	)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), s.spotID).Return(entity.SpotDetails{OwnerID: s.ownerID}, nil)
+	s.confirmer.EXPECT().
+		ConfirmBooking(gomock.Any(), s.bookingID, s.paymentID, enum.BookingStatusPendingOwnerApproval, gomock.Any(), gomock.Nil()).
+		Return(entity.Booking{}, errors.NewNotFound("booking", s.bookingID))
+
+	got, err := s.useCase.Execute(s.context, s.bookingID, s.paymentID, s.amount)
+
+	s.Require().NoError(err)
+	s.Equal(confirmed, got)
 }

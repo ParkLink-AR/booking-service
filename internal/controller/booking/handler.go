@@ -37,48 +37,50 @@ type ListBookingsByUserUseCase interface {
 // Handler handles HTTP requests for listing and creating a parking spot's bookings, and
 // for checking which of a set of spots have no booking in a given time range.
 type Handler struct {
-	listBookingsUseCase            ListBookingsUseCase
-	listBookingsByUserUseCase      ListBookingsByUserUseCase
-	createBookingUseCase           CreateBookingUseCase
-	confirmBookingUseCase          ConfirmBookingUseCase
-	getBookableSpotsUseCase        GetBookableSpotsUseCase
-	approveBookingUseCase          ApproveBookingUseCase
-	rejectBookingUseCase           RejectBookingUseCase
-	cancelBookingUseCase           CancelBookingUseCase
-	listBookingsDetailedUseCase    ListBookingsDetailedUseCase
-	getBookingUseCase              GetBookingUseCase
-	submitReviewUseCase            SubmitReviewUseCase
-	listReviewsByTargetUseCase     ListReviewsByTargetUseCase
-	listReviewsByBookingUseCase    ListReviewsByBookingUseCase
-	getSpotRatingsUseCase          GetSpotRatingsUseCase
-	verifyBookingCodeUseCase       VerifyBookingCodeUseCase
-	sendMessageUseCase             SendMessageUseCase
-	listMessagesUseCase            ListMessagesUseCase
-	createTicketUseCase            CreateTicketUseCase
-	listMyTicketsUseCase           ListMyTicketsUseCase
-	getTicketUseCase               GetTicketUseCase
-	listTicketMessagesUseCase      ListTicketMessagesUseCase
-	addTicketMessageUseCase        AddTicketMessageUseCase
-	listAdminTicketsUseCase        ListAdminTicketsUseCase
-	getAdminTicketUseCase          GetAdminTicketUseCase
-	listAdminTicketMessagesUseCase ListAdminTicketMessagesUseCase
-	adminReplyUseCase              AdminReplyUseCase
-	updateTicketStatusUseCase      UpdateTicketStatusUseCase
-	listAdminPayoutsUseCase        ListAdminPayoutsUseCase
-	getAdminPayoutUseCase          GetAdminPayoutUseCase
-	listOwnerBookingsUseCase       ListOwnerBookingsUseCase
-	getCommissionUseCase           GetCommissionUseCase
-	setCommissionUseCase           SetCommissionUseCase
-	getOwnerPendingBalancesUseCase GetOwnerPendingBalancesUseCase
-	draftSettlementUseCase         DraftSettlementUseCase
-	confirmSettlementUseCase       ConfirmSettlementUseCase
-	cancelSettlementUseCase        CancelSettlementUseCase
-	getSettlementUseCase           GetSettlementUseCase
-	listAdminSettlementsUseCase    ListAdminSettlementsUseCase
-	listSettlementsByOwnerUseCase  ListSettlementsByOwnerUseCase
-	getOwnSettlementUseCase        GetOwnSettlementUseCase
-	listTicketsByUserUseCase       ListTicketsByUserUseCase
-	location                       *time.Location
+	listBookingsUseCase                   ListBookingsUseCase
+	listBookingsByUserUseCase             ListBookingsByUserUseCase
+	createBookingUseCase                  CreateBookingUseCase
+	confirmBookingUseCase                 ConfirmBookingUseCase
+	getBookableSpotsUseCase               GetBookableSpotsUseCase
+	approveBookingUseCase                 ApproveBookingUseCase
+	rejectBookingUseCase                  RejectBookingUseCase
+	cancelBookingUseCase                  CancelBookingUseCase
+	listBookingsDetailedUseCase           ListBookingsDetailedUseCase
+	getBookingUseCase                     GetBookingUseCase
+	submitReviewUseCase                   SubmitReviewUseCase
+	listReviewsByTargetUseCase            ListReviewsByTargetUseCase
+	listReviewsByBookingUseCase           ListReviewsByBookingUseCase
+	getSpotRatingsUseCase                 GetSpotRatingsUseCase
+	verifyBookingCodeUseCase              VerifyBookingCodeUseCase
+	sendMessageUseCase                    SendMessageUseCase
+	listMessagesUseCase                   ListMessagesUseCase
+	createTicketUseCase                   CreateTicketUseCase
+	listMyTicketsUseCase                  ListMyTicketsUseCase
+	getTicketUseCase                      GetTicketUseCase
+	listTicketMessagesUseCase             ListTicketMessagesUseCase
+	addTicketMessageUseCase               AddTicketMessageUseCase
+	listAdminTicketsUseCase               ListAdminTicketsUseCase
+	getAdminTicketUseCase                 GetAdminTicketUseCase
+	listAdminTicketMessagesUseCase        ListAdminTicketMessagesUseCase
+	adminReplyUseCase                     AdminReplyUseCase
+	updateTicketStatusUseCase             UpdateTicketStatusUseCase
+	listAdminPayoutsUseCase               ListAdminPayoutsUseCase
+	getAdminPayoutUseCase                 GetAdminPayoutUseCase
+	listOwnerBookingsUseCase              ListOwnerBookingsUseCase
+	getCommissionUseCase                  GetCommissionUseCase
+	setCommissionUseCase                  SetCommissionUseCase
+	getOwnerPendingBalancesUseCase        GetOwnerPendingBalancesUseCase
+	draftSettlementUseCase                DraftSettlementUseCase
+	confirmSettlementUseCase              ConfirmSettlementUseCase
+	cancelSettlementUseCase               CancelSettlementUseCase
+	getSettlementUseCase                  GetSettlementUseCase
+	listAdminSettlementsUseCase           ListAdminSettlementsUseCase
+	listSettlementsByOwnerUseCase         ListSettlementsByOwnerUseCase
+	getOwnSettlementUseCase               GetOwnSettlementUseCase
+	listTicketsByUserUseCase              ListTicketsByUserUseCase
+	location                              *time.Location
+	listPendingVerificationReviewsUseCase ListPendingVerificationReviewsUseCase
+	resolveVerificationReviewUseCase      ResolveVerificationReviewUseCase
 	// internalServiceKey is the secret shared with payment-service (INTERNAL_SERVICE_KEY);
 	// it's the only caller allowed to confirm a booking (see ConfirmBookingEndpoint).
 	internalServiceKey string
@@ -128,51 +130,55 @@ func NewHandler(
 	listTicketsByUserUseCase ListTicketsByUserUseCase,
 	location *time.Location,
 	internalServiceKey string,
+	listPendingVerificationReviewsUseCase ListPendingVerificationReviewsUseCase,
+	resolveVerificationReviewUseCase ResolveVerificationReviewUseCase,
 ) *Handler {
 	return &Handler{
-		listBookingsUseCase:            listBookingsUseCase,
-		listBookingsByUserUseCase:      listBookingsByUserUseCase,
-		createBookingUseCase:           createBookingUseCase,
-		confirmBookingUseCase:          confirmBookingUseCase,
-		getBookableSpotsUseCase:        getBookableSpotsUseCase,
-		approveBookingUseCase:          approveBookingUseCase,
-		rejectBookingUseCase:           rejectBookingUseCase,
-		cancelBookingUseCase:           cancelBookingUseCase,
-		listBookingsDetailedUseCase:    listBookingsDetailedUseCase,
-		getBookingUseCase:              getBookingUseCase,
-		submitReviewUseCase:            submitReviewUseCase,
-		listReviewsByTargetUseCase:     listReviewsByTargetUseCase,
-		listReviewsByBookingUseCase:    listReviewsByBookingUseCase,
-		getSpotRatingsUseCase:          getSpotRatingsUseCase,
-		verifyBookingCodeUseCase:       verifyBookingCodeUseCase,
-		sendMessageUseCase:             sendMessageUseCase,
-		listMessagesUseCase:            listMessagesUseCase,
-		createTicketUseCase:            createTicketUseCase,
-		listMyTicketsUseCase:           listMyTicketsUseCase,
-		getTicketUseCase:               getTicketUseCase,
-		listTicketMessagesUseCase:      listTicketMessagesUseCase,
-		addTicketMessageUseCase:        addTicketMessageUseCase,
-		listAdminTicketsUseCase:        listAdminTicketsUseCase,
-		getAdminTicketUseCase:          getAdminTicketUseCase,
-		listAdminTicketMessagesUseCase: listAdminTicketMessagesUseCase,
-		adminReplyUseCase:              adminReplyUseCase,
-		updateTicketStatusUseCase:      updateTicketStatusUseCase,
-		listAdminPayoutsUseCase:        listAdminPayoutsUseCase,
-		getAdminPayoutUseCase:          getAdminPayoutUseCase,
-		listOwnerBookingsUseCase:       listOwnerBookingsUseCase,
-		getCommissionUseCase:           getCommissionUseCase,
-		setCommissionUseCase:           setCommissionUseCase,
-		getOwnerPendingBalancesUseCase: getOwnerPendingBalancesUseCase,
-		draftSettlementUseCase:         draftSettlementUseCase,
-		confirmSettlementUseCase:       confirmSettlementUseCase,
-		cancelSettlementUseCase:        cancelSettlementUseCase,
-		getSettlementUseCase:           getSettlementUseCase,
-		listAdminSettlementsUseCase:    listAdminSettlementsUseCase,
-		listSettlementsByOwnerUseCase:  listSettlementsByOwnerUseCase,
-		getOwnSettlementUseCase:        getOwnSettlementUseCase,
-		listTicketsByUserUseCase:       listTicketsByUserUseCase,
-		location:                       location,
-		internalServiceKey:             internalServiceKey,
+		listBookingsUseCase:                   listBookingsUseCase,
+		listBookingsByUserUseCase:             listBookingsByUserUseCase,
+		createBookingUseCase:                  createBookingUseCase,
+		confirmBookingUseCase:                 confirmBookingUseCase,
+		getBookableSpotsUseCase:               getBookableSpotsUseCase,
+		approveBookingUseCase:                 approveBookingUseCase,
+		rejectBookingUseCase:                  rejectBookingUseCase,
+		cancelBookingUseCase:                  cancelBookingUseCase,
+		listBookingsDetailedUseCase:           listBookingsDetailedUseCase,
+		getBookingUseCase:                     getBookingUseCase,
+		submitReviewUseCase:                   submitReviewUseCase,
+		listReviewsByTargetUseCase:            listReviewsByTargetUseCase,
+		listReviewsByBookingUseCase:           listReviewsByBookingUseCase,
+		getSpotRatingsUseCase:                 getSpotRatingsUseCase,
+		verifyBookingCodeUseCase:              verifyBookingCodeUseCase,
+		sendMessageUseCase:                    sendMessageUseCase,
+		listMessagesUseCase:                   listMessagesUseCase,
+		createTicketUseCase:                   createTicketUseCase,
+		listMyTicketsUseCase:                  listMyTicketsUseCase,
+		getTicketUseCase:                      getTicketUseCase,
+		listTicketMessagesUseCase:             listTicketMessagesUseCase,
+		addTicketMessageUseCase:               addTicketMessageUseCase,
+		listAdminTicketsUseCase:               listAdminTicketsUseCase,
+		getAdminTicketUseCase:                 getAdminTicketUseCase,
+		listAdminTicketMessagesUseCase:        listAdminTicketMessagesUseCase,
+		adminReplyUseCase:                     adminReplyUseCase,
+		updateTicketStatusUseCase:             updateTicketStatusUseCase,
+		listAdminPayoutsUseCase:               listAdminPayoutsUseCase,
+		getAdminPayoutUseCase:                 getAdminPayoutUseCase,
+		listOwnerBookingsUseCase:              listOwnerBookingsUseCase,
+		getCommissionUseCase:                  getCommissionUseCase,
+		setCommissionUseCase:                  setCommissionUseCase,
+		getOwnerPendingBalancesUseCase:        getOwnerPendingBalancesUseCase,
+		draftSettlementUseCase:                draftSettlementUseCase,
+		confirmSettlementUseCase:              confirmSettlementUseCase,
+		cancelSettlementUseCase:               cancelSettlementUseCase,
+		getSettlementUseCase:                  getSettlementUseCase,
+		listAdminSettlementsUseCase:           listAdminSettlementsUseCase,
+		listSettlementsByOwnerUseCase:         listSettlementsByOwnerUseCase,
+		getOwnSettlementUseCase:               getOwnSettlementUseCase,
+		listTicketsByUserUseCase:              listTicketsByUserUseCase,
+		location:                              location,
+		internalServiceKey:                    internalServiceKey,
+		listPendingVerificationReviewsUseCase: listPendingVerificationReviewsUseCase,
+		resolveVerificationReviewUseCase:      resolveVerificationReviewUseCase,
 	}
 }
 
@@ -187,6 +193,7 @@ func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Post(parkingSpotsBasePath+"/bookable", handler.GetBookableSpotsEndpoint)
 	router.Post(parkingSpotsBasePath+"/ratings", handler.GetSpotRatingsEndpoint)
 	router.Post("/bookings/{id}/confirm", handler.ConfirmBookingEndpoint)
+	router.Get("/internal/bookings/{id}", handler.GetInternalBookingEndpoint)
 	router.Post("/bookings/{id}/approve", handler.ApproveBookingEndpoint)
 	router.Post("/bookings/{id}/reject", handler.RejectBookingEndpoint)
 	router.Post("/bookings/{id}/cancel", handler.CancelBookingEndpoint)
@@ -209,6 +216,10 @@ func (handler *Handler) RegisterRoutes(router chi.Router) {
 	router.Get("/admin/payouts", handler.ListAdminPayoutsEndpoint)
 	router.Get("/admin/payouts/{id}", handler.GetAdminPayoutEndpoint)
 	router.Get("/admin/owners/{id}/bookings", handler.ListOwnerBookingsEndpoint)
+	// Paid bookings that completed without the owner ever entering the driver's arrival
+	// code -- their payout is held back until an admin approves or refunds each one.
+	router.Get("/admin/bookings/unverified", handler.ListPendingVerificationReviewsEndpoint)
+	router.Post("/admin/bookings/{id}/verification-review", handler.ResolveVerificationReviewEndpoint)
 	router.Get("/admin/settings/commission", handler.GetCommissionEndpoint)
 	router.Put("/admin/settings/commission", handler.SetCommissionEndpoint)
 	// Same read, exposed at a non-admin path: mobile needs the current commission rate to
@@ -231,6 +242,9 @@ func (handler *Handler) ListBookingsByUserEndpoint(responseWriter http.ResponseW
 		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_USER_ID", "id must be a valid UUID")
 		return
 	}
+	if !requireSelfOrAdmin(responseWriter, request, userID) {
+		return
+	}
 
 	bookings, err := handler.listBookingsByUserUseCase.Execute(request.Context(), userID)
 	if err != nil {
@@ -238,10 +252,9 @@ func (handler *Handler) ListBookingsByUserEndpoint(responseWriter http.ResponseW
 		return
 	}
 
-	// Only include verification codes when the caller is asking about their own history
-	// -- {id} is untrusted on its own (this endpoint doesn't require it to match the
-	// caller), so compare against X-User-Id rather than assuming {id} is the real driver.
-	includeCodes := request.Header.Get("X-User-Id") == userID
+	// Only include verification codes for the driver themselves -- an admin looking at
+	// someone's history (allowed by requireSelfOrAdmin above) must not see them.
+	includeCodes := request.Header.Get(userIDHeader) == userID
 
 	response := make([]userBookingResponse, len(bookings))
 	for i, b := range bookings {

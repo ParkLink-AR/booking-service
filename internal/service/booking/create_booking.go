@@ -10,7 +10,8 @@ import (
 	"github.com/example/bookings-service/internal/domain/errors"
 )
 
-// CreateBooking validates input.Start < input.End, then branches on input.Kind:
+// CreateBooking validates input.Start < input.End and that the caller doesn't own the spot,
+// then branches on input.Kind:
 //
 //   - HOURLY first confirms with parking-service that the spot is still active (a paused
 //     or deleted spot must reject any new reservation, even though its already-existing
@@ -40,6 +41,15 @@ import (
 func (service *Service) CreateBooking(ctx context.Context, input entity.CreateBookingInput) (entity.Booking, error) {
 	if !input.Start.Before(input.End) {
 		return entity.Booking{}, errors.NewInvalidInput("INVALID_DATE_RANGE", "start must be before end")
+	}
+
+	// An owner can see their own spot from the driver side of the app, but never rent it.
+	ownerID, err := service.parkingClient.GetSpotOwnerID(ctx, input.ParkingSpotID)
+	if err != nil {
+		return entity.Booking{}, err
+	}
+	if ownerID == input.UserID {
+		return entity.Booking{}, errors.NewForbidden("no podés reservar tu propia cochera")
 	}
 
 	start, end := input.Start, input.End

@@ -18,13 +18,15 @@ type ListSettlementsByOwnerUseCase interface {
 	Execute(ctx context.Context, ownerID string) ([]entity.Settlement, error)
 }
 
-// ListSettlementsByUserEndpoint is the owner's own self-service "Finanzas" history --
-// same auth level/convention as ListBookingsByUserEndpoint (GET /users/{id}/bookings/history):
-// no in-handler ownership enforcement beyond what that endpoint already relies on.
+// ListSettlementsByUserEndpoint is the owner's own self-service "Finanzas" history -- only
+// that owner (or a ParkLink admin) may read it.
 func (handler *Handler) ListSettlementsByUserEndpoint(responseWriter http.ResponseWriter, request *http.Request) {
 	userID := chi.URLParam(request, "id")
 	if _, err := uuid.Parse(userID); err != nil {
 		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_USER_ID", "id must be a valid UUID")
+		return
+	}
+	if !requireSelfOrAdmin(responseWriter, request, userID) {
 		return
 	}
 

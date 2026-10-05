@@ -1,6 +1,7 @@
 package booking_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -59,7 +60,7 @@ func (s *handlerSuite) TestCreateBookingEndpoint_Success() {
 		}).
 		Return(want, nil)
 
-	recorder := s.doPost("/bookings", createBookingBody("2026-08-18T10:00:00-03:00", "2026-08-18T11:00:00-03:00", 5000))
+	recorder := s.doPostAsDriver("/bookings", createBookingBody("2026-08-18T10:00:00-03:00", "2026-08-18T11:00:00-03:00", 5000))
 
 	s.Equal(http.StatusCreated, recorder.Code)
 
@@ -106,32 +107,48 @@ func (s *handlerSuite) TestCreateBookingEndpoint_PassesCapacityThrough() {
 		`{"user_id":"%s","start":"%s","end":"%s","amount":%d,"parking_spot":{"id":"%s","schedule":%s,"capacity":4}}`,
 		validUserID, "2026-08-18T10:00:00-03:00", "2026-08-18T11:00:00-03:00", 5000, validParkingSpotID, tuesdayScheduleBody,
 	)
-	recorder := s.doPost("/bookings", body)
+	recorder := s.doPostAsDriver("/bookings", body)
 
 	s.Equal(http.StatusCreated, recorder.Code)
 }
 
 func (s *handlerSuite) TestCreateBookingEndpoint_InvalidSpotID() {
 	body := `{"user_id":"` + validUserID + `","start":"2026-08-18T10:00:00-03:00","end":"2026-08-18T11:00:00-03:00","amount":5000,"parking_spot":{"id":"not-a-uuid","schedule":` + tuesdayScheduleBody + `}}`
-	recorder := s.doPost("/bookings", body)
+	recorder := s.doPostAsDriver("/bookings", body)
 
 	s.Equal(http.StatusBadRequest, recorder.Code)
 	s.Contains(recorder.Body.String(), "INVALID_SPOT_ID")
 }
 
 func (s *handlerSuite) TestCreateBookingEndpoint_InvalidBody() {
-	recorder := s.doPost("/bookings", `not-json`)
+	recorder := s.doPostAsDriver("/bookings", `not-json`)
 
 	s.Equal(http.StatusBadRequest, recorder.Code)
 	s.Contains(recorder.Body.String(), "INVALID_BODY")
 }
 
-func (s *handlerSuite) TestCreateBookingEndpoint_InvalidUserID() {
-	body := `{"user_id":"not-a-uuid","start":"2026-08-18T10:00:00-03:00","end":"2026-08-18T11:00:00-03:00","amount":5000,"parking_spot":{"id":"` + validParkingSpotID + `","schedule":` + tuesdayScheduleBody + `}}`
-	recorder := s.doPost("/bookings", body)
+func (s *handlerSuite) TestCreateBookingEndpoint_MissingCallerIdentity() {
+	recorder := s.doPost("/bookings", createBookingBody("2026-08-18T10:00:00-03:00", "2026-08-18T11:00:00-03:00", 5000))
 
-	s.Equal(http.StatusBadRequest, recorder.Code)
-	s.Contains(recorder.Body.String(), "INVALID_USER_ID")
+	s.Equal(http.StatusUnauthorized, recorder.Code)
+	s.Contains(recorder.Body.String(), "UNAUTHENTICATED")
+}
+
+func (s *handlerSuite) TestCreateBookingEndpoint_IgnoresUserIDInBody() {
+	otherUser := "99999999-9999-9999-9999-999999999999"
+	body := fmt.Sprintf(
+		`{"user_id":"%s","start":"2026-08-18T10:00:00-03:00","end":"2026-08-18T11:00:00-03:00","amount":5000,"parking_spot":{"id":"%s","schedule":%s}}`,
+		otherUser, validParkingSpotID, tuesdayScheduleBody,
+	)
+	s.createBookingUseCase.EXPECT().Execute(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, input entity.CreateBookingInput) (entity.Booking, error) {
+			s.Equal(validUserID, input.UserID)
+			return entity.Booking{ID: validParkingSpotID, UserID: input.UserID}, nil
+		})
+
+	recorder := s.doPostAsDriver("/bookings", body)
+
+	s.Equal(http.StatusCreated, recorder.Code)
 }
 
 var invalidTimeRangeCases = []struct {
@@ -144,14 +161,14 @@ var invalidTimeRangeCases = []struct {
 
 func (s *handlerSuite) TestCreateBookingEndpoint_InvalidTimeRange() {
 	for _, testCase := range invalidTimeRangeCases {
-		recorder := s.doPost("/bookings", testCase.body)
+		recorder := s.doPostAsDriver("/bookings", testCase.body)
 		s.Equal(http.StatusBadRequest, recorder.Code, testCase.name)
 		s.Contains(recorder.Body.String(), "INVALID_TIME_RANGE", testCase.name)
 	}
 }
 
 func (s *handlerSuite) TestCreateBookingEndpoint_InvalidAmount() {
-	recorder := s.doPost("/bookings", createBookingBody("2026-08-18T10:00:00-03:00", "2026-08-18T11:00:00-03:00", 0))
+	recorder := s.doPostAsDriver("/bookings", createBookingBody("2026-08-18T10:00:00-03:00", "2026-08-18T11:00:00-03:00", 0))
 
 	s.Equal(http.StatusBadRequest, recorder.Code)
 	s.Contains(recorder.Body.String(), "INVALID_AMOUNT")
@@ -163,7 +180,7 @@ func (s *handlerSuite) TestCreateBookingEndpoint_Stay_InvalidEndDate() {
 		validUserID, validParkingSpotID,
 	)
 
-	recorder := s.doPost("/bookings", body)
+	recorder := s.doPostAsDriver("/bookings", body)
 
 	s.Equal(http.StatusBadRequest, recorder.Code)
 	s.Contains(recorder.Body.String(), "INVALID_STAY_END_DATE")
@@ -174,7 +191,7 @@ func (s *handlerSuite) TestCreateBookingEndpoint_Conflict() {
 		Execute(gomock.Any(), gomock.Any()).
 		Return(entity.Booking{}, errors.NewConflict("requested time range overlaps with an existing booking"))
 
-	recorder := s.doPost("/bookings", createBookingBody("2026-08-18T10:00:00-03:00", "2026-08-18T11:00:00-03:00", 5000))
+	recorder := s.doPostAsDriver("/bookings", createBookingBody("2026-08-18T10:00:00-03:00", "2026-08-18T11:00:00-03:00", 5000))
 
 	s.Equal(http.StatusConflict, recorder.Code)
 	s.Contains(recorder.Body.String(), "BOOKING_CONFLICT")
@@ -185,7 +202,7 @@ func (s *handlerSuite) TestCreateBookingEndpoint_OutsidePublishedHours() {
 		Execute(gomock.Any(), gomock.Any()).
 		Return(entity.Booking{}, errors.NewInvalidInput("OUTSIDE_PUBLISHED_HOURS", "requested time is outside the parking spot's published hours"))
 
-	recorder := s.doPost("/bookings", createBookingBody("2026-08-18T22:00:00-03:00", "2026-08-18T23:00:00-03:00", 5000))
+	recorder := s.doPostAsDriver("/bookings", createBookingBody("2026-08-18T22:00:00-03:00", "2026-08-18T23:00:00-03:00", 5000))
 
 	s.Equal(http.StatusBadRequest, recorder.Code)
 	s.Contains(recorder.Body.String(), "OUTSIDE_PUBLISHED_HOURS")

@@ -55,6 +55,9 @@ func (handler *Handler) ListTicketsByUserEndpoint(responseWriter http.ResponseWr
 		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_USER_ID", "id must be a valid UUID")
 		return
 	}
+	if !requireSelfOrAdmin(responseWriter, request, userID) {
+		return
+	}
 
 	summaries, err := handler.listTicketsByUserUseCase.Execute(request.Context(), userID)
 	if err != nil {

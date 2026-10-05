@@ -579,3 +579,18 @@ func (s *serviceSuite) TestCreateBooking_RepositoryCreateErrorPropagates() {
 	s.Equal(entity.Booking{}, got)
 	s.True(errors.IsConflict(err))
 }
+
+func (s *serviceSuite) TestCreateBooking_OwnerCannotBookOwnSpot() {
+	owner := "11111111-1111-1111-1111-111111111111"
+	s.spotOwnerID = owner
+
+	_, err := s.service.CreateBooking(s.context, entity.CreateBookingInput{
+		ParkingSpotID:       s.parkingSpotID,
+		ParkingSpotSchedule: tuesdaySchedule,
+		UserID:              owner,
+		Start:               s.localDate(18).Add(10 * time.Hour),
+		End:                 s.localDate(18).Add(11 * time.Hour),
+	})
+
+	s.True(errors.IsForbidden(err))
+}

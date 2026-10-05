@@ -15,7 +15,7 @@ import (
 
 // GetBookingUseCase is the interface consumed by this handler for GET /bookings/{id}.
 type GetBookingUseCase interface {
-	Execute(ctx context.Context, bookingID string) (entity.Booking, error)
+	Execute(ctx context.Context, bookingID string, viewer entity.BookingViewer) (entity.Booking, error)
 }
 
 func (handler *Handler) GetBookingEndpoint(responseWriter http.ResponseWriter, request *http.Request) {
@@ -25,7 +25,9 @@ func (handler *Handler) GetBookingEndpoint(responseWriter http.ResponseWriter, r
 		return
 	}
 
-	booking, err := handler.getBookingUseCase.Execute(request.Context(), bookingID)
+	viewerID := request.Header.Get(userIDHeader)
+	viewer := entity.BookingViewer{UserID: viewerID, Privileged: request.Header.Get(adminRoleHeader) != ""}
+	booking, err := handler.getBookingUseCase.Execute(request.Context(), bookingID, viewer)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			writeErrorCode(responseWriter, http.StatusNotFound, "BOOKING_NOT_FOUND", "booking not found")
@@ -35,8 +37,7 @@ func (handler *Handler) GetBookingEndpoint(responseWriter http.ResponseWriter, r
 		return
 	}
 
-	// Optional: only gates whether the verification code is included (see
-	// bookingResponseFromEntity) -- this endpoint has no ownership check of its own.
-	viewerID := request.Header.Get("X-User-Id")
+	// Also gates whether the verification code is included (driver only, see
+	// bookingResponseFromEntity).
 	writeJSON(responseWriter, http.StatusOK, bookingResponseFromEntity(booking, handler.location, viewerID))
 }

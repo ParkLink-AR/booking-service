@@ -31,16 +31,28 @@ type spotResponse struct {
 // Client calls parking-service directly inside the docker network, the same
 // way parking-service's own BookingClientService calls this service.
 type Client struct {
-	httpClient *http.Client
-	baseURL    string
+	httpClient  *http.Client
+	baseURL     string
+	internalKey string
 }
 
-func NewClient(baseURL string) *Client {
-	return &Client{httpClient: &http.Client{Timeout: 5 * time.Second}, baseURL: baseURL}
+// NewClient builds a parking-service client. internalKey (INTERNAL_SERVICE_KEY) is sent on
+// every call so parking-service accepts it as a trusted service-to-service request.
+func NewClient(baseURL, internalKey string) *Client {
+	return &Client{httpClient: &http.Client{Timeout: 5 * time.Second}, baseURL: baseURL, internalKey: internalKey}
+}
+
+func (client *Client) newGetRequest(ctx context.Context, requestURL string) (*http.Request, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("X-Internal-Key", client.internalKey)
+	return request, nil
 }
 
 func (client *Client) getSpot(ctx context.Context, spotID string) (spotResponse, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/parking-spots/%s", client.baseURL, spotID), nil)
+	request, err := client.newGetRequest(ctx, fmt.Sprintf("%s/parking-spots/%s", client.baseURL, spotID))
 	if err != nil {
 		return spotResponse{}, errors.NewUpstream("parkingclient.getSpot", err)
 	}
@@ -97,7 +109,7 @@ type ownedSpotResponse struct {
 // spots" view. Calls parking-service's existing public GET /users/{id}/parking-spots
 // endpoint, same trust model as getSpot (no auth, same docker-network call).
 func (client *Client) GetSpotIDsForOwner(ctx context.Context, ownerID string) ([]string, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/users/%s/parking-spots", client.baseURL, ownerID), nil)
+	request, err := client.newGetRequest(ctx, fmt.Sprintf("%s/users/%s/parking-spots", client.baseURL, ownerID))
 	if err != nil {
 		return nil, errors.NewUpstream("parkingclient.GetSpotIDsForOwner", err)
 	}
@@ -187,7 +199,7 @@ func (client *Client) GetStayQuote(ctx context.Context, spotID, startDate, endDa
 	}
 	requestURL := fmt.Sprintf("%s/parking-spots/%s/stays/quote?%s", client.baseURL, spotID, query.Encode())
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
+	request, err := client.newGetRequest(ctx, requestURL)
 	if err != nil {
 		return StayQuote{}, errors.NewUpstream("parkingclient.GetStayQuote", err)
 	}

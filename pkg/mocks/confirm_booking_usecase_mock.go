@@ -41,16 +41,16 @@ func (m *MockConfirmBookingUseCase) EXPECT() *MockConfirmBookingUseCaseMockRecor
 }
 
 // Execute mocks base method.
-func (m *MockConfirmBookingUseCase) Execute(ctx context.Context, bookingID, paymentID string) (entity.Booking, error) {
+func (m *MockConfirmBookingUseCase) Execute(ctx context.Context, bookingID, paymentID string, amount int) (entity.Booking, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Execute", ctx, bookingID, paymentID)
+	ret := m.ctrl.Call(m, "Execute", ctx, bookingID, paymentID, amount)
 	ret0, _ := ret[0].(entity.Booking)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Execute indicates an expected call of Execute.
-func (mr *MockConfirmBookingUseCaseMockRecorder) Execute(ctx, bookingID, paymentID any) *gomock.Call {
+func (mr *MockConfirmBookingUseCaseMockRecorder) Execute(ctx, bookingID, paymentID, amount any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockConfirmBookingUseCase)(nil).Execute), ctx, bookingID, paymentID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockConfirmBookingUseCase)(nil).Execute), ctx, bookingID, paymentID, amount)
 }

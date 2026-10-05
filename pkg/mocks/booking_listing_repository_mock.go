@@ -141,6 +141,21 @@ func (mr *MockParkingClientMockRecorder) GetHourlyPrice(ctx, spotID any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHourlyPrice", reflect.TypeOf((*MockParkingClient)(nil).GetHourlyPrice), ctx, spotID)
 }
 
+// GetSpotOwnerID mocks base method.
+func (m *MockParkingClient) GetSpotOwnerID(ctx context.Context, spotID string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSpotOwnerID", ctx, spotID)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSpotOwnerID indicates an expected call of GetSpotOwnerID.
+func (mr *MockParkingClientMockRecorder) GetSpotOwnerID(ctx, spotID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSpotOwnerID", reflect.TypeOf((*MockParkingClient)(nil).GetSpotOwnerID), ctx, spotID)
+}
+
 // GetStayQuote mocks base method.
 func (m *MockParkingClient) GetStayQuote(ctx context.Context, spotID, startDate, endDate string, startHour int) (parkingclient.StayQuote, error) {
 	m.ctrl.T.Helper()

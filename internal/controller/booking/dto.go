@@ -21,7 +21,6 @@ type parkingSpotRequest struct {
 }
 
 type createBookingRequest struct {
-	UserID string `json:"user_id"`
 	Start  string `json:"start"`
 	End    string `json:"end"`
 	Amount int    `json:"amount"`
@@ -54,8 +53,13 @@ type bookingResponse struct {
 	End           string  `json:"end"`
 	Status        string  `json:"status"`
 	HoldExpiresAt *string `json:"hold_expires_at,omitempty"`
-	Amount        int     `json:"amount"`
-	PaymentID     string  `json:"payment_id,omitempty"`
+	// Amount is what the driver was charged (the owner's price + ParkLink's commission).
+	Amount int `json:"amount"`
+	// OwnerAmount is what the spot's owner earns from it (their own price) -- only sent
+	// to someone other than the driver (see bookingResponseFromEntity), who only ever
+	// sees what they paid. Absent for a booking that predates the field.
+	OwnerAmount *int   `json:"owner_amount,omitempty"`
+	PaymentID   string `json:"payment_id,omitempty"`
 	// PaidAt is set once, the moment ConfirmBooking recorded the Mercado Pago payment --
 	// see entity.Booking.PaidAt. Absent (nil) means the booking was never actually paid,
 	// regardless of its current status (e.g. EXPIRED, or CANCELLED before ever reaching
@@ -100,7 +104,8 @@ func vehicleResponseFromEntity(plate, brand, model, country *string) *vehicleRes
 // when there's nothing to compare against, e.g. the driver who just created/confirmed the
 // booking) -- VerificationCode/VerifiedAt are only included when viewerID matches
 // booking.UserID, i.e. when the viewer IS the driver. Pass "" to always omit them (e.g.
-// for the owner-facing approve/reject responses).
+// for the owner-facing approve/reject responses). OwnerAmount is the reverse: included for
+// anyone but the driver.
 func bookingResponseFromEntity(booking entity.Booking, location *time.Location, viewerID string) *bookingResponse {
 	response := &bookingResponse{
 		ID:            booking.ID,
@@ -124,6 +129,9 @@ func bookingResponseFromEntity(booking entity.Booking, location *time.Location, 
 		response.PaidAt = &formatted
 	}
 	response.CancellationReason = booking.CancellationReason
+	if viewerID == "" || viewerID != booking.UserID {
+		response.OwnerAmount = booking.OwnerAmount
+	}
 	if viewerID != "" && viewerID == booking.UserID {
 		response.VerificationCode = booking.VerificationCode
 		if booking.VerifiedAt != nil {

@@ -31,6 +31,9 @@ type serviceSuite struct {
 	context           context.Context
 	location          *time.Location
 	parkingSpotID     string
+	// spotOwnerID is who GetSpotOwnerID reports as the spot's owner -- someone other than
+	// the drivers these tests book as, unless a test sets it to one of them.
+	spotOwnerID string
 }
 
 func (s *serviceSuite) SetupTest() {
@@ -46,6 +49,10 @@ func (s *serviceSuite) SetupTest() {
 	s.service = booking.NewService(s.bookingRepository, s.parkingClient, s.commissionRates, location, testHoldDuration)
 	s.context = context.Background()
 	s.parkingSpotID = "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"
+	s.spotOwnerID = "99999999-9999-9999-9999-999999999999"
+	s.parkingClient.EXPECT().GetSpotOwnerID(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ string) (string, error) { return s.spotOwnerID, nil }).
+		AnyTimes()
 }
 
 func (s *serviceSuite) TearDownTest() {

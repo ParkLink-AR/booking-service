@@ -251,6 +251,15 @@ func runMigrations(database *sql.DB) error {
 		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS vehicle_brand TEXT;
 		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS vehicle_model TEXT;
 		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS vehicle_country TEXT;
+
+		-- migrations/020: flags a paid booking that completed without its in-person arrival
+		-- code ever being verified, for an admin to review before the owner is paid --
+		-- PENDING blocks the payout until it's APPROVED (paid out) or REFUNDED (driver gets
+		-- the money back). NULL for verified bookings and anything completed before this.
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS verification_review TEXT
+			CHECK (verification_review IN ('PENDING', 'APPROVED', 'REFUNDED'));
+		CREATE INDEX IF NOT EXISTS idx_bookings_verification_review_pending
+			ON bookings (updated_at) WHERE verification_review = 'PENDING';
 	`)
 	return err
 }

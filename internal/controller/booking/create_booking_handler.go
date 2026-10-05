@@ -30,8 +30,11 @@ func (handler *Handler) CreateBookingEndpoint(responseWriter http.ResponseWriter
 		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_SPOT_ID", "parking_spot.id must be a valid UUID")
 		return
 	}
-	if _, err := uuid.Parse(body.UserID); err != nil {
-		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_USER_ID", "user_id must be a valid UUID")
+	// The driver is always the authenticated caller -- never a user_id from the body,
+	// which would let anyone book (and be charged for) a spot on someone else's behalf.
+	userID := request.Header.Get(userIDHeader)
+	if _, err := uuid.Parse(userID); err != nil {
+		writeErrorCode(responseWriter, http.StatusUnauthorized, "UNAUTHENTICATED", "missing or invalid X-User-Id")
 		return
 	}
 	start, err := time.Parse(time.RFC3339, body.Start)
@@ -89,7 +92,7 @@ func (handler *Handler) CreateBookingEndpoint(responseWriter http.ResponseWriter
 	input := entity.CreateBookingInput{
 		ParkingSpotID:       body.ParkingSpot.ID,
 		ParkingSpotSchedule: schedule,
-		UserID:              body.UserID,
+		UserID:              userID,
 		Start:               start,
 		End:                 end,
 		Amount:              body.Amount,

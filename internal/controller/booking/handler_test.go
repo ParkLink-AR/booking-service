@@ -26,50 +26,52 @@ func TestHandlerSuite(t *testing.T) {
 
 type handlerSuite struct {
 	suite.Suite
-	controller                     *gomock.Controller
-	listBookingsUseCase            *mocks.MockListBookingsUseCase
-	listBookingsByUserUseCase      *mocks.MockListBookingsByUserUseCase
-	createBookingUseCase           *mocks.MockCreateBookingUseCase
-	confirmBookingUseCase          *mocks.MockConfirmBookingUseCase
-	getBookableSpotsUseCase        *mocks.MockGetBookableSpotsUseCase
-	approveBookingUseCase          *mocks.MockApproveBookingUseCase
-	rejectBookingUseCase           *mocks.MockRejectBookingUseCase
-	cancelBookingUseCase           *mocks.MockCancelBookingUseCase
-	listBookingsDetailedUseCase    *mocks.MockListBookingsDetailedUseCase
-	getBookingUseCase              *mocks.MockGetBookingUseCase
-	submitReviewUseCase            *mocks.MockSubmitReviewUseCase
-	listReviewsByTargetUseCase     *mocks.MockListReviewsByTargetUseCase
-	listReviewsByBookingUseCase    *mocks.MockListReviewsByBookingUseCase
-	getSpotRatingsUseCase          *mocks.MockGetSpotRatingsUseCase
-	verifyBookingCodeUseCase       *mocks.MockVerifyBookingCodeUseCase
-	sendMessageUseCase             *mocks.MockSendMessageUseCase
-	listMessagesUseCase            *mocks.MockListMessagesUseCase
-	createTicketUseCase            *mocks.MockCreateTicketUseCase
-	listMyTicketsUseCase           *mocks.MockListMyTicketsUseCase
-	getTicketUseCase               *mocks.MockGetTicketUseCase
-	listTicketMessagesUseCase      *mocks.MockListTicketMessagesUseCase
-	addTicketMessageUseCase        *mocks.MockAddTicketMessageUseCase
-	listAdminTicketsUseCase        *mocks.MockListAdminTicketsUseCase
-	getAdminTicketUseCase          *mocks.MockGetAdminTicketUseCase
-	listAdminTicketMessagesUseCase *mocks.MockListAdminTicketMessagesUseCase
-	adminReplyUseCase              *mocks.MockAdminReplyUseCase
-	updateTicketStatusUseCase      *mocks.MockUpdateTicketStatusUseCase
-	listAdminPayoutsUseCase        *mocks.MockListAdminPayoutsUseCase
-	getAdminPayoutUseCase          *mocks.MockGetAdminPayoutUseCase
-	listOwnerBookingsUseCase       *mocks.MockListOwnerBookingsUseCase
-	getCommissionUseCase           *mocks.MockGetCommissionUseCase
-	setCommissionUseCase           *mocks.MockSetCommissionUseCase
-	getOwnerPendingBalancesUseCase *mocks.MockGetOwnerPendingBalancesUseCase
-	draftSettlementUseCase         *mocks.MockDraftSettlementUseCase
-	confirmSettlementUseCase       *mocks.MockConfirmSettlementUseCase
-	cancelSettlementUseCase        *mocks.MockCancelSettlementUseCase
-	getSettlementUseCase           *mocks.MockGetSettlementUseCase
-	listAdminSettlementsUseCase    *mocks.MockListAdminSettlementsUseCase
-	listSettlementsByOwnerUseCase  *mocks.MockListSettlementsByOwnerUseCase
-	getOwnSettlementUseCase        *mocks.MockGetOwnSettlementUseCase
-	listTicketsByUserUseCase       *mocks.MockListTicketsByUserUseCase
-	router                         chi.Router
-	location                       *time.Location
+	controller                            *gomock.Controller
+	listBookingsUseCase                   *mocks.MockListBookingsUseCase
+	listBookingsByUserUseCase             *mocks.MockListBookingsByUserUseCase
+	createBookingUseCase                  *mocks.MockCreateBookingUseCase
+	confirmBookingUseCase                 *mocks.MockConfirmBookingUseCase
+	getBookableSpotsUseCase               *mocks.MockGetBookableSpotsUseCase
+	approveBookingUseCase                 *mocks.MockApproveBookingUseCase
+	rejectBookingUseCase                  *mocks.MockRejectBookingUseCase
+	cancelBookingUseCase                  *mocks.MockCancelBookingUseCase
+	listBookingsDetailedUseCase           *mocks.MockListBookingsDetailedUseCase
+	getBookingUseCase                     *mocks.MockGetBookingUseCase
+	submitReviewUseCase                   *mocks.MockSubmitReviewUseCase
+	listReviewsByTargetUseCase            *mocks.MockListReviewsByTargetUseCase
+	listReviewsByBookingUseCase           *mocks.MockListReviewsByBookingUseCase
+	getSpotRatingsUseCase                 *mocks.MockGetSpotRatingsUseCase
+	verifyBookingCodeUseCase              *mocks.MockVerifyBookingCodeUseCase
+	sendMessageUseCase                    *mocks.MockSendMessageUseCase
+	listMessagesUseCase                   *mocks.MockListMessagesUseCase
+	createTicketUseCase                   *mocks.MockCreateTicketUseCase
+	listMyTicketsUseCase                  *mocks.MockListMyTicketsUseCase
+	getTicketUseCase                      *mocks.MockGetTicketUseCase
+	listTicketMessagesUseCase             *mocks.MockListTicketMessagesUseCase
+	addTicketMessageUseCase               *mocks.MockAddTicketMessageUseCase
+	listAdminTicketsUseCase               *mocks.MockListAdminTicketsUseCase
+	getAdminTicketUseCase                 *mocks.MockGetAdminTicketUseCase
+	listAdminTicketMessagesUseCase        *mocks.MockListAdminTicketMessagesUseCase
+	adminReplyUseCase                     *mocks.MockAdminReplyUseCase
+	updateTicketStatusUseCase             *mocks.MockUpdateTicketStatusUseCase
+	listAdminPayoutsUseCase               *mocks.MockListAdminPayoutsUseCase
+	getAdminPayoutUseCase                 *mocks.MockGetAdminPayoutUseCase
+	listOwnerBookingsUseCase              *mocks.MockListOwnerBookingsUseCase
+	getCommissionUseCase                  *mocks.MockGetCommissionUseCase
+	setCommissionUseCase                  *mocks.MockSetCommissionUseCase
+	getOwnerPendingBalancesUseCase        *mocks.MockGetOwnerPendingBalancesUseCase
+	draftSettlementUseCase                *mocks.MockDraftSettlementUseCase
+	confirmSettlementUseCase              *mocks.MockConfirmSettlementUseCase
+	cancelSettlementUseCase               *mocks.MockCancelSettlementUseCase
+	getSettlementUseCase                  *mocks.MockGetSettlementUseCase
+	listAdminSettlementsUseCase           *mocks.MockListAdminSettlementsUseCase
+	listSettlementsByOwnerUseCase         *mocks.MockListSettlementsByOwnerUseCase
+	getOwnSettlementUseCase               *mocks.MockGetOwnSettlementUseCase
+	listTicketsByUserUseCase              *mocks.MockListTicketsByUserUseCase
+	listPendingVerificationReviewsUseCase *mocks.MockListPendingVerificationReviewsUseCase
+	resolveVerificationReviewUseCase      *mocks.MockResolveVerificationReviewUseCase
+	router                                chi.Router
+	location                              *time.Location
 }
 
 const validParkingSpotID = "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"
@@ -119,6 +121,8 @@ func (s *handlerSuite) SetupTest() {
 	s.listSettlementsByOwnerUseCase = mocks.NewMockListSettlementsByOwnerUseCase(s.controller)
 	s.getOwnSettlementUseCase = mocks.NewMockGetOwnSettlementUseCase(s.controller)
 	s.listTicketsByUserUseCase = mocks.NewMockListTicketsByUserUseCase(s.controller)
+	s.listPendingVerificationReviewsUseCase = mocks.NewMockListPendingVerificationReviewsUseCase(s.controller)
+	s.resolveVerificationReviewUseCase = mocks.NewMockResolveVerificationReviewUseCase(s.controller)
 
 	location, err := time.LoadLocation("America/Argentina/Buenos_Aires")
 	s.Require().NoError(err)
@@ -146,6 +150,7 @@ func (s *handlerSuite) SetupTest() {
 		s.listTicketsByUserUseCase,
 		s.location,
 		testInternalServiceKey,
+		s.listPendingVerificationReviewsUseCase, s.resolveVerificationReviewUseCase,
 	).RegisterRoutes(s.router)
 }
 
@@ -165,6 +170,11 @@ func (s *handlerSuite) doPost(path, body string) *httptest.ResponseRecorder {
 	recorder := httptest.NewRecorder()
 	s.router.ServeHTTP(recorder, request)
 	return recorder
+}
+
+// doPostAsDriver issues a POST as the gateway would forward it for validUserID.
+func (s *handlerSuite) doPostAsDriver(path, body string) *httptest.ResponseRecorder {
+	return s.doWithHeaders(http.MethodPost, path, body, map[string]string{"X-User-Id": validUserID})
 }
 
 func (s *handlerSuite) doWithHeaders(method, path, body string, headers map[string]string) *httptest.ResponseRecorder {
@@ -384,11 +394,71 @@ func (s *handlerSuite) TestDraftSettlementEndpoint_NothingToSettle() {
 }
 
 func (s *handlerSuite) TestConfirmBookingEndpoint_SucceedsWithInternalKey() {
-	s.confirmBookingUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID, "mp-123").
+	s.confirmBookingUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID, "mp-123", 150000).
 		Return(entity.Booking{ID: validParkingSpotID, Status: enum.BookingStatusPendingOwnerApproval}, nil)
 
+	recorder := s.doWithHeaders(http.MethodPost, "/bookings/"+validParkingSpotID+"/confirm", `{"payment_id":"mp-123","amount":150000}`,
+		map[string]string{"X-Internal-Key": testInternalServiceKey})
+
+	s.Equal(http.StatusOK, recorder.Code)
+}
+
+func (s *handlerSuite) TestConfirmBookingEndpoint_HoldExpiredReturnsItsCode() {
+	s.confirmBookingUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID, "mp-123", 150000).
+		Return(entity.Booking{}, errors.NewInvalidInput("HOLD_EXPIRED", "la reserva venció"))
+
+	recorder := s.doWithHeaders(http.MethodPost, "/bookings/"+validParkingSpotID+"/confirm", `{"payment_id":"mp-123","amount":150000}`,
+		map[string]string{"X-Internal-Key": testInternalServiceKey})
+
+	s.Equal(http.StatusBadRequest, recorder.Code)
+	s.Contains(recorder.Body.String(), "HOLD_EXPIRED")
+}
+
+func (s *handlerSuite) TestConfirmBookingEndpoint_RejectsMissingAmount() {
 	recorder := s.doWithHeaders(http.MethodPost, "/bookings/"+validParkingSpotID+"/confirm", `{"payment_id":"mp-123"}`,
 		map[string]string{"X-Internal-Key": testInternalServiceKey})
+
+	s.Equal(http.StatusBadRequest, recorder.Code)
+	s.Contains(recorder.Body.String(), "MISSING_AMOUNT")
+}
+
+func (s *handlerSuite) TestGetInternalBookingEndpoint_RequiresInternalKey() {
+	recorder := s.doWithHeaders(http.MethodGet, "/internal/bookings/"+validParkingSpotID, "", nil)
+
+	s.Equal(http.StatusUnauthorized, recorder.Code)
+}
+
+func (s *handlerSuite) TestGetInternalBookingEndpoint_ReturnsServerSidePrice() {
+	s.getBookingUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID, entity.BookingViewer{Privileged: true}).
+		Return(entity.Booking{ID: validParkingSpotID, UserID: validUserID, Status: enum.BookingStatusPendingPayment, Amount: 150000}, nil)
+
+	recorder := s.doWithHeaders(http.MethodGet, "/internal/bookings/"+validParkingSpotID, "",
+		map[string]string{"X-Internal-Key": testInternalServiceKey})
+
+	s.Equal(http.StatusOK, recorder.Code)
+	s.Contains(recorder.Body.String(), `"amount":150000`)
+	s.Contains(recorder.Body.String(), `"status":"PENDING_PAYMENT"`)
+}
+
+func (s *handlerSuite) TestListBookingsByUserEndpoint_ForbidsOtherUsers() {
+	recorder := s.doWithHeaders(http.MethodGet, "/users/"+validParkingSpotID+"/bookings/history", "",
+		map[string]string{"X-User-Id": validUserID})
+
+	s.Equal(http.StatusForbidden, recorder.Code)
+}
+
+func (s *handlerSuite) TestListSettlementsByUserEndpoint_ForbidsOtherUsers() {
+	recorder := s.doWithHeaders(http.MethodGet, "/users/"+validParkingSpotID+"/settlements", "",
+		map[string]string{"X-User-Id": validUserID})
+
+	s.Equal(http.StatusForbidden, recorder.Code)
+}
+
+func (s *handlerSuite) TestListTicketsByUserEndpoint_AllowsAdmin() {
+	s.listTicketsByUserUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID).Return(nil, nil)
+
+	recorder := s.doWithHeaders(http.MethodGet, "/users/"+validParkingSpotID+"/tickets", "",
+		map[string]string{"X-User-Id": "admin-1", "X-Admin-Role": "ADMIN"})
 
 	s.Equal(http.StatusOK, recorder.Code)
 }
@@ -405,6 +475,45 @@ func (s *handlerSuite) TestConfirmBookingEndpoint_RejectsWrongInternalKey() {
 		map[string]string{"X-Internal-Key": "not-the-key"})
 
 	s.Equal(http.StatusUnauthorized, recorder.Code)
+}
+
+func (s *handlerSuite) TestResolveVerificationReviewEndpoint_Approved() {
+	review := enum.VerificationReviewApproved
+	s.resolveVerificationReviewUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID, enum.VerificationReviewApproved).
+		Return(entity.Booking{ID: validParkingSpotID, Status: enum.BookingStatusCompleted, VerificationReview: &review}, nil)
+
+	recorder := s.doPost("/admin/bookings/"+validParkingSpotID+"/verification-review", `{"decision":"APPROVED"}`)
+
+	s.Equal(http.StatusOK, recorder.Code)
+	s.Contains(recorder.Body.String(), `"verification_review":"APPROVED"`)
+}
+
+func (s *handlerSuite) TestResolveVerificationReviewEndpoint_RejectsPendingDecision() {
+	recorder := s.doPost("/admin/bookings/"+validParkingSpotID+"/verification-review", `{"decision":"PENDING"}`)
+
+	s.Equal(http.StatusBadRequest, recorder.Code)
+	s.Contains(recorder.Body.String(), "INVALID_DECISION")
+}
+
+func (s *handlerSuite) TestResolveVerificationReviewEndpoint_AlreadyResolved() {
+	s.resolveVerificationReviewUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID, enum.VerificationReviewRefunded).
+		Return(entity.Booking{}, errors.NewConflict("esta reserva no tiene una revisión pendiente"))
+
+	recorder := s.doPost("/admin/bookings/"+validParkingSpotID+"/verification-review", `{"decision":"REFUNDED"}`)
+
+	s.Equal(http.StatusConflict, recorder.Code)
+	s.Contains(recorder.Body.String(), "REVIEW_NOT_PENDING")
+}
+
+func (s *handlerSuite) TestListPendingVerificationReviewsEndpoint_Success() {
+	review := enum.VerificationReviewPending
+	s.listPendingVerificationReviewsUseCase.EXPECT().Execute(gomock.Any()).
+		Return([]entity.Booking{{ID: validParkingSpotID, Status: enum.BookingStatusCompleted, VerificationReview: &review}}, nil)
+
+	recorder := s.doWithHeaders(http.MethodGet, "/admin/bookings/unverified", "", nil)
+
+	s.Equal(http.StatusOK, recorder.Code)
+	s.Contains(recorder.Body.String(), `"verification_review":"PENDING"`)
 }
 
 func (s *handlerSuite) TestConfirmSettlementEndpoint_NoProof_Success() {
@@ -511,7 +620,8 @@ func (s *handlerSuite) TestListSettlementsByUserEndpoint_Success() {
 	s.listSettlementsByOwnerUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID).
 		Return([]entity.Settlement{{ID: "s1"}}, nil)
 
-	recorder := s.doGet("/users/" + validParkingSpotID + "/settlements")
+	recorder := s.doWithHeaders(http.MethodGet, "/users/"+validParkingSpotID+"/settlements", "",
+		map[string]string{"X-User-Id": validParkingSpotID})
 
 	s.Equal(http.StatusOK, recorder.Code)
 	s.Contains(recorder.Body.String(), "s1")

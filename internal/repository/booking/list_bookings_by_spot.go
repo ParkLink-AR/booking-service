@@ -16,7 +16,7 @@ func (repository *Repository) ListBookingsBySpot(ctx context.Context, spotID str
 		SELECT
 			id, parking_spot_id, user_id,
 			lower(time_range), upper(time_range),
-			status, hold_expires_at, owner_response_deadline, amount, COALESCE(payment_id, ''), paid_at,
+			status, hold_expires_at, owner_response_deadline, amount, owner_amount, COALESCE(payment_id, ''), paid_at,
 			kind, created_at, updated_at,
 			vehicle_plate, vehicle_brand, vehicle_model, vehicle_country
 		FROM `+constants.BookingsTableName+`
@@ -35,7 +35,7 @@ func (repository *Repository) ListBookingsBySpot(ctx context.Context, spotID str
 		if err := rows.Scan(
 			&b.ID, &b.ParkingSpotID, &b.UserID,
 			&b.Start, &b.End,
-			&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.PaymentID, &b.PaidAt,
+			&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.OwnerAmount, &b.PaymentID, &b.PaidAt,
 			&kindLabel, &b.CreatedAt, &b.UpdatedAt,
 			&b.VehiclePlate, &b.VehicleBrand, &b.VehicleModel, &b.VehicleCountry,
 		); err != nil {

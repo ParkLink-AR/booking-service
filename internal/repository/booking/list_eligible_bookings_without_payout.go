@@ -13,6 +13,8 @@ import (
 // GeneratePendingPayoutsUseCase turns into new PENDING payouts on each sweep. The LEFT JOIN
 // against payouts (rather than a NOT EXISTS/subquery) plus `p.id IS NULL` is what makes this
 // idempotent: a booking that already got a payout on a previous tick never comes back here.
+// A booking whose arrival was never verified only qualifies once an admin APPROVED it (see
+// ResolveVerificationReview) -- PENDING holds it back, REFUNDED excludes it for good.
 func (repository *Repository) ListEligibleBookingsWithoutPayout(ctx context.Context) ([]entity.Booking, error) {
 	rows, err := repository.database.QueryContext(ctx, `
 		SELECT
@@ -27,6 +29,7 @@ func (repository *Repository) ListEligibleBookingsWithoutPayout(ctx context.Cont
 		  AND b.paid_at IS NOT NULL
 		  AND upper(b.time_range) <= now() - interval '24 hours'
 		  AND p.id IS NULL
+		  AND (b.verification_review IS NULL OR b.verification_review = 'APPROVED')
 		ORDER BY b.created_at ASC
 	`)
 	if err != nil {

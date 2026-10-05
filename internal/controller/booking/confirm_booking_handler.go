@@ -2,7 +2,6 @@ package booking
 
 import (
 	"context"
-	"crypto/subtle"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -17,20 +16,21 @@ import (
 
 // ConfirmBookingUseCase is the interface consumed by this handler for POST /bookings/{id}/confirm.
 type ConfirmBookingUseCase interface {
-	Execute(ctx context.Context, bookingID, paymentID string) (entity.Booking, error)
+	Execute(ctx context.Context, bookingID, paymentID string, amount int) (entity.Booking, error)
 }
 
 type confirmBookingRequest struct {
 	PaymentID string `json:"payment_id"`
+	// Amount is what Mercado Pago actually charged, in centavos -- checked against the
+	// booking's own price so a tampered checkout can't confirm it for less.
+	Amount int `json:"amount"`
 }
 
 func (handler *Handler) ConfirmBookingEndpoint(responseWriter http.ResponseWriter, request *http.Request) {
 	// Only payment-service may confirm a booking -- and only once Mercado Pago has
 	// approved its payment. Without this any logged-in user could mark their own booking
 	// as paid with a made-up payment_id. An unset key rejects every call (fail closed).
-	providedKey := request.Header.Get(internalKeyHeader)
-	if handler.internalServiceKey == "" ||
-		subtle.ConstantTimeCompare([]byte(providedKey), []byte(handler.internalServiceKey)) != 1 {
+	if !handler.isInternalCaller(request) {
 		writeErrorCode(responseWriter, http.StatusUnauthorized, "INVALID_INTERNAL_KEY", "invalid internal key")
 		return
 	}
@@ -51,11 +51,15 @@ func (handler *Handler) ConfirmBookingEndpoint(responseWriter http.ResponseWrite
 		return
 	}
 
-	confirmed, err := handler.confirmBookingUseCase.Execute(request.Context(), bookingID, body.PaymentID)
+	if body.Amount <= 0 {
+		writeErrorCode(responseWriter, http.StatusBadRequest, "MISSING_AMOUNT", "amount must be a positive number of centavos")
+		return
+	}
+
+	confirmed, err := handler.confirmBookingUseCase.Execute(request.Context(), bookingID, body.PaymentID, body.Amount)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			writeErrorCode(responseWriter, http.StatusNotFound, "BOOKING_NOT_FOUND",
-				"booking not found, already confirmed, or hold expired")
+			writeErrorCode(responseWriter, http.StatusNotFound, "BOOKING_NOT_FOUND", "booking not found")
 			return
 		}
 		writeDomainError(responseWriter, err)

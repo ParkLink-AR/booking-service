@@ -53,6 +53,11 @@ type Booking struct {
 	// later CONFIRMED/IN_PROGRESS -> COMPLETED transition, so it remains the only record
 	// of whether a completed booking was ever verified in person.
 	VerifiedAt *time.Time
+	// VerificationReview is set only on a paid booking that reached COMPLETED without ever
+	// being verified (VerifiedAt nil) -- see enum.VerificationReview. While it's PENDING the
+	// owner's payout is held back until a ParkLink admin approves or refunds it. Nil for
+	// every verified booking and for anything completed before this field existed.
+	VerificationReview *enum.VerificationReview
 	// Capacity is the number of identical places the spot rents against this same id
 	// (a "playa"): up to Capacity active bookings may overlap. Caller-supplied, like
 	// ParkingSpotSchedule -- booking-service does not fetch it. 0 is treated as 1.
@@ -105,4 +110,12 @@ type CreateBookingInput struct {
 	VehicleBrand   string
 	VehicleModel   string
 	VehicleCountry string
+}
+
+// BookingViewer is who's asking to read a booking. Privileged callers (a ParkLink admin)
+// may read any booking; everyone else only one they're part of (its driver, or the owner
+// of its spot).
+type BookingViewer struct {
+	UserID     string
+	Privileged bool
 }
