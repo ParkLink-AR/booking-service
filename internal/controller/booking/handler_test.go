@@ -74,6 +74,8 @@ type handlerSuite struct {
 
 const validParkingSpotID = "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"
 
+const testInternalServiceKey = "test-internal-key"
+
 func (s *handlerSuite) SetupTest() {
 	s.controller = gomock.NewController(s.T())
 	s.listBookingsUseCase = mocks.NewMockListBookingsUseCase(s.controller)
@@ -143,6 +145,7 @@ func (s *handlerSuite) SetupTest() {
 		s.listSettlementsByOwnerUseCase, s.getOwnSettlementUseCase,
 		s.listTicketsByUserUseCase,
 		s.location,
+		testInternalServiceKey,
 	).RegisterRoutes(s.router)
 }
 
@@ -378,6 +381,30 @@ func (s *handlerSuite) TestDraftSettlementEndpoint_NothingToSettle() {
 
 	s.Equal(http.StatusBadRequest, recorder.Code)
 	s.Contains(recorder.Body.String(), "NOTHING_TO_SETTLE")
+}
+
+func (s *handlerSuite) TestConfirmBookingEndpoint_SucceedsWithInternalKey() {
+	s.confirmBookingUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID, "mp-123").
+		Return(entity.Booking{ID: validParkingSpotID, Status: enum.BookingStatusPendingOwnerApproval}, nil)
+
+	recorder := s.doWithHeaders(http.MethodPost, "/bookings/"+validParkingSpotID+"/confirm", `{"payment_id":"mp-123"}`,
+		map[string]string{"X-Internal-Key": testInternalServiceKey})
+
+	s.Equal(http.StatusOK, recorder.Code)
+}
+
+func (s *handlerSuite) TestConfirmBookingEndpoint_RejectsMissingInternalKey() {
+	recorder := s.doPost("/bookings/"+validParkingSpotID+"/confirm", `{"payment_id":"mp-123"}`)
+
+	s.Equal(http.StatusUnauthorized, recorder.Code)
+	s.Contains(recorder.Body.String(), "INVALID_INTERNAL_KEY")
+}
+
+func (s *handlerSuite) TestConfirmBookingEndpoint_RejectsWrongInternalKey() {
+	recorder := s.doWithHeaders(http.MethodPost, "/bookings/"+validParkingSpotID+"/confirm", `{"payment_id":"mp-123"}`,
+		map[string]string{"X-Internal-Key": "not-the-key"})
+
+	s.Equal(http.StatusUnauthorized, recorder.Code)
 }
 
 func (s *handlerSuite) TestConfirmSettlementEndpoint_NoProof_Success() {

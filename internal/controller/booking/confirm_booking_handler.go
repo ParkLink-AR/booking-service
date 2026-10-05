@@ -2,6 +2,7 @@ package booking
 
 import (
 	"context"
+	"crypto/subtle"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -24,6 +25,16 @@ type confirmBookingRequest struct {
 }
 
 func (handler *Handler) ConfirmBookingEndpoint(responseWriter http.ResponseWriter, request *http.Request) {
+	// Only payment-service may confirm a booking -- and only once Mercado Pago has
+	// approved its payment. Without this any logged-in user could mark their own booking
+	// as paid with a made-up payment_id. An unset key rejects every call (fail closed).
+	providedKey := request.Header.Get(internalKeyHeader)
+	if handler.internalServiceKey == "" ||
+		subtle.ConstantTimeCompare([]byte(providedKey), []byte(handler.internalServiceKey)) != 1 {
+		writeErrorCode(responseWriter, http.StatusUnauthorized, "INVALID_INTERNAL_KEY", "invalid internal key")
+		return
+	}
+
 	bookingID := chi.URLParam(request, "id")
 	if _, err := uuid.Parse(bookingID); err != nil {
 		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_BOOKING_ID", "id must be a valid UUID")
@@ -51,7 +62,7 @@ func (handler *Handler) ConfirmBookingEndpoint(responseWriter http.ResponseWrite
 		return
 	}
 
-	// This response always goes straight back to the driver's own client (the payment
-	// webhook flow), so it's safe to always include the fresh verification code here.
+	// This response only ever goes back to payment-service (see the internal key check
+	// above), so it's safe to always include the fresh verification code here.
 	writeJSON(responseWriter, http.StatusOK, bookingResponseFromEntity(confirmed, handler.location, confirmed.UserID))
 }

@@ -79,6 +79,9 @@ type Handler struct {
 	getOwnSettlementUseCase        GetOwnSettlementUseCase
 	listTicketsByUserUseCase       ListTicketsByUserUseCase
 	location                       *time.Location
+	// internalServiceKey is the secret shared with payment-service (INTERNAL_SERVICE_KEY);
+	// it's the only caller allowed to confirm a booking (see ConfirmBookingEndpoint).
+	internalServiceKey string
 }
 
 func NewHandler(
@@ -124,6 +127,7 @@ func NewHandler(
 	getOwnSettlementUseCase GetOwnSettlementUseCase,
 	listTicketsByUserUseCase ListTicketsByUserUseCase,
 	location *time.Location,
+	internalServiceKey string,
 ) *Handler {
 	return &Handler{
 		listBookingsUseCase:            listBookingsUseCase,
@@ -168,6 +172,7 @@ func NewHandler(
 		getOwnSettlementUseCase:        getOwnSettlementUseCase,
 		listTicketsByUserUseCase:       listTicketsByUserUseCase,
 		location:                       location,
+		internalServiceKey:             internalServiceKey,
 	}
 }
 

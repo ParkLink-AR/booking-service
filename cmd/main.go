@@ -145,6 +145,7 @@ func main() {
 		listSettlementsByOwnerUseCase, getOwnSettlementUseCase,
 		listTicketsByUserUseCase,
 		buenosAiresLocation,
+		os.Getenv("INTERNAL_SERVICE_KEY"),
 	)
 
 	// Start consumer in background
@@ -242,6 +243,7 @@ func loadHandlers(
 	getOwnSettlementUseCase *ucbooking.GetOwnSettlementUseCase,
 	listTicketsByUserUseCase *ucbooking.ListTicketsByUserUseCase,
 	location *time.Location,
+	internalServiceKey string,
 ) {
 	handlers := []Handler{
 		bookingcontroller.NewHandler(
@@ -264,6 +266,7 @@ func loadHandlers(
 			listSettlementsByOwnerUseCase, getOwnSettlementUseCase,
 			listTicketsByUserUseCase,
 			location,
+			internalServiceKey,
 		),
 	}
 	for _, handler := range handlers {
