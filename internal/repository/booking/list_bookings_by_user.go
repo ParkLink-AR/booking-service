@@ -11,6 +11,10 @@ import (
 // ListBookingsByUser returns all bookings for a given user_id, most recently *created* first
 // -- not by start time, so a booking made just now for a far-future date still sorts above
 // one made earlier for a sooner date.
+//
+// Checkouts the driver never paid are left out: EXPIRED rows, and PENDING_PAYMENT rows whose
+// hold already elapsed but that the expiry job hasn't swept to EXPIRED yet. A still-live
+// PENDING_PAYMENT (inside its hold window) is kept, so the driver can see it while paying.
 func (repository *Repository) ListBookingsByUser(
 	ctx context.Context,
 	userID string,
@@ -24,6 +28,8 @@ func (repository *Repository) ListBookingsByUser(
 		       vehicle_plate, vehicle_brand, vehicle_model, vehicle_country
 		FROM ` + constants.BookingsTableName + `
 		WHERE user_id = $1
+		  AND status <> 'EXPIRED'
+		  AND NOT (status = 'PENDING_PAYMENT' AND hold_expires_at <= now())
 		ORDER BY created_at DESC
 	`
 
