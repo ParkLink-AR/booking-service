@@ -101,9 +101,11 @@ func (handler *Handler) CreateBookingEndpoint(responseWriter http.ResponseWriter
 		StayEndDate:         body.StayEndDate,
 	}
 	if body.Vehicle != nil {
-		input.VehiclePlate = body.Vehicle.Plate
-		input.VehicleBrand = body.Vehicle.Brand
-		input.VehicleModel = body.Vehicle.Model
+		// Same normalization auth-service applies to saved vehicles -- this snapshot comes
+		// straight from the client, so it's normalized again here before being stored.
+		input.VehiclePlate = entity.NormalizePlate(body.Vehicle.Plate)
+		input.VehicleBrand = entity.CapitalizeWords(body.Vehicle.Brand)
+		input.VehicleModel = entity.CapitalizeWords(body.Vehicle.Model)
 		input.VehicleCountry = body.Vehicle.Country
 	}
 
