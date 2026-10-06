@@ -3,12 +3,29 @@ package entity
 import (
 	"sort"
 	"time"
+
+	"github.com/example/bookings-service/internal/domain/constants"
 )
 
 // TimeWindow is a contiguous half-open time interval [Start, End).
 type TimeWindow struct {
 	Start time.Time
 	End   time.Time
+}
+
+// GracePeriod is how long past its end a booking keeps its spot blocked for other drivers
+// (see constants.GracePeriodMinutes). Driver-facing times never include it.
+const GracePeriod = constants.GracePeriodMinutes * time.Minute
+
+// OccupancyWindow returns the window a booking blocks for the purpose of checking another
+// range against it: [Start-GracePeriod, End+GracePeriod). A booking really occupies its
+// spot over [Start, End+GracePeriod); the extra GracePeriod before Start is the same buffer
+// seen from the other side -- a candidate range that ends within GracePeriod of this
+// booking's start would itself spill into it if its driver ran late. Both views collapse
+// into "any two bookings on the same spot must be at least GracePeriod apart", and padding
+// the existing booking lets the candidate be compared as its plain [start, end).
+func OccupancyWindow(window TimeWindow) TimeWindow {
+	return TimeWindow{Start: window.Start.Add(-GracePeriod), End: window.End.Add(GracePeriod)}
 }
 
 // MaxConcurrency returns the largest number of windows that overlap the same instant

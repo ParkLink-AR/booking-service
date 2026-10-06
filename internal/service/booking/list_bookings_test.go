@@ -148,19 +148,64 @@ func (s *serviceSuite) TestListBookings_RepositoryErrorPropagates() {
 
 func (s *serviceSuite) TestListBookings_ActiveOnlyExcludesInactiveAndExpiredHolds() {
 	expiredHold := time.Now().Add(-time.Hour)
-	confirmed := entity.BookingWindow{Status: enum.BookingStatusConfirmed}
-	cancelled := entity.BookingWindow{Status: enum.BookingStatusCancelled}
-	expiredHoldBooking := entity.BookingWindow{Status: enum.BookingStatusPendingPayment, HoldExpiresAt: &expiredHold}
+	start := s.localDate(18).Add(10 * time.Hour).UTC()
+	end := s.localDate(18).Add(11 * time.Hour).UTC()
+	confirmed := entity.BookingWindow{Start: start, End: end, Status: enum.BookingStatusConfirmed}
+	inProgress := entity.BookingWindow{Start: start, End: end, Status: enum.BookingStatusInProgress}
+	cancelled := entity.BookingWindow{Start: start, End: end, Status: enum.BookingStatusCancelled}
+	expiredHoldBooking := entity.BookingWindow{Start: start, End: end, Status: enum.BookingStatusPendingPayment, HoldExpiresAt: &expiredHold}
 
 	s.bookingRepository.EXPECT().
 		ListBookings(gomock.Any(), s.parkingSpotID, (*time.Time)(nil), (*time.Time)(nil), (*enum.BookingStatus)(nil)).
-		Return([]entity.BookingWindow{confirmed, cancelled, expiredHoldBooking}, nil)
+		Return([]entity.BookingWindow{confirmed, inProgress, cancelled, expiredHoldBooking}, nil)
 
 	got, err := s.service.ListBookings(s.context, s.parkingSpotID, nil, nil, nil, true)
 
 	s.Require().NoError(err)
-	s.Require().Len(got, 1, "only the CONFIRMED booking should be active")
-	s.Equal([]entity.BookingWindow{confirmed}, got[0].Bookings)
+	s.Require().Len(got, 1, "only the CONFIRMED and IN_PROGRESS bookings should be active")
+	s.Require().Len(got[0].Bookings, 2)
+	s.Equal(enum.BookingStatusConfirmed, got[0].Bookings[0].Status)
+	s.Equal(enum.BookingStatusInProgress, got[0].Bookings[1].Status)
+}
+
+// The grace period only shows up in the occupancy view: active listings are padded on both
+// sides and the requested range is widened to match, while the plain listing is untouched.
+func (s *serviceSuite) TestListBookings_ActiveOnlyPadsWindowsAndWidensRangeByGracePeriod() {
+	from := s.localDate(18)
+	to := s.localDate(19)
+	start := s.localDate(18).Add(10 * time.Hour).UTC()
+	end := s.localDate(18).Add(11 * time.Hour).UTC()
+	widenedFrom := from.Add(-entity.GracePeriod)
+	widenedTo := to.Add(entity.GracePeriod)
+
+	s.bookingRepository.EXPECT().
+		ListBookings(gomock.Any(), s.parkingSpotID, &widenedFrom, &widenedTo, (*enum.BookingStatus)(nil)).
+		Return([]entity.BookingWindow{{Start: start, End: end, Status: enum.BookingStatusConfirmed}}, nil)
+
+	got, err := s.service.ListBookings(s.context, s.parkingSpotID, &from, &to, nil, true)
+
+	s.Require().NoError(err)
+	s.Require().Len(got, 1)
+	s.Require().Len(got[0].Bookings, 1)
+	s.True(got[0].Bookings[0].Start.Equal(start.Add(-entity.GracePeriod)))
+	s.True(got[0].Bookings[0].End.Equal(end.Add(entity.GracePeriod)))
+}
+
+func (s *serviceSuite) TestListBookings_NotActiveOnlyKeepsRealWindows() {
+	from := s.localDate(18)
+	to := s.localDate(19)
+	start := s.localDate(18).Add(10 * time.Hour).UTC()
+	end := s.localDate(18).Add(11 * time.Hour).UTC()
+	window := entity.BookingWindow{Start: start, End: end, Status: enum.BookingStatusConfirmed}
+
+	s.bookingRepository.EXPECT().
+		ListBookings(gomock.Any(), s.parkingSpotID, &from, &to, (*enum.BookingStatus)(nil)).
+		Return([]entity.BookingWindow{window}, nil)
+
+	got, err := s.service.ListBookings(s.context, s.parkingSpotID, &from, &to, nil, false)
+
+	s.Require().NoError(err)
+	s.Equal([]entity.BookingWindow{window}, got[0].Bookings)
 }
 
 var repositoryFailure = repositoryFailureFixture{}

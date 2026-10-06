@@ -5,6 +5,12 @@ const (
 	// PENDING_PAYMENT booking holds the time slot before its hold is considered expired.
 	DefaultHoldMinutes = 5
 
+	// GracePeriodMinutes is the buffer a booking keeps the spot occupied after its end (and,
+	// symmetrically, that a new booking must leave before the next one starts), in case the
+	// driver hasn't left yet. It only affects whether *other* drivers can book -- it is never
+	// billed to the driver nor shown to anyone. See entity.OccupancyWindow.
+	GracePeriodMinutes = 15
+
 	// BuenosAiresTimezone is the IANA timezone every booking timestamp is rendered in.
 	BuenosAiresTimezone = "America/Argentina/Buenos_Aires"
 

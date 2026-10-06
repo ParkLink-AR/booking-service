@@ -13,8 +13,9 @@ import (
 )
 
 // GetBookingsForSpotsInRange returns every booking, of any status, for any of
-// parkingSpotIDs that overlaps [start, end). It does not decide which statuses occupy the
-// spot — the caller applies that business rule.
+// parkingSpotIDs that would collide with [start, end) once the grace period is counted (see
+// entity.OccupancyWindow), i.e. whose range overlaps [start-grace, end+grace). It does not
+// decide which statuses occupy the spot — the caller applies that business rule.
 func (repository *Repository) GetBookingsForSpotsInRange(
 	ctx context.Context,
 	parkingSpotIDs []string,
@@ -25,7 +26,7 @@ func (repository *Repository) GetBookingsForSpotsInRange(
 		FROM `+constants.BookingsTableName+`
 		WHERE parking_spot_id = ANY($1::uuid[])
 		  AND time_range && tstzrange($2, $3, '[)')
-	`, pq.Array(parkingSpotIDs), start, end)
+	`, pq.Array(parkingSpotIDs), start.Add(-entity.GracePeriod), end.Add(entity.GracePeriod))
 	if err != nil {
 		return nil, errors.NewInternalError("booking.GetBookingsForSpotsInRange", err)
 	}

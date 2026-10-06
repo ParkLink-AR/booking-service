@@ -75,8 +75,10 @@ func (s *bookingRepositoryIntegrationSuite) TestConfirmedBookingIsActive() {
 
 	s.Require().NoError(err)
 	s.Require().Len(got, 1)
-	s.True(got[0].Start.Equal(start))
-	s.True(got[0].End.Equal(end))
+	// Windows are returned as occupancy (padded by the grace period) -- see
+	// TestActiveBookingWindowsComeBackPaddedByGracePeriod.
+	s.True(got[0].Start.Equal(start.Add(-entity.GracePeriod)))
+	s.True(got[0].End.Equal(end.Add(entity.GracePeriod)))
 }
 
 // This is the acceptance criterion from spec.md section 10: an expired PENDING_PAYMENT
@@ -111,6 +113,95 @@ func (s *bookingRepositoryIntegrationSuite) TestUnexpiredPendingPaymentOccupiesA
 
 	s.Require().NoError(err)
 	s.Require().Len(got, 1)
+}
+
+// The grace period: a booking occupies its spot until GracePeriod after its end, and a
+// range ending within GracePeriod of its start is blocked too. The windows come back already
+// padded so callers can compare them against a plain candidate range.
+func (s *bookingRepositoryIntegrationSuite) TestActiveBookingWindowsComeBackPaddedByGracePeriod() {
+	parkingSpotID := "66666666-6666-6666-6666-666666666666"
+	start := time.Date(2026, 8, 18, 10, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 8, 18, 11, 0, 0, 0, time.UTC)
+	s.insertBooking(parkingSpotID, start, end, "CONFIRMED", nil)
+
+	got, err := s.repository.GetActiveBookingsInRange(s.context, parkingSpotID,
+		time.Date(2026, 8, 18, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 19, 0, 0, 0, 0, time.UTC),
+	)
+
+	s.Require().NoError(err)
+	s.Require().Len(got, 1)
+	s.True(got[0].Start.Equal(start.Add(-entity.GracePeriod)))
+	s.True(got[0].End.Equal(end.Add(entity.GracePeriod)))
+}
+
+func (s *bookingRepositoryIntegrationSuite) TestBookingEndingJustBeforeRangeStillBlocksIt() {
+	parkingSpotID := "77777777-7777-7777-7777-777777777777"
+	s.insertBooking(parkingSpotID,
+		time.Date(2026, 8, 18, 9, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 18, 10, 0, 0, 0, time.UTC),
+		"CONFIRMED", nil,
+	)
+
+	withinGrace, err := s.repository.GetActiveBookingsInRange(s.context, parkingSpotID,
+		time.Date(2026, 8, 18, 10, 10, 0, 0, time.UTC),
+		time.Date(2026, 8, 18, 11, 0, 0, 0, time.UTC),
+	)
+	s.Require().NoError(err)
+	s.Len(withinGrace, 1, "a range starting 10 minutes after the end is still inside the grace period")
+
+	pastGrace, err := s.repository.GetActiveBookingsInRange(s.context, parkingSpotID,
+		time.Date(2026, 8, 18, 10, 15, 0, 0, time.UTC),
+		time.Date(2026, 8, 18, 11, 0, 0, 0, time.UTC),
+	)
+	s.Require().NoError(err)
+	s.Empty(pastGrace, "a range starting exactly GracePeriod after the end is free")
+}
+
+func (s *bookingRepositoryIntegrationSuite) TestInProgressBookingOccupiesAvailability() {
+	parkingSpotID := "88888888-8888-8888-8888-888888888888"
+	s.insertBooking(parkingSpotID,
+		time.Date(2026, 8, 18, 10, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 18, 11, 0, 0, 0, time.UTC),
+		"IN_PROGRESS", nil,
+	)
+
+	got, err := s.repository.GetActiveBookingsInRange(s.context, parkingSpotID,
+		time.Date(2026, 8, 18, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 19, 0, 0, 0, 0, time.UTC),
+	)
+
+	s.Require().NoError(err)
+	s.Len(got, 1)
+}
+
+func (s *bookingRepositoryIntegrationSuite) TestCreateBookingRejectsRangeInsideGracePeriod() {
+	parkingSpotID := "99999999-9999-9999-9999-999999999990"
+	s.insertBooking(parkingSpotID,
+		time.Date(2026, 8, 18, 10, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 18, 11, 0, 0, 0, time.UTC),
+		"CONFIRMED", nil,
+	)
+	hold := time.Now().Add(time.Hour)
+	candidate := func(startMinute, endMinute int) entity.Booking {
+		return entity.Booking{
+			ParkingSpotID: parkingSpotID,
+			UserID:        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+			Start:         time.Date(2026, 8, 18, 11, startMinute, 0, 0, time.UTC),
+			End:           time.Date(2026, 8, 18, 11, endMinute, 0, 0, time.UTC),
+			Status:        enum.BookingStatusPendingPayment,
+			HoldExpiresAt: &hold,
+			Amount:        1000,
+			Capacity:      1,
+		}
+	}
+
+	_, err := s.repository.CreateBooking(s.context, candidate(10, 59))
+	s.Require().Error(err, "starting 10 minutes after the previous booking ends must be rejected")
+	s.True(errors.IsConflict(err))
+
+	_, err = s.repository.CreateBooking(s.context, candidate(15, 59))
+	s.Require().NoError(err, "starting exactly GracePeriod after the previous booking ends is allowed")
 }
 
 var inactiveStatusCases = []string{"COMPLETED", "CANCELLED", "EXPIRED"}
