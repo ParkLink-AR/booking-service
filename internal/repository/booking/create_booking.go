@@ -33,16 +33,18 @@ func (repository *Repository) CreateBooking(ctx context.Context, booking entity.
 		return entity.Booking{}, errors.NewInternalError("booking.CreateBooking", err)
 	}
 
+	// Every existing booking blocks its range padded by the grace period (see
+	// entity.OccupancyWindow), so the overlap filter is widened the same way.
 	rows, err := tx.QueryContext(ctx, `
 		SELECT lower(time_range), upper(time_range)
 		FROM `+constants.BookingsTableName+`
 		WHERE parking_spot_id = $1
 		  AND (
-		    status = 'CONFIRMED'
+		    status IN ('CONFIRMED', 'IN_PROGRESS')
 		    OR (status = 'PENDING_PAYMENT' AND hold_expires_at > now())
 		  )
 		  AND time_range && tstzrange($2, $3, '[)')
-	`, booking.ParkingSpotID, booking.Start, booking.End)
+	`, booking.ParkingSpotID, booking.Start.Add(-entity.GracePeriod), booking.End.Add(entity.GracePeriod))
 	if err != nil {
 		return entity.Booking{}, errors.NewInternalError("booking.CreateBooking", err)
 	}
@@ -54,7 +56,7 @@ func (repository *Repository) CreateBooking(ctx context.Context, booking entity.
 			rows.Close()
 			return entity.Booking{}, errors.NewInternalError("booking.CreateBooking", err)
 		}
-		active = append(active, entity.TimeWindow{Start: start, End: end})
+		active = append(active, entity.OccupancyWindow(entity.TimeWindow{Start: start, End: end}))
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()

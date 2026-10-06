@@ -59,3 +59,38 @@ func TestMaxConcurrency(t *testing.T) {
 		assert.Equal(t, tc.want, got, tc.name)
 	}
 }
+
+func TestOccupancyWindowPadsBothSidesByGracePeriod(t *testing.T) {
+	got := entity.OccupancyWindow(win(10, 11))
+
+	assert.True(t, got.Start.Equal(at(10).Add(-entity.GracePeriod)))
+	assert.True(t, got.End.Equal(at(11).Add(entity.GracePeriod)))
+}
+
+// A new booking is compared as a plain [start, end) against the padded existing ones, so the
+// rule that comes out is "bookings on the same spot must be at least GracePeriod apart".
+func TestOccupancyWindowKeepsBookingsAtLeastGracePeriodApart(t *testing.T) {
+	existing := []entity.TimeWindow{entity.OccupancyWindow(win(10, 11))}
+	minutes := func(hour, minute int) time.Time {
+		return time.Date(2026, 8, 18, hour, minute, 0, 0, time.UTC)
+	}
+
+	cases := []struct {
+		name       string
+		start, end time.Time
+		conflict   bool
+	}{
+		{name: "back to back after", start: minutes(11, 0), end: minutes(12, 0), conflict: true},
+		{name: "14 minutes after", start: minutes(11, 14), end: minutes(12, 0), conflict: true},
+		{name: "exactly the grace period after", start: minutes(11, 15), end: minutes(12, 0), conflict: false},
+		{name: "back to back before", start: minutes(9, 0), end: minutes(10, 0), conflict: true},
+		{name: "ends 14 minutes before", start: minutes(9, 0), end: minutes(9, 46), conflict: true},
+		{name: "ends exactly the grace period before", start: minutes(9, 0), end: minutes(9, 45), conflict: false},
+		{name: "far away", start: minutes(13, 0), end: minutes(14, 0), conflict: false},
+	}
+
+	for _, tc := range cases {
+		got := entity.MaxConcurrency(existing, tc.start, tc.end) >= 1
+		assert.Equal(t, tc.conflict, got, tc.name)
+	}
+}

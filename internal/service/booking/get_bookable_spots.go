@@ -58,10 +58,11 @@ func (service *Service) GetBookableSpots(
 }
 
 // isActive reports whether a booking with the given status currently occupies its spot:
-// CONFIRMED, or PENDING_PAYMENT with an unexpired hold.
+// CONFIRMED or IN_PROGRESS (the owner already verified the driver's arrival -- still
+// parked until the booking ends), or PENDING_PAYMENT with an unexpired hold.
 func isActive(status enum.BookingStatus, holdExpiresAt *time.Time) bool {
 	switch status {
-	case enum.BookingStatusConfirmed:
+	case enum.BookingStatusConfirmed, enum.BookingStatusInProgress:
 		return true
 	case enum.BookingStatusPendingPayment:
 		return holdExpiresAt != nil && holdExpiresAt.After(time.Now())
