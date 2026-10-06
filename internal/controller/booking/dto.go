@@ -53,6 +53,9 @@ type bookingResponse struct {
 	End           string  `json:"end"`
 	Status        string  `json:"status"`
 	HoldExpiresAt *string `json:"hold_expires_at,omitempty"`
+	// OwnerResponseDeadline is when a PENDING_OWNER_APPROVAL booking is auto-cancelled (and
+	// refunded) if the owner hasn't approved or rejected it yet. Absent otherwise.
+	OwnerResponseDeadline *string `json:"owner_response_deadline,omitempty"`
 	// Amount is what the driver was charged (the owner's price + ParkLink's commission).
 	Amount int `json:"amount"`
 	// OwnerAmount is what the spot's owner earns from it (their own price) -- only sent
@@ -127,6 +130,10 @@ func bookingResponseFromEntity(booking entity.Booking, location *time.Location, 
 	if booking.PaidAt != nil {
 		formatted := booking.PaidAt.In(location).Format(time.RFC3339)
 		response.PaidAt = &formatted
+	}
+	if booking.OwnerResponseDeadline != nil {
+		formatted := booking.OwnerResponseDeadline.In(location).Format(time.RFC3339)
+		response.OwnerResponseDeadline = &formatted
 	}
 	response.CancellationReason = booking.CancellationReason
 	if viewerID == "" || viewerID != booking.UserID {
