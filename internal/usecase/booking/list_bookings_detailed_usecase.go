@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/example/bookings-service/internal/domain/entity"
+	"github.com/example/bookings-service/internal/domain/enum"
 	"github.com/example/bookings-service/internal/domain/errors"
 )
 
@@ -15,9 +16,13 @@ type BookingListerBySpot interface {
 	ListBookingsBySpot(ctx context.Context, spotID string) ([]entity.Booking, error)
 }
 
-// ListBookingsDetailedUseCase powers the owner's "solicitudes de reserva" screen: the
-// full booking rows for one of their spots, not the day-grouped calendar view that
-// ListBookingsUseCase returns for public availability checks.
+// ListBookingsDetailedUseCase powers the owner's views of a spot's bookings (the spot's
+// "Reservas" screen, plus the Hoy and calendar tabs): the full booking rows for one of
+// their spots, not the day-grouped calendar view that ListBookingsUseCase returns for
+// public availability checks.
+//
+// Bookings that never went through -- still waiting for the driver's payment, or expired
+// (unpaid, or the owner never answered) -- are left out: for the owner they never existed.
 type ListBookingsDetailedUseCase struct {
 	lister BookingListerBySpot
 	owners SpotOwnerLookup
@@ -36,5 +41,19 @@ func (uc *ListBookingsDetailedUseCase) Execute(ctx context.Context, spotID, call
 		return nil, errors.NewForbidden("no sos el dueño de esta cochera")
 	}
 
-	return uc.lister.ListBookingsBySpot(ctx, spotID)
+	bookings, err := uc.lister.ListBookingsBySpot(ctx, spotID)
+	if err != nil {
+		return nil, err
+	}
+	visible := make([]entity.Booking, 0, len(bookings))
+	for _, booking := range bookings {
+		if visibleToOwner(booking.Status) {
+			visible = append(visible, booking)
+		}
+	}
+	return visible, nil
+}
+
+func visibleToOwner(status enum.BookingStatus) bool {
+	return status != enum.BookingStatusPendingPayment && status != enum.BookingStatusExpired
 }

@@ -17,6 +17,7 @@ import (
 	bookingcontroller "github.com/example/bookings-service/internal/controller/booking"
 	"github.com/example/bookings-service/internal/controller/trustedcaller"
 	"github.com/example/bookings-service/internal/domain/constants"
+	"github.com/example/bookings-service/internal/repository/authclient"
 	bookingrepository "github.com/example/bookings-service/internal/repository/booking"
 	"github.com/example/bookings-service/internal/repository/messaging"
 	"github.com/example/bookings-service/internal/repository/parkingclient"
@@ -57,6 +58,7 @@ func main() {
 	consumer := messaging.NewConsumer(rabbitChannel, logger)
 	eventPublisher := messaging.NewPublisher(rabbitChannel, rabbitExchangeName, logger)
 	parkingClient := parkingclient.NewClient(envOrDefault("PARKING_SERVICE_URL", "http://localhost:3001"), os.Getenv("INTERNAL_SERVICE_KEY"))
+	authClient := authclient.NewClient(envOrDefault("AUTH_SERVICE_URL", "http://localhost:8000"), os.Getenv("INTERNAL_SERVICE_KEY"))
 	paymentClient := paymentclient.NewClient(
 		envOrDefault("PAYMENT_SERVICE_URL", "http://localhost:8004"),
 		os.Getenv("INTERNAL_SERVICE_KEY"),
@@ -78,7 +80,7 @@ func main() {
 	// Use cases
 	listBookingsUseCase := ucbooking.NewListBookingsUseCase(bookingService)
 	listBookingsByUserUseCase := ucbooking.NewListBookingsByUserUseCase(bookingRepository)
-	createBookingUseCase := ucbooking.NewCreateBookingUseCase(bookingService)
+	createBookingUseCase := ucbooking.NewCreateBookingUseCase(bookingService, authClient)
 	confirmBookingUseCase := ucbooking.NewConfirmBookingUseCase(bookingRepository, parkingClient, eventPublisher)
 	getBookableSpotsUseCase := ucbooking.NewGetBookableSpotsUseCase(bookingService)
 	approveBookingUseCase := ucbooking.NewApproveBookingUseCase(bookingRepository, parkingClient, eventPublisher)
@@ -120,6 +122,7 @@ func main() {
 	listTicketsByUserUseCase := ucbooking.NewListTicketsByUserUseCase(bookingRepository)
 	listPendingVerificationReviewsUseCase := ucbooking.NewListPendingVerificationReviewsUseCase(bookingRepository)
 	resolveVerificationReviewUseCase := ucbooking.NewResolveVerificationReviewUseCase(bookingRepository, paymentClient)
+	accountClosureUseCase := ucbooking.NewAccountClosureUseCase(bookingRepository, paymentClient, parkingClient, eventPublisher)
 
 	// Router
 	router := chi.NewRouter()
@@ -151,6 +154,7 @@ func main() {
 		buenosAiresLocation,
 		os.Getenv("INTERNAL_SERVICE_KEY"),
 		listPendingVerificationReviewsUseCase, resolveVerificationReviewUseCase,
+		accountClosureUseCase,
 	)
 
 	// Start consumer in background
@@ -251,6 +255,7 @@ func loadHandlers(
 	internalServiceKey string,
 	listPendingVerificationReviewsUseCase *ucbooking.ListPendingVerificationReviewsUseCase,
 	resolveVerificationReviewUseCase *ucbooking.ResolveVerificationReviewUseCase,
+	accountClosureUseCase *ucbooking.AccountClosureUseCase,
 ) {
 	handlers := []Handler{
 		bookingcontroller.NewHandler(
@@ -276,6 +281,7 @@ func loadHandlers(
 			internalServiceKey,
 			listPendingVerificationReviewsUseCase, resolveVerificationReviewUseCase,
 		),
+		bookingcontroller.NewAccountClosureHandler(accountClosureUseCase, internalServiceKey),
 	}
 	for _, handler := range handlers {
 		handler.RegisterRoutes(router)

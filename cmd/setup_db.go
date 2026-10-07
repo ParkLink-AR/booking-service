@@ -258,6 +258,15 @@ func runMigrations(database *sql.DB) error {
 		-- the money back). NULL for verified bookings and anything completed before this.
 		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS verification_review TEXT
 			CHECK (verification_review IN ('PENDING', 'APPROVED', 'REFUNDED'));
+
+		-- migrations/021: bookings cancelled because one side's account was closed or
+		-- suspended (see usecase.AccountClosureUseCase) -- the driver always got a full refund.
+		ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_cancellation_reason_check;
+		ALTER TABLE bookings ADD CONSTRAINT bookings_cancellation_reason_check
+			CHECK (cancellation_reason IN (
+				'OWNER_REJECTED', 'OWNER_EXPIRED', 'DRIVER_CANCELLED',
+				'OWNER_ACCOUNT_CLOSED', 'DRIVER_ACCOUNT_CLOSED'
+			));
 		CREATE INDEX IF NOT EXISTS idx_bookings_verification_review_pending
 			ON bookings (updated_at) WHERE verification_review = 'PENDING';
 	`)

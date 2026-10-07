@@ -21,6 +21,9 @@ const (
 	RoutingKeyBookingMessageSent     = "booking.message_sent"
 	RoutingKeySupportTicketReplied   = "support.ticket_replied"
 	RoutingKeySettlementPaid         = "settlement.paid"
+	// A booking that hadn't started was cancelled because one side's account was closed
+	// or suspended -- see AccountClosureUseCase.
+	RoutingKeyBookingCancelled = "booking.cancelled"
 )
 
 // EventPublisher publishes a domain event to the shared event bus under a routing key.

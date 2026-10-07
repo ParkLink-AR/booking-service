@@ -43,4 +43,9 @@ const (
 	CancellationReasonOwnerRejected   = "OWNER_REJECTED"
 	CancellationReasonOwnerExpired    = "OWNER_EXPIRED"
 	CancellationReasonDriverCancelled = "DRIVER_CANCELLED"
+	// The booking hadn't started yet when the spot owner's (OWNER_ACCOUNT_CLOSED) or the
+	// driver's (DRIVER_ACCOUNT_CLOSED) account was closed or suspended -- see
+	// usecase.AccountClosureUseCase. The driver always gets a full refund.
+	CancellationReasonOwnerAccountClosed  = "OWNER_ACCOUNT_CLOSED"
+	CancellationReasonDriverAccountClosed = "DRIVER_ACCOUNT_CLOSED"
 )

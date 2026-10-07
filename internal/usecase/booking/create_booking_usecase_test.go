@@ -22,6 +22,7 @@ type createBookingUseCaseSuite struct {
 	suite.Suite
 	controller     *gomock.Controller
 	bookingCreator *mocks.MockBookingCreator
+	accounts       *mocks.MockAccountStatusChecker
 	useCase        *booking.CreateBookingUseCase
 	context        context.Context
 }
@@ -29,7 +30,8 @@ type createBookingUseCaseSuite struct {
 func (s *createBookingUseCaseSuite) SetupTest() {
 	s.controller = gomock.NewController(s.T())
 	s.bookingCreator = mocks.NewMockBookingCreator(s.controller)
-	s.useCase = booking.NewCreateBookingUseCase(s.bookingCreator)
+	s.accounts = mocks.NewMockAccountStatusChecker(s.controller)
+	s.useCase = booking.NewCreateBookingUseCase(s.bookingCreator, s.accounts)
 	s.context = context.Background()
 }
 
@@ -47,6 +49,7 @@ func (s *createBookingUseCaseSuite) TestExecute_DelegatesToBookingCreator() {
 	}
 	want := entity.Booking{ID: "created-id", ParkingSpotID: input.ParkingSpotID}
 
+	s.accounts.EXPECT().GetAccountStatus(gomock.Any(), input.UserID).Return("ACTIVE", nil)
 	s.bookingCreator.EXPECT().CreateBooking(gomock.Any(), input).Return(want, nil)
 
 	got, err := s.useCase.Execute(s.context, input)
@@ -58,6 +61,7 @@ func (s *createBookingUseCaseSuite) TestExecute_DelegatesToBookingCreator() {
 func (s *createBookingUseCaseSuite) TestExecute_ServiceErrorPropagates() {
 	input := entity.CreateBookingInput{ParkingSpotID: "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"}
 
+	s.accounts.EXPECT().GetAccountStatus(gomock.Any(), input.UserID).Return("ACTIVE", nil)
 	s.bookingCreator.EXPECT().
 		CreateBooking(gomock.Any(), input).
 		Return(entity.Booking{}, errors.NewConflict("requested time range overlaps with an existing booking"))
@@ -66,4 +70,34 @@ func (s *createBookingUseCaseSuite) TestExecute_ServiceErrorPropagates() {
 
 	s.Equal(entity.Booking{}, got)
 	s.True(errors.IsConflict(err))
+}
+
+type inactiveAccountCase struct {
+	status string
+}
+
+var inactiveAccountCases = []inactiveAccountCase{
+	{status: "SUSPENDED"},
+	{status: "PENDING_DELETION"},
+	{status: "DELETED"},
+}
+
+func (s *createBookingUseCaseSuite) TestExecute_RefusesAccountsThatAreNotActive() {
+	input := entity.CreateBookingInput{UserID: "11111111-1111-1111-1111-111111111111"}
+	for _, testCase := range inactiveAccountCases {
+		s.accounts.EXPECT().GetAccountStatus(gomock.Any(), input.UserID).Return(testCase.status, nil)
+
+		_, err := s.useCase.Execute(s.context, input)
+
+		s.True(errors.IsForbidden(err), testCase.status)
+	}
+}
+
+func (s *createBookingUseCaseSuite) TestExecute_AuthServiceErrorPropagates() {
+	input := entity.CreateBookingInput{UserID: "11111111-1111-1111-1111-111111111111"}
+	s.accounts.EXPECT().GetAccountStatus(gomock.Any(), input.UserID).Return("", errors.NewUpstream("auth", context.DeadlineExceeded))
+
+	_, err := s.useCase.Execute(s.context, input)
+
+	s.Error(err)
 }
