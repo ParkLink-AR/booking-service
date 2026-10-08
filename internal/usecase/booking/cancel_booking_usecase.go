@@ -24,15 +24,18 @@ type BookingCanceller interface {
 type CancelBookingUseCase struct {
 	canceller BookingCanceller
 	refunder  PaymentRefunder
+	spots     SpotDetailsLookup
+	events    EventPublisher
 	now       func() time.Time // injectable for testing
 }
 
-func NewCancelBookingUseCase(canceller BookingCanceller, refunder PaymentRefunder) *CancelBookingUseCase {
-	return &CancelBookingUseCase{canceller: canceller, refunder: refunder, now: time.Now}
+func NewCancelBookingUseCase(canceller BookingCanceller, refunder PaymentRefunder, spots SpotDetailsLookup, events EventPublisher) *CancelBookingUseCase {
+	return &CancelBookingUseCase{canceller: canceller, refunder: refunder, spots: spots, events: events, now: time.Now}
 }
 
-// Execute cancels bookingID on behalf of callerID (who must be the booking's driver) and
-// refunds the payment that was already charged. Cancellation is rejected when the current
+// Execute cancels bookingID on behalf of callerID (who must be the booking's driver),
+// refunds the payment that was already charged, and publishes booking.cancelled so the
+// owner is told. Cancellation is rejected when the current
 // time is less than cancellationCutoff (1 hour) before the booking's start.
 func (uc *CancelBookingUseCase) Execute(ctx context.Context, bookingID, callerID string) (entity.Booking, error) {
 	booking, err := uc.canceller.GetByID(ctx, bookingID)
@@ -55,6 +58,12 @@ func (uc *CancelBookingUseCase) Execute(ctx context.Context, bookingID, callerID
 	cancelled, err := uc.canceller.CancelBooking(ctx, bookingID)
 	if err != nil {
 		return entity.Booking{}, err
+	}
+	// Tells the owner the slot is free again. The spot (its owner and title) is only needed
+	// for that notice, so a failed lookup never fails the cancellation itself.
+	if spot, err := uc.spots.GetSpotDetails(ctx, cancelled.ParkingSpotID); err == nil {
+		emitBookingEvent(ctx, uc.events, RoutingKeyBookingCancelled,
+			newBookingCancelledEvent(cancelled, spot, CancelledByDriver))
 	}
 
 	// The booking is already CANCELLED at this point even if the refund call

@@ -24,6 +24,8 @@ type cancelBookingUseCaseSuite struct {
 	controller *gomock.Controller
 	canceller  *mocks.MockBookingCanceller
 	refunder   *mocks.MockPaymentRefunder
+	spots      *mocks.MockSpotDetailsLookup
+	events     *mocks.MockEventPublisher
 	useCase    *booking.CancelBookingUseCase
 	context    context.Context
 
@@ -37,7 +39,9 @@ func (s *cancelBookingUseCaseSuite) SetupTest() {
 	s.controller = gomock.NewController(s.T())
 	s.canceller = mocks.NewMockBookingCanceller(s.controller)
 	s.refunder = mocks.NewMockPaymentRefunder(s.controller)
-	s.useCase = booking.NewCancelBookingUseCase(s.canceller, s.refunder)
+	s.spots = mocks.NewMockSpotDetailsLookup(s.controller)
+	s.events = mocks.NewMockEventPublisher(s.controller)
+	s.useCase = booking.NewCancelBookingUseCase(s.canceller, s.refunder, s.spots, s.events)
 	s.context = context.Background()
 
 	s.bookingID = "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"
@@ -55,8 +59,9 @@ func (s *cancelBookingUseCaseSuite) TearDownTest() {
 func (s *cancelBookingUseCaseSuite) confirmedBooking() entity.Booking {
 	start := time.Now().UTC().Add(2 * time.Hour)
 	return entity.Booking{
-		ID:        s.bookingID,
-		UserID:    s.driverID,
+		ID:            s.bookingID,
+		ParkingSpotID: "spot-1",
+		UserID:        s.driverID,
 		Start:     start,
 		End:       start.Add(time.Hour),
 		Status:    enum.BookingStatusConfirmed,
@@ -72,6 +77,34 @@ func (s *cancelBookingUseCaseSuite) TestExecute_DriverCancelsWithinWindow_Cancel
 
 	s.canceller.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(b, nil)
 	s.canceller.EXPECT().CancelBooking(gomock.Any(), s.bookingID).Return(cancelled, nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), "spot-1").Return(entity.SpotDetails{OwnerID: "owner-1", Title: "Cochera Palermo"}, nil)
+	s.events.EXPECT().Publish(gomock.Any(), booking.RoutingKeyBookingCancelled, gomock.Any()).DoAndReturn(
+		func(_ context.Context, _ string, payload any) error {
+			event := toJSONMap(s.T(), payload)
+			s.Equal(booking.CancelledByDriver, event["cancelled_by"])
+			s.Equal("owner-1", event["owner_user_id"])
+			s.Equal("Cochera Palermo", event["parking_spot_title"])
+			return nil
+		},
+	)
+	s.refunder.EXPECT().RefundPayment(gomock.Any(), s.paymentID).Return(nil)
+
+	got, err := s.useCase.Execute(s.context, s.bookingID, s.driverID)
+
+	s.Require().NoError(err)
+	s.Equal(enum.BookingStatusCancelled, got.Status)
+}
+
+// The owner's notice is best-effort: a spot that can't be looked up still lets the driver
+// cancel and get the refund.
+func (s *cancelBookingUseCaseSuite) TestExecute_SpotLookupFails_StillCancelsWithoutNotice() {
+	b := s.confirmedBooking()
+	cancelled := b
+	cancelled.Status = enum.BookingStatusCancelled
+
+	s.canceller.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(b, nil)
+	s.canceller.EXPECT().CancelBooking(gomock.Any(), s.bookingID).Return(cancelled, nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), "spot-1").Return(entity.SpotDetails{}, errors.NewNotFound("spot", "spot-1"))
 	s.refunder.EXPECT().RefundPayment(gomock.Any(), s.paymentID).Return(nil)
 
 	got, err := s.useCase.Execute(s.context, s.bookingID, s.driverID)

@@ -24,27 +24,29 @@ type PaymentRefunder interface {
 
 type RejectBookingUseCase struct {
 	rejecter BookingRejecter
-	owners   SpotOwnerLookup
+	spots    SpotDetailsLookup
 	refunder PaymentRefunder
+	events   EventPublisher
 }
 
-func NewRejectBookingUseCase(rejecter BookingRejecter, owners SpotOwnerLookup, refunder PaymentRefunder) *RejectBookingUseCase {
-	return &RejectBookingUseCase{rejecter: rejecter, owners: owners, refunder: refunder}
+func NewRejectBookingUseCase(rejecter BookingRejecter, spots SpotDetailsLookup, refunder PaymentRefunder, events EventPublisher) *RejectBookingUseCase {
+	return &RejectBookingUseCase{rejecter: rejecter, spots: spots, refunder: refunder, events: events}
 }
 
 // Execute rejects bookingID on behalf of callerID (who must own the booking's parking
-// spot) and refunds the payment that was already charged for it.
+// spot), refunds the payment that was already charged for it, and publishes
+// booking.cancelled so the driver is told.
 func (uc *RejectBookingUseCase) Execute(ctx context.Context, bookingID, callerID string) (entity.Booking, error) {
 	booking, err := uc.rejecter.GetByID(ctx, bookingID)
 	if err != nil {
 		return entity.Booking{}, err
 	}
 
-	ownerID, err := uc.owners.GetSpotOwnerID(ctx, booking.ParkingSpotID)
+	spot, err := uc.spots.GetSpotDetails(ctx, booking.ParkingSpotID)
 	if err != nil {
 		return entity.Booking{}, err
 	}
-	if ownerID != callerID {
+	if spot.OwnerID != callerID {
 		return entity.Booking{}, errors.NewForbidden("no sos el dueño de esta cochera")
 	}
 
@@ -52,6 +54,10 @@ func (uc *RejectBookingUseCase) Execute(ctx context.Context, bookingID, callerID
 	if err != nil {
 		return entity.Booking{}, err
 	}
+	// Announced as soon as it's cancelled: the driver must learn their booking is off even
+	// if the refund below needs a manual retry.
+	emitBookingEvent(ctx, uc.events, RoutingKeyBookingCancelled,
+		newBookingCancelledEvent(rejected, spot, CancelledByOwnerRejected))
 
 	// The booking is already CANCELLED at this point even if the refund call
 	// below fails -- retrying by calling reject again won't work (status is

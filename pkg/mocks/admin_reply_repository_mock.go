@@ -55,3 +55,41 @@ func (mr *MockTicketStatusUpdaterMockRecorder) UpdateTicketStatus(ctx, ticketID,
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateTicketStatus", reflect.TypeOf((*MockTicketStatusUpdater)(nil).UpdateTicketStatus), ctx, ticketID, status)
 }
+
+// MockTicketBookingGetter is a mock of TicketBookingGetter interface.
+type MockTicketBookingGetter struct {
+	ctrl     *gomock.Controller
+	recorder *MockTicketBookingGetterMockRecorder
+}
+
+// MockTicketBookingGetterMockRecorder is the mock recorder for MockTicketBookingGetter.
+type MockTicketBookingGetterMockRecorder struct {
+	mock *MockTicketBookingGetter
+}
+
+// NewMockTicketBookingGetter creates a new mock instance.
+func NewMockTicketBookingGetter(ctrl *gomock.Controller) *MockTicketBookingGetter {
+	mock := &MockTicketBookingGetter{ctrl: ctrl}
+	mock.recorder = &MockTicketBookingGetterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockTicketBookingGetter) EXPECT() *MockTicketBookingGetterMockRecorder {
+	return m.recorder
+}
+
+// GetByID mocks base method.
+func (m *MockTicketBookingGetter) GetByID(ctx context.Context, bookingID string) (entity.Booking, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByID", ctx, bookingID)
+	ret0, _ := ret[0].(entity.Booking)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByID indicates an expected call of GetByID.
+func (mr *MockTicketBookingGetterMockRecorder) GetByID(ctx, bookingID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockTicketBookingGetter)(nil).GetByID), ctx, bookingID)
+}

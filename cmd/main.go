@@ -84,7 +84,7 @@ func main() {
 	confirmBookingUseCase := ucbooking.NewConfirmBookingUseCase(bookingRepository, parkingClient, eventPublisher)
 	getBookableSpotsUseCase := ucbooking.NewGetBookableSpotsUseCase(bookingService)
 	approveBookingUseCase := ucbooking.NewApproveBookingUseCase(bookingRepository, parkingClient, eventPublisher)
-	rejectBookingUseCase := ucbooking.NewRejectBookingUseCase(bookingRepository, parkingClient, paymentClient)
+	rejectBookingUseCase := ucbooking.NewRejectBookingUseCase(bookingRepository, parkingClient, paymentClient, eventPublisher)
 	listBookingsDetailedUseCase := ucbooking.NewListBookingsDetailedUseCase(bookingRepository, parkingClient)
 	getBookingUseCase := ucbooking.NewGetBookingUseCase(bookingRepository, parkingClient)
 	submitReviewUseCase := ucbooking.NewSubmitReviewUseCase(bookingRepository, parkingClient, bookingRepository)
@@ -92,7 +92,7 @@ func main() {
 	listReviewsByBookingUseCase := ucbooking.NewListReviewsByBookingUseCase(bookingRepository)
 	getSpotRatingsUseCase := ucbooking.NewGetSpotRatingsUseCase(bookingRepository)
 	verifyBookingCodeUseCase := ucbooking.NewVerifyBookingCodeUseCase(bookingRepository, parkingClient, eventPublisher)
-	cancelBookingUseCase := ucbooking.NewCancelBookingUseCase(bookingRepository, paymentClient)
+	cancelBookingUseCase := ucbooking.NewCancelBookingUseCase(bookingRepository, paymentClient, parkingClient, eventPublisher)
 	sendMessageUseCase := ucbooking.NewSendMessageUseCase(bookingRepository, parkingClient, bookingRepository, eventPublisher)
 	listMessagesUseCase := ucbooking.NewListMessagesUseCase(bookingRepository, parkingClient, bookingRepository)
 	createTicketUseCase := ucbooking.NewCreateTicketUseCase(bookingRepository, parkingClient, bookingRepository, bookingRepository)
@@ -103,7 +103,7 @@ func main() {
 	listAdminTicketsUseCase := ucbooking.NewListAdminTicketsUseCase(bookingRepository)
 	getAdminTicketUseCase := ucbooking.NewGetAdminTicketUseCase(bookingRepository, bookingRepository, parkingClient)
 	listAdminTicketMessagesUseCase := ucbooking.NewListAdminTicketMessagesUseCase(bookingRepository, bookingRepository)
-	adminReplyUseCase := ucbooking.NewAdminReplyUseCase(bookingRepository, bookingRepository, bookingRepository, eventPublisher)
+	adminReplyUseCase := ucbooking.NewAdminReplyUseCase(bookingRepository, bookingRepository, bookingRepository, bookingRepository, eventPublisher)
 	updateTicketStatusUseCase := ucbooking.NewUpdateTicketStatusUseCase(bookingRepository)
 	generatePendingPayoutsUseCase := ucbooking.NewGeneratePendingPayoutsUseCase(bookingRepository, bookingRepository, bookingRepository, parkingClient)
 	listAdminPayoutsUseCase := ucbooking.NewListAdminPayoutsUseCase(bookingRepository, storageClient)
@@ -123,6 +123,8 @@ func main() {
 	listPendingVerificationReviewsUseCase := ucbooking.NewListPendingVerificationReviewsUseCase(bookingRepository)
 	resolveVerificationReviewUseCase := ucbooking.NewResolveVerificationReviewUseCase(bookingRepository, paymentClient)
 	accountClosureUseCase := ucbooking.NewAccountClosureUseCase(bookingRepository, paymentClient, parkingClient, eventPublisher)
+	expirePendingApprovalsUseCase := ucbooking.NewExpirePendingApprovalsUseCase(bookingRepository, paymentClient, parkingClient, eventPublisher)
+	completeFinishedBookingsUseCase := ucbooking.NewCompleteFinishedBookingsUseCase(bookingRepository, parkingClient, eventPublisher)
 
 	// Router
 	router := chi.NewRouter()
@@ -170,11 +172,11 @@ func main() {
 
 	// Background job: auto-cancel + refund PENDING_OWNER_APPROVAL bookings the
 	// owner never responded to within OWNER_APPROVAL_HOURS.
-	go runOwnerApprovalExpiryJob(ctx, bookingRepository, paymentClient, logger)
+	go runOwnerApprovalExpiryJob(ctx, expirePendingApprovalsUseCase, logger)
 
 	// Background job: mark CONFIRMED bookings COMPLETED once their time window has
 	// passed -- this is what makes a stay "over" and triggers the review prompts.
-	go runCompletionSweepJob(ctx, bookingRepository, logger)
+	go runCompletionSweepJob(ctx, completeFinishedBookingsUseCase, logger)
 
 	// Background job: turn every booking that's been COMPLETED and paid for at least 24h
 	// into a PENDING payout row for ParkLink staff to review and mark paid.
@@ -310,10 +312,10 @@ func runHoldExpiryJob(ctx context.Context, repo *bookingrepository.Repository, l
 }
 
 // runOwnerApprovalExpiryJob ticks every minute and auto-cancels + refunds every
-// PENDING_OWNER_APPROVAL booking whose owner_response_deadline has elapsed. Reuses the
-// hold-expiry job's cadence -- these bookings are rare compared to payment holds, no need
-// for a separate interval.
-func runOwnerApprovalExpiryJob(ctx context.Context, repo *bookingrepository.Repository, refunder *paymentclient.Client, logger *zap.Logger) {
+// PENDING_OWNER_APPROVAL booking whose owner_response_deadline has elapsed (see
+// ExpirePendingApprovalsUseCase). Reuses the hold-expiry job's cadence -- these bookings
+// are rare compared to payment holds, no need for a separate interval.
+func runOwnerApprovalExpiryJob(ctx context.Context, useCase *ucbooking.ExpirePendingApprovalsUseCase, logger *zap.Logger) {
 	ticker := time.NewTicker(holdExpiryInterval)
 	defer ticker.Stop()
 	for {
@@ -321,27 +323,24 @@ func runOwnerApprovalExpiryJob(ctx context.Context, repo *bookingrepository.Repo
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			expired, err := repo.ExpireStalePendingApprovals(ctx)
+			result, err := useCase.Execute(ctx)
 			if err != nil {
 				logger.Error("owner approval expiry job failed", zap.Error(err))
 				continue
 			}
-			for _, booking := range expired {
-				if err := refunder.RefundPayment(ctx, booking.PaymentID); err != nil {
-					logger.Error("refund failed for expired pending-approval booking",
-						zap.String("booking_id", booking.ID), zap.Error(err))
-				}
+			for _, bookingID := range result.RefundFailures {
+				logger.Error("refund failed for expired pending-approval booking", zap.String("booking_id", bookingID))
 			}
-			if len(expired) > 0 {
-				logger.Info("expired stale pending-owner-approval bookings", zap.Int("count", len(expired)))
+			if result.Expired > 0 {
+				logger.Info("expired stale pending-owner-approval bookings", zap.Int("count", result.Expired))
 			}
 		}
 	}
 }
 
 // runCompletionSweepJob ticks every minute and marks CONFIRMED bookings whose time
-// window has already ended as COMPLETED.
-func runCompletionSweepJob(ctx context.Context, repo *bookingrepository.Repository, logger *zap.Logger) {
+// window has already ended as COMPLETED (see CompleteFinishedBookingsUseCase).
+func runCompletionSweepJob(ctx context.Context, useCase *ucbooking.CompleteFinishedBookingsUseCase, logger *zap.Logger) {
 	ticker := time.NewTicker(holdExpiryInterval)
 	defer ticker.Stop()
 	for {
@@ -349,11 +348,11 @@ func runCompletionSweepJob(ctx context.Context, repo *bookingrepository.Reposito
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			n, err := repo.ExpireCompletedBookings(ctx)
+			n, err := useCase.Execute(ctx)
 			if err != nil {
 				logger.Error("completion sweep job failed", zap.Error(err))
 			} else if n > 0 {
-				logger.Info("marked bookings completed", zap.Int64("count", n))
+				logger.Info("marked bookings completed", zap.Int("count", n))
 			}
 		}
 	}

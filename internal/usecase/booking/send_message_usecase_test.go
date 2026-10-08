@@ -68,7 +68,14 @@ func (s *sendMessageUseCaseSuite) TestExecute_DriverSendsToOwner_CreatesAndPubli
 			return m, nil
 		},
 	)
-	s.events.EXPECT().Publish(gomock.Any(), booking.RoutingKeyBookingMessageSent, gomock.Any()).Return(nil)
+	s.events.EXPECT().Publish(gomock.Any(), booking.RoutingKeyBookingMessageSent, gomock.Any()).DoAndReturn(
+		func(_ context.Context, _ string, payload any) error {
+			event := toJSONMap(s.T(), payload)
+			s.Equal(s.ownerID, event["recipient_user_id"])
+			s.Equal(booking.RecipientRoleOwner, event["recipient_role"])
+			return nil
+		},
+	)
 
 	got, err := s.useCase.Execute(s.context, s.bookingID, s.driverID, "¿A qué hora llegás?")
 
@@ -85,7 +92,14 @@ func (s *sendMessageUseCaseSuite) TestExecute_OwnerSendsToDriver_CreatesAndPubli
 			return m, nil
 		},
 	)
-	s.events.EXPECT().Publish(gomock.Any(), booking.RoutingKeyBookingMessageSent, gomock.Any()).Return(nil)
+	s.events.EXPECT().Publish(gomock.Any(), booking.RoutingKeyBookingMessageSent, gomock.Any()).DoAndReturn(
+		func(_ context.Context, _ string, payload any) error {
+			event := toJSONMap(s.T(), payload)
+			s.Equal(s.driverID, event["recipient_user_id"])
+			s.Equal(booking.RecipientRoleDriver, event["recipient_role"])
+			return nil
+		},
+	)
 
 	_, err := s.useCase.Execute(s.context, s.bookingID, s.ownerID, "Te espero en la entrada")
 

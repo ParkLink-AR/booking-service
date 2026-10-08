@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/example/bookings-service/internal/domain/constants"
+	"github.com/example/bookings-service/internal/domain/entity"
 	"github.com/example/bookings-service/internal/domain/errors"
 )
 
@@ -13,9 +14,10 @@ import (
 // driver's in-person code ever having been verified (still CONFIRMED, verified_at NULL)
 // is also flagged verification_review = 'PENDING', which holds back the owner's payout
 // until an admin reviews it (see ListEligibleBookingsWithoutPayout and
-// ResolveVerificationReview). Returns the number of rows updated.
-func (repository *Repository) ExpireCompletedBookings(ctx context.Context) (int64, error) {
-	result, err := repository.database.ExecContext(ctx, `
+// ResolveVerificationReview). Returns the bookings it completed, so the caller can
+// announce each one.
+func (repository *Repository) ExpireCompletedBookings(ctx context.Context) ([]entity.Booking, error) {
+	rows, err := repository.database.QueryContext(ctx, `
 		UPDATE `+constants.BookingsTableName+`
 		SET    status              = 'COMPLETED'::booking_status,
 		       verification_review = CASE
@@ -25,13 +27,32 @@ func (repository *Repository) ExpireCompletedBookings(ctx context.Context) (int6
 		       updated_at          = now()
 		WHERE  status IN ('CONFIRMED', 'IN_PROGRESS')
 		  AND  upper(time_range) < now()
+		RETURNING
+			id, parking_spot_id, user_id,
+			lower(time_range), upper(time_range),
+			status, amount, COALESCE(payment_id, ''), paid_at, created_at, updated_at
 	`)
 	if err != nil {
-		return 0, errors.NewInternalError("booking.ExpireCompletedBookings", err)
+		return nil, errors.NewInternalError("booking.ExpireCompletedBookings", err)
 	}
-	n, err := result.RowsAffected()
-	if err != nil {
-		return 0, errors.NewInternalError("booking.ExpireCompletedBookings.RowsAffected", err)
+	defer rows.Close()
+
+	var completed []entity.Booking
+	for rows.Next() {
+		var b entity.Booking
+		var statusLabel string
+		if err := rows.Scan(
+			&b.ID, &b.ParkingSpotID, &b.UserID,
+			&b.Start, &b.End,
+			&statusLabel, &b.Amount, &b.PaymentID, &b.PaidAt, &b.CreatedAt, &b.UpdatedAt,
+		); err != nil {
+			return nil, errors.NewInternalError("booking.ExpireCompletedBookings", err)
+		}
+		b.Status, _ = parseBookingStatus(statusLabel)
+		completed = append(completed, b)
 	}
-	return n, nil
+	if err := rows.Err(); err != nil {
+		return nil, errors.NewInternalError("booking.ExpireCompletedBookings", err)
+	}
+	return completed, nil
 }

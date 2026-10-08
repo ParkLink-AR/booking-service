@@ -22,13 +22,6 @@ type AccountClosureRepository interface {
 	ClearVehicleSnapshot(ctx context.Context, userID string) error
 }
 
-// Who cancelled: the side whose account was closed. Carried on the booking.cancelled event
-// so notifications-service tells the other side.
-const (
-	cancelledByOwnerAccount  = "owner_account"
-	cancelledByDriverAccount = "driver_account"
-)
-
 // AccountClosureUseCase is the bookings side of closing or suspending an account (called
 // by auth-service, see app/services/account_lifecycle.py there). The account is userID
 // as a driver, and spotIDs are the spots it owns.
@@ -151,9 +144,9 @@ func (uc *AccountClosureUseCase) CancelBookings(ctx context.Context, userID stri
 			}
 			result.ExpiredHolds++
 		case closureCancelAsDriver, closureCancelAsOwner, closureRejectAsOwner:
-			reason, cancelledBy := constants.CancellationReasonOwnerAccountClosed, cancelledByOwnerAccount
+			reason, cancelledBy := constants.CancellationReasonOwnerAccountClosed, CancelledByOwnerAccount
 			if action == closureCancelAsDriver {
-				reason, cancelledBy = constants.CancellationReasonDriverAccountClosed, cancelledByDriverAccount
+				reason, cancelledBy = constants.CancellationReasonDriverAccountClosed, CancelledByDriverAccount
 			}
 			cancelled, err := uc.repository.CancelBookingWithReason(ctx, booking.ID, reason)
 			if err != nil {
@@ -174,18 +167,10 @@ func (uc *AccountClosureUseCase) CancelBookings(ctx context.Context, userID stri
 	return result, nil
 }
 
-type bookingCancelledEvent struct {
-	bookingEvent
-	CancelledBy string `json:"cancelled_by"`
-}
-
 func (uc *AccountClosureUseCase) publishCancelled(ctx context.Context, booking entity.Booking, cancelledBy string) {
 	// The spot title only makes the notification nicer -- a failed lookup doesn't skip it.
 	spot, _ := uc.spots.GetSpotDetails(ctx, booking.ParkingSpotID)
-	_ = uc.events.Publish(ctx, RoutingKeyBookingCancelled, bookingCancelledEvent{
-		bookingEvent: newBookingEvent(RoutingKeyBookingCancelled, booking, spot),
-		CancelledBy:  cancelledBy,
-	})
+	_ = uc.events.Publish(ctx, RoutingKeyBookingCancelled, newBookingCancelledEvent(booking, spot, cancelledBy))
 }
 
 // Anonymize wipes the personal data copied onto the driver's bookings (the vehicle

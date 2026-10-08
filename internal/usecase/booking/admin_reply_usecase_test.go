@@ -2,6 +2,7 @@ package booking_test
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -25,6 +26,7 @@ type adminReplyUseCaseSuite struct {
 	tickets    *mocks.MockTicketGetter
 	messages   *mocks.MockTicketMessageCreator
 	status     *mocks.MockTicketStatusUpdater
+	bookings   *mocks.MockTicketBookingGetter
 	events     *mocks.MockEventPublisher
 	useCase    *booking.AdminReplyUseCase
 	context    context.Context
@@ -38,8 +40,12 @@ func (s *adminReplyUseCaseSuite) SetupTest() {
 	s.tickets = mocks.NewMockTicketGetter(s.controller)
 	s.messages = mocks.NewMockTicketMessageCreator(s.controller)
 	s.status = mocks.NewMockTicketStatusUpdater(s.controller)
+	s.bookings = mocks.NewMockTicketBookingGetter(s.controller)
 	s.events = mocks.NewMockEventPublisher(s.controller)
-	s.useCase = booking.NewAdminReplyUseCase(s.tickets, s.messages, s.status, s.events)
+	s.useCase = booking.NewAdminReplyUseCase(s.tickets, s.messages, s.status, s.bookings, s.events)
+	// Which side opened the ticket only shapes the notification; the tests below that care
+	// about it set their own expectation.
+	s.bookings.EXPECT().GetByID(gomock.Any(), gomock.Any()).Return(entity.Booking{UserID: "driver-1"}, nil).AnyTimes()
 	s.context = context.Background()
 
 	s.ticketID = "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"
@@ -117,4 +123,39 @@ func (s *adminReplyUseCaseSuite) TestExecute_PublishFailureIsSwallowed() {
 
 	s.Require().NoError(err)
 	s.Equal("msg-1", got.ID)
+}
+
+// The notification says which side of the booking the ticket's creator is on.
+func (s *adminReplyUseCaseSuite) TestExecute_EventCarriesCreatorRole() {
+	cases := map[string]string{"driver-1": booking.RecipientRoleDriver, "owner-1": booking.RecipientRoleOwner}
+	for createdBy, wantRole := range cases {
+		s.tickets.EXPECT().GetTicketByID(gomock.Any(), s.ticketID).
+			Return(entity.SupportTicket{ID: s.ticketID, BookingID: "booking-1", CreatedBy: createdBy, Status: enum.TicketStatusInProgress}, nil)
+		s.messages.EXPECT().CreateTicketMessage(gomock.Any(), gomock.Any()).Return(entity.SupportTicketMessage{ID: "msg-1", Body: "hola"}, nil)
+		s.events.EXPECT().Publish(gomock.Any(), booking.RoutingKeySupportTicketReplied, gomock.Any()).DoAndReturn(
+			func(_ context.Context, _ string, payload any) error {
+				event := toJSONMap(s.T(), payload)
+				s.Equal(createdBy, event["recipient_user_id"])
+				s.Equal(wantRole, event["recipient_role"])
+				return nil
+			},
+		)
+
+		_, err := s.useCase.Execute(s.context, s.ticketID, s.adminID, "hola")
+
+		s.Require().NoError(err)
+	}
+}
+
+// toJSONMap is an event payload as notifications-service receives it.
+func toJSONMap(t interface{ Fatalf(string, ...any) }, payload any) map[string]any {
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal event: %v", err)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("unmarshal event: %v", err)
+	}
+	return out
 }

@@ -21,9 +21,29 @@ const (
 	RoutingKeyBookingMessageSent     = "booking.message_sent"
 	RoutingKeySupportTicketReplied   = "support.ticket_replied"
 	RoutingKeySettlementPaid         = "settlement.paid"
-	// A booking that hadn't started was cancelled because one side's account was closed
-	// or suspended -- see AccountClosureUseCase.
+	// A paid booking was cancelled before it started -- by the owner (rejected it, or never
+	// answered in time), by the driver, or because one side's account was closed or
+	// suspended (see AccountClosureUseCase). cancelled_by says which.
 	RoutingKeyBookingCancelled = "booking.cancelled"
+	// A stay's time window ended (see CompleteFinishedBookingsUseCase): both sides are
+	// asked to review each other.
+	RoutingKeyBookingCompleted = "booking.completed"
+)
+
+// Values of booking.cancelled's cancelled_by: who or what called the booking off.
+const (
+	CancelledByOwnerRejected = "owner_rejected"
+	CancelledByOwnerExpired  = "owner_expired"
+	CancelledByDriver        = "driver"
+	CancelledByOwnerAccount  = "owner_account"
+	CancelledByDriverAccount = "driver_account"
+)
+
+// Which side of a booking an event's recipient is on -- lets the notification show the
+// right role and open the right side of the booking.
+const (
+	RecipientRoleDriver = "driver"
+	RecipientRoleOwner  = "owner"
 )
 
 // EventPublisher publishes a domain event to the shared event bus under a routing key.
@@ -70,6 +90,20 @@ func newBookingEvent(eventType string, b entity.Booking, spot entity.SpotDetails
 	}
 }
 
+// bookingCancelledEvent is the wire shape of booking.cancelled: the booking plus who called
+// it off (one of the CancelledBy* values).
+type bookingCancelledEvent struct {
+	bookingEvent
+	CancelledBy string `json:"cancelled_by"`
+}
+
+func newBookingCancelledEvent(b entity.Booking, spot entity.SpotDetails, cancelledBy string) bookingCancelledEvent {
+	return bookingCancelledEvent{
+		bookingEvent: newBookingEvent(RoutingKeyBookingCancelled, b, spot),
+		CancelledBy:  cancelledBy,
+	}
+}
+
 // bookingMessageEvent is the wire shape of booking.message_sent -- deliberately separate
 // from bookingEvent (no time_range/amount/payment_id concept for a chat message), but the
 // same self-contained philosophy: it carries the recipient id and spot title directly, so
@@ -83,10 +117,11 @@ type bookingMessageEvent struct {
 	ParkingSpotTitle string    `json:"parking_spot_title"`
 	SenderUserID     string    `json:"sender_user_id"`
 	RecipientUserID  string    `json:"recipient_user_id"`
+	RecipientRole    string    `json:"recipient_role"`
 	Body             string    `json:"body"`
 }
 
-func newBookingMessageEvent(message entity.BookingMessage, spotTitle, spotID, recipientID string) bookingMessageEvent {
+func newBookingMessageEvent(message entity.BookingMessage, spotTitle, spotID, recipientID, recipientRole string) bookingMessageEvent {
 	return bookingMessageEvent{
 		EventID:          uuid.NewString(),
 		EventType:        RoutingKeyBookingMessageSent,
@@ -96,6 +131,7 @@ func newBookingMessageEvent(message entity.BookingMessage, spotTitle, spotID, re
 		ParkingSpotTitle: spotTitle,
 		SenderUserID:     message.SenderID,
 		RecipientUserID:  recipientID,
+		RecipientRole:    recipientRole,
 		Body:             message.Body,
 	}
 }
@@ -112,10 +148,12 @@ type supportTicketRepliedEvent struct {
 	BookingID       string    `json:"booking_id"`
 	TicketSubject   string    `json:"ticket_subject"`
 	RecipientUserID string    `json:"recipient_user_id"`
-	Body            string    `json:"body"`
+	// Empty when the ticket's booking couldn't be looked up.
+	RecipientRole string `json:"recipient_role"`
+	Body          string `json:"body"`
 }
 
-func newSupportTicketRepliedEvent(message entity.SupportTicketMessage, ticket entity.SupportTicket) supportTicketRepliedEvent {
+func newSupportTicketRepliedEvent(message entity.SupportTicketMessage, ticket entity.SupportTicket, recipientRole string) supportTicketRepliedEvent {
 	return supportTicketRepliedEvent{
 		EventID:         uuid.NewString(),
 		EventType:       RoutingKeySupportTicketReplied,
@@ -124,6 +162,7 @@ func newSupportTicketRepliedEvent(message entity.SupportTicketMessage, ticket en
 		BookingID:       ticket.BookingID,
 		TicketSubject:   ticket.Subject,
 		RecipientUserID: ticket.CreatedBy,
+		RecipientRole:   recipientRole,
 		Body:            message.Body,
 	}
 }

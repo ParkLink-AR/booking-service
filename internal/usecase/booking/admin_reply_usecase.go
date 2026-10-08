@@ -20,15 +20,22 @@ type TicketStatusUpdater interface {
 // moves a freshly OPENed ticket to IN_PROGRESS automatically (any other status is left as the
 // admin set it, e.g. replying on a RESOLVED ticket doesn't silently reopen it) and notifies the
 // ticket's creator via push.
+// TicketBookingGetter reads the booking a ticket is about -- to tell whether the ticket's
+// creator is its driver or the spot's owner. Implemented by internal/repository/booking.
+type TicketBookingGetter interface {
+	GetByID(ctx context.Context, bookingID string) (entity.Booking, error)
+}
+
 type AdminReplyUseCase struct {
 	tickets  TicketGetter
 	messages TicketMessageCreator
 	status   TicketStatusUpdater
+	bookings TicketBookingGetter
 	events   EventPublisher
 }
 
-func NewAdminReplyUseCase(tickets TicketGetter, messages TicketMessageCreator, status TicketStatusUpdater, events EventPublisher) *AdminReplyUseCase {
-	return &AdminReplyUseCase{tickets: tickets, messages: messages, status: status, events: events}
+func NewAdminReplyUseCase(tickets TicketGetter, messages TicketMessageCreator, status TicketStatusUpdater, bookings TicketBookingGetter, events EventPublisher) *AdminReplyUseCase {
+	return &AdminReplyUseCase{tickets: tickets, messages: messages, status: status, bookings: bookings, events: events}
 }
 
 func (uc *AdminReplyUseCase) Execute(ctx context.Context, ticketID, adminUserID, body string) (entity.SupportTicketMessage, error) {
@@ -61,7 +68,22 @@ func (uc *AdminReplyUseCase) Execute(ctx context.Context, ticketID, adminUserID,
 		}
 	}
 
-	emitBookingEvent(ctx, uc.events, RoutingKeySupportTicketReplied, newSupportTicketRepliedEvent(created, ticket))
+	emitBookingEvent(ctx, uc.events, RoutingKeySupportTicketReplied,
+		newSupportTicketRepliedEvent(created, ticket, uc.creatorRole(ctx, ticket)))
 
 	return created, nil
+}
+
+// creatorRole is which side of the booking opened the ticket: its driver, or else the
+// spot's owner (the only other party allowed to open one). Empty when the booking can't be
+// read -- the notification is still sent, just without a role.
+func (uc *AdminReplyUseCase) creatorRole(ctx context.Context, ticket entity.SupportTicket) string {
+	booking, err := uc.bookings.GetByID(ctx, ticket.BookingID)
+	if err != nil {
+		return ""
+	}
+	if booking.UserID == ticket.CreatedBy {
+		return RecipientRoleDriver
+	}
+	return RecipientRoleOwner
 }

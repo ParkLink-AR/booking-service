@@ -54,12 +54,12 @@ func (uc *SendMessageUseCase) Execute(ctx context.Context, bookingID, callerID, 
 		return entity.BookingMessage{}, err
 	}
 
-	var recipientID string
+	var recipientID, recipientRole string
 	switch callerID {
 	case booking.UserID:
-		recipientID = spot.OwnerID
+		recipientID, recipientRole = spot.OwnerID, RecipientRoleOwner
 	case spot.OwnerID:
-		recipientID = booking.UserID
+		recipientID, recipientRole = booking.UserID, RecipientRoleDriver
 	default:
 		return entity.BookingMessage{}, errors.NewForbidden("no sos parte de esta reserva")
 	}
@@ -74,7 +74,7 @@ func (uc *SendMessageUseCase) Execute(ctx context.Context, bookingID, callerID, 
 	}
 
 	emitBookingEvent(ctx, uc.events, RoutingKeyBookingMessageSent,
-		newBookingMessageEvent(created, spot.Title, booking.ParkingSpotID, recipientID))
+		newBookingMessageEvent(created, spot.Title, booking.ParkingSpotID, recipientID, recipientRole))
 
 	return created, nil
 }
