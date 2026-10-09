@@ -21,7 +21,7 @@ func (repository *Repository) ListBookingsByOwnerSpots(ctx context.Context, park
 			lower(time_range), upper(time_range),
 			status, hold_expires_at, owner_response_deadline, amount, owner_amount, COALESCE(payment_id, ''), paid_at,
 			kind, created_at, updated_at,
-			vehicle_plate, vehicle_brand, vehicle_model, vehicle_country
+			vehicle_plate, vehicle_brand, vehicle_model, vehicle_country, vehicle_type
 		FROM `+constants.BookingsTableName+`
 		WHERE parking_spot_id = ANY($1::uuid[])
 		ORDER BY created_at DESC
@@ -40,7 +40,7 @@ func (repository *Repository) ListBookingsByOwnerSpots(ctx context.Context, park
 			&b.Start, &b.End,
 			&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.OwnerAmount, &b.PaymentID, &b.PaidAt,
 			&kindLabel, &b.CreatedAt, &b.UpdatedAt,
-			&b.VehiclePlate, &b.VehicleBrand, &b.VehicleModel, &b.VehicleCountry,
+			&b.VehiclePlate, &b.VehicleBrand, &b.VehicleModel, &b.VehicleCountry, &b.VehicleType,
 		); err != nil {
 			return nil, errors.NewInternalError("booking.ListBookingsByOwnerSpots", err)
 		}

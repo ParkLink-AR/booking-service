@@ -18,7 +18,7 @@ const verificationReviewColumns = `
 	lower(time_range), upper(time_range),
 	status, amount, owner_amount, COALESCE(payment_id, ''), paid_at,
 	kind, verified_at, verification_review, created_at, updated_at,
-	vehicle_plate, vehicle_brand, vehicle_model, vehicle_country`
+	vehicle_plate, vehicle_brand, vehicle_model, vehicle_country, vehicle_type`
 
 type rowScanner interface {
 	Scan(dest ...any) error
@@ -33,7 +33,7 @@ func scanVerificationReviewBooking(row rowScanner) (entity.Booking, error) {
 		&b.Start, &b.End,
 		&statusLabel, &b.Amount, &b.OwnerAmount, &b.PaymentID, &b.PaidAt,
 		&kindLabel, &b.VerifiedAt, &reviewLabel, &b.CreatedAt, &b.UpdatedAt,
-		&b.VehiclePlate, &b.VehicleBrand, &b.VehicleModel, &b.VehicleCountry,
+		&b.VehiclePlate, &b.VehicleBrand, &b.VehicleModel, &b.VehicleCountry, &b.VehicleType,
 	); err != nil {
 		return entity.Booking{}, err
 	}

@@ -269,7 +269,7 @@ func (handler *Handler) ListBookingsByUserEndpoint(responseWriter http.ResponseW
 			PaymentID:     b.PaymentID,
 			Kind:          b.Kind.String(),
 			UpdatedAt:     b.UpdatedAt.In(handler.location).Format(time.RFC3339),
-			Vehicle:       vehicleResponseFromEntity(b.VehiclePlate, b.VehicleBrand, b.VehicleModel, b.VehicleCountry),
+			Vehicle:       vehicleResponseFromEntity(b),
 		}
 		if b.HoldExpiresAt != nil {
 			formatted := b.HoldExpiresAt.In(handler.location).Format(time.RFC3339)

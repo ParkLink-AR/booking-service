@@ -207,3 +207,26 @@ func (s *handlerSuite) TestCreateBookingEndpoint_OutsidePublishedHours() {
 	s.Equal(http.StatusBadRequest, recorder.Code)
 	s.Contains(recorder.Body.String(), "OUTSIDE_PUBLISHED_HOURS")
 }
+
+// The vehicle the driver picked travels with its type (lowercased) and its snapshot comes
+// back in the response -- a bicycle with no plate included.
+func (s *handlerSuite) TestCreateBookingEndpoint_ForwardsTheVehicleWithItsType() {
+	bicycle := "bicycle"
+	country := "AR"
+	s.createBookingUseCase.EXPECT().
+		Execute(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, input entity.CreateBookingInput) (entity.Booking, error) {
+			s.Equal("bicycle", input.VehicleType)
+			s.Empty(input.VehiclePlate)
+			return entity.Booking{ID: "created-id", VehicleType: &bicycle, VehicleCountry: &country}, nil
+		})
+
+	body := fmt.Sprintf(
+		`{"user_id":"%s","start":"%s","end":"%s","amount":%d,"parking_spot":{"id":"%s","schedule":%s},"vehicle":{"type":" Bicycle ","plate":"","brand":"","model":"","country":"AR"}}`,
+		validUserID, "2026-08-18T10:00:00-03:00", "2026-08-18T11:00:00-03:00", 5000, validParkingSpotID, tuesdayScheduleBody,
+	)
+	recorder := s.doPostAsDriver("/bookings", body)
+
+	s.Equal(http.StatusCreated, recorder.Code)
+	s.Contains(recorder.Body.String(), `"vehicle":{"type":"bicycle","country":"AR"}`)
+}

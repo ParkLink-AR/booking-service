@@ -3,6 +3,7 @@ package booking
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/goccy/go-json"
@@ -103,6 +104,7 @@ func (handler *Handler) CreateBookingEndpoint(responseWriter http.ResponseWriter
 	if body.Vehicle != nil {
 		// Same normalization auth-service applies to saved vehicles -- this snapshot comes
 		// straight from the client, so it's normalized again here before being stored.
+		input.VehicleType = strings.ToLower(strings.TrimSpace(body.Vehicle.Type))
 		input.VehiclePlate = entity.NormalizePlate(body.Vehicle.Plate)
 		input.VehicleBrand = entity.CapitalizeWords(body.Vehicle.Brand)
 		input.VehicleModel = entity.CapitalizeWords(body.Vehicle.Model)

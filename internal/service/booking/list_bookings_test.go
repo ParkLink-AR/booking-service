@@ -34,6 +34,9 @@ type serviceSuite struct {
 	// spotOwnerID is who GetSpotOwnerID reports as the spot's owner -- someone other than
 	// the drivers these tests book as, unless a test sets it to one of them.
 	spotOwnerID string
+	// vehicleRules is what GetVehicleRules reports the spot asks of a booking's vehicle --
+	// nothing (a car-only spot where a vehicle is optional), unless a test sets it.
+	vehicleRules entity.SpotVehicleRules
 }
 
 func (s *serviceSuite) SetupTest() {
@@ -52,6 +55,10 @@ func (s *serviceSuite) SetupTest() {
 	s.spotOwnerID = "99999999-9999-9999-9999-999999999999"
 	s.parkingClient.EXPECT().GetSpotOwnerID(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, _ string) (string, error) { return s.spotOwnerID, nil }).
+		AnyTimes()
+	s.vehicleRules = entity.SpotVehicleRules{AcceptedTypes: []string{"car"}}
+	s.parkingClient.EXPECT().GetVehicleRules(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ string) (entity.SpotVehicleRules, error) { return s.vehicleRules, nil }).
 		AnyTimes()
 }
 

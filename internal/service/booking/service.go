@@ -30,9 +30,10 @@ type BookingRepository interface {
 // at all, and who owns it (an owner can't book their own spot).
 type ParkingClient interface {
 	GetSpotOwnerID(ctx context.Context, spotID string) (string, error)
-	GetStayQuote(ctx context.Context, spotID, startDate, endDate string, startHour int) (parkingclient.StayQuote, error)
-	GetHourlyPrice(ctx context.Context, spotID string) (float64, error)
+	GetStayQuote(ctx context.Context, spotID, startDate, endDate string, startHour int, vehicleType string) (parkingclient.StayQuote, error)
+	GetHourlyPrice(ctx context.Context, spotID, vehicleType string) (float64, error)
 	IsSpotActive(ctx context.Context, spotID string) (bool, error)
+	GetVehicleRules(ctx context.Context, spotID string) (entity.SpotVehicleRules, error)
 }
 
 // CommissionRateReader reads the platform's current commission settings -- same shape as

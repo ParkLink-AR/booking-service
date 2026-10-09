@@ -130,7 +130,7 @@ func (repository *Repository) GetOwnerPendingPayouts(ctx context.Context, ownerI
 func (repository *Repository) ClearVehicleSnapshot(ctx context.Context, userID string) error {
 	_, err := repository.database.ExecContext(ctx, `
 		UPDATE `+constants.BookingsTableName+`
-		SET    vehicle_plate = NULL, vehicle_brand = NULL, vehicle_model = NULL, vehicle_country = NULL
+		SET    vehicle_plate = NULL, vehicle_brand = NULL, vehicle_model = NULL, vehicle_country = NULL, vehicle_type = NULL
 		WHERE  user_id::text = $1
 	`, userID)
 	if err != nil {

@@ -32,13 +32,13 @@ type createBookingRequest struct {
 	Kind        string             `json:"kind,omitempty"`
 	StayEndDate string             `json:"stay_end_date,omitempty"`
 	ParkingSpot parkingSpotRequest `json:"parking_spot"`
-	// Vehicle is entirely optional -- the driver may not have picked (or saved) one. When
-	// present, every field is expected to be non-empty (mobile only ever sends this object
-	// when all four are set together -- see CreateBookingInput.VehiclePlate).
+	// Vehicle is the saved vehicle the driver picked -- optional unless the spot asks for
+	// it or prices by vehicle type (see Service.checkVehicle). A bicycle has no plate.
 	Vehicle *vehicleRequest `json:"vehicle,omitempty"`
 }
 
 type vehicleRequest struct {
+	Type    string `json:"type"`
 	Plate   string `json:"plate"`
 	Brand   string `json:"brand"`
 	Model   string `json:"model"`
@@ -86,19 +86,28 @@ type bookingResponse struct {
 }
 
 type vehicleResponse struct {
-	Plate   string `json:"plate"`
-	Brand   string `json:"brand"`
-	Model   string `json:"model"`
-	Country string `json:"country"`
+	// Absent for a booking made before vehicles had a type.
+	Type *string `json:"type,omitempty"`
+	// Absent for a bicycle (no plate, and maybe no brand/model).
+	Plate   *string `json:"plate,omitempty"`
+	Brand   *string `json:"brand,omitempty"`
+	Model   *string `json:"model,omitempty"`
+	Country *string `json:"country,omitempty"`
 }
 
-// vehicleResponseFromEntity builds a *vehicleResponse from a booking's vehicle snapshot
-// fields, or nil if none was set -- shared by every response DTO that carries one.
-func vehicleResponseFromEntity(plate, brand, model, country *string) *vehicleResponse {
-	if plate == nil {
+// vehicleResponseFromEntity builds a *vehicleResponse from a booking's vehicle snapshot,
+// or nil if none was picked -- shared by every response DTO that carries one.
+func vehicleResponseFromEntity(booking entity.Booking) *vehicleResponse {
+	if booking.VehicleType == nil && booking.VehiclePlate == nil {
 		return nil
 	}
-	return &vehicleResponse{Plate: *plate, Brand: *brand, Model: *model, Country: *country}
+	return &vehicleResponse{
+		Type:    booking.VehicleType,
+		Plate:   booking.VehiclePlate,
+		Brand:   booking.VehicleBrand,
+		Model:   booking.VehicleModel,
+		Country: booking.VehicleCountry,
+	}
 }
 
 // bookingResponseFromEntity maps a booking to the wire format, rendering every timestamp
@@ -121,7 +130,7 @@ func bookingResponseFromEntity(booking entity.Booking, location *time.Location, 
 		PaymentID:     booking.PaymentID,
 		Kind:          booking.Kind.String(),
 		UpdatedAt:     booking.UpdatedAt.In(location).Format(time.RFC3339),
-		Vehicle:       vehicleResponseFromEntity(booking.VehiclePlate, booking.VehicleBrand, booking.VehicleModel, booking.VehicleCountry),
+		Vehicle:       vehicleResponseFromEntity(booking),
 	}
 	if booking.HoldExpiresAt != nil {
 		formatted := booking.HoldExpiresAt.In(location).Format(time.RFC3339)

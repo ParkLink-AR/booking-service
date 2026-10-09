@@ -51,6 +51,9 @@ func (service *Service) CreateBooking(ctx context.Context, input entity.CreateBo
 	if ownerID == input.UserID {
 		return entity.Booking{}, errors.NewForbidden("no podés reservar tu propia cochera")
 	}
+	if err := service.checkVehicle(ctx, input); err != nil {
+		return entity.Booking{}, err
+	}
 
 	start, end := input.Start, input.End
 	var amount, ownerAmount int
@@ -120,13 +123,13 @@ func (service *Service) CreateBooking(ctx context.Context, input entity.CreateBo
 		Capacity:      capacity,
 		Kind:          input.Kind,
 	}
-	// Entirely optional, and never partially set -- the controller only forwards a vehicle
-	// when all four fields were sent together (see createBookingRequest.Vehicle).
-	if input.VehiclePlate != "" {
-		booking.VehiclePlate = &input.VehiclePlate
-		booking.VehicleBrand = &input.VehicleBrand
-		booking.VehicleModel = &input.VehicleModel
-		booking.VehicleCountry = &input.VehicleCountry
+	// The vehicle the driver picked, if any (see checkVehicle for when one is required).
+	booking.VehicleType = optionalString(input.VehicleType)
+	booking.VehiclePlate = optionalString(input.VehiclePlate)
+	booking.VehicleBrand = optionalString(input.VehicleBrand)
+	booking.VehicleModel = optionalString(input.VehicleModel)
+	if booking.VehicleType != nil || booking.VehiclePlate != nil {
+		booking.VehicleCountry = optionalString(input.VehicleCountry)
 	}
 
 	return service.bookingRepository.CreateBooking(ctx, booking)
@@ -156,7 +159,7 @@ func (service *Service) priceStay(ctx context.Context, input entity.CreateBookin
 	startDate := localStart.Format("2006-01-02")
 	startHour := localStart.Hour()
 
-	quote, err := service.parkingClient.GetStayQuote(ctx, input.ParkingSpotID, startDate, input.StayEndDate, startHour)
+	quote, err := service.parkingClient.GetStayQuote(ctx, input.ParkingSpotID, startDate, input.StayEndDate, startHour, input.VehicleType)
 	if err != nil {
 		return stayQuote{}, err
 	}
@@ -190,7 +193,7 @@ type hourlyPricing struct {
 // requested duration, in centavos -- same rounding convention as parking-service's own
 // stay quote. addCommission then adds the platform's cut on top.
 func (service *Service) priceHourly(ctx context.Context, input entity.CreateBookingInput) (hourlyPricing, error) {
-	pricePerHour, err := service.parkingClient.GetHourlyPrice(ctx, input.ParkingSpotID)
+	pricePerHour, err := service.parkingClient.GetHourlyPrice(ctx, input.ParkingSpotID, input.VehicleType)
 	if err != nil {
 		return hourlyPricing{}, err
 	}
@@ -215,4 +218,38 @@ func (service *Service) addCommission(ctx context.Context, ownerAmount int) (int
 	}
 	commission := ownerAmount * settings.CommissionRateBP / 10000
 	return ownerAmount + commission, nil
+}
+
+// checkVehicle enforces what the spot asks of the booking's vehicle (see
+// entity.SpotVehicleRules): when the owner asks for it, or the price depends on it, the
+// driver has to pick one of their saved vehicles -- with its type, and a plate unless it's
+// a bicycle -- and it has to be a type the spot fits. Otherwise a vehicle is optional, but
+// one that's given still has to fit.
+func (service *Service) checkVehicle(ctx context.Context, input entity.CreateBookingInput) error {
+	rules, err := service.parkingClient.GetVehicleRules(ctx, input.ParkingSpotID)
+	if err != nil {
+		return err
+	}
+	needsVehicle := rules.NeedsVehicle(input.Kind == enum.BookingKindStay)
+	if input.VehicleType == "" {
+		if needsVehicle {
+			return errors.NewInvalidInput("VEHICLE_REQUIRED", "this parking spot needs to know which vehicle you're coming with")
+		}
+		return nil
+	}
+	if !rules.Accepts(input.VehicleType) {
+		return errors.NewInvalidInput("VEHICLE_TYPE_NOT_ACCEPTED", "this parking spot doesn't fit that type of vehicle")
+	}
+	if needsVehicle && input.VehicleType != entity.VehicleTypeBicycle && input.VehiclePlate == "" {
+		return errors.NewInvalidInput("VEHICLE_PLATE_REQUIRED", "this parking spot needs your vehicle's plate")
+	}
+	return nil
+}
+
+// optionalString is nil for "" -- an unset snapshot field.
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }

@@ -127,18 +127,18 @@ func (m *MockParkingClient) EXPECT() *MockParkingClientMockRecorder {
 }
 
 // GetHourlyPrice mocks base method.
-func (m *MockParkingClient) GetHourlyPrice(ctx context.Context, spotID string) (float64, error) {
+func (m *MockParkingClient) GetHourlyPrice(ctx context.Context, spotID, vehicleType string) (float64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetHourlyPrice", ctx, spotID)
+	ret := m.ctrl.Call(m, "GetHourlyPrice", ctx, spotID, vehicleType)
 	ret0, _ := ret[0].(float64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetHourlyPrice indicates an expected call of GetHourlyPrice.
-func (mr *MockParkingClientMockRecorder) GetHourlyPrice(ctx, spotID any) *gomock.Call {
+func (mr *MockParkingClientMockRecorder) GetHourlyPrice(ctx, spotID, vehicleType any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHourlyPrice", reflect.TypeOf((*MockParkingClient)(nil).GetHourlyPrice), ctx, spotID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHourlyPrice", reflect.TypeOf((*MockParkingClient)(nil).GetHourlyPrice), ctx, spotID, vehicleType)
 }
 
 // GetSpotOwnerID mocks base method.
@@ -157,18 +157,33 @@ func (mr *MockParkingClientMockRecorder) GetSpotOwnerID(ctx, spotID any) *gomock
 }
 
 // GetStayQuote mocks base method.
-func (m *MockParkingClient) GetStayQuote(ctx context.Context, spotID, startDate, endDate string, startHour int) (parkingclient.StayQuote, error) {
+func (m *MockParkingClient) GetStayQuote(ctx context.Context, spotID, startDate, endDate string, startHour int, vehicleType string) (parkingclient.StayQuote, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetStayQuote", ctx, spotID, startDate, endDate, startHour)
+	ret := m.ctrl.Call(m, "GetStayQuote", ctx, spotID, startDate, endDate, startHour, vehicleType)
 	ret0, _ := ret[0].(parkingclient.StayQuote)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetStayQuote indicates an expected call of GetStayQuote.
-func (mr *MockParkingClientMockRecorder) GetStayQuote(ctx, spotID, startDate, endDate, startHour any) *gomock.Call {
+func (mr *MockParkingClientMockRecorder) GetStayQuote(ctx, spotID, startDate, endDate, startHour, vehicleType any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStayQuote", reflect.TypeOf((*MockParkingClient)(nil).GetStayQuote), ctx, spotID, startDate, endDate, startHour)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStayQuote", reflect.TypeOf((*MockParkingClient)(nil).GetStayQuote), ctx, spotID, startDate, endDate, startHour, vehicleType)
+}
+
+// GetVehicleRules mocks base method.
+func (m *MockParkingClient) GetVehicleRules(ctx context.Context, spotID string) (entity.SpotVehicleRules, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetVehicleRules", ctx, spotID)
+	ret0, _ := ret[0].(entity.SpotVehicleRules)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetVehicleRules indicates an expected call of GetVehicleRules.
+func (mr *MockParkingClientMockRecorder) GetVehicleRules(ctx, spotID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVehicleRules", reflect.TypeOf((*MockParkingClient)(nil).GetVehicleRules), ctx, spotID)
 }
 
 // IsSpotActive mocks base method.

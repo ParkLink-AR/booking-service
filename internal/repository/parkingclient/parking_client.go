@@ -26,6 +26,13 @@ type spotResponse struct {
 	Title        string   `json:"title"`
 	Status       string   `json:"status"`
 	PricePerHour *float64 `json:"pricePerHour"`
+	// Set when the hourly price depends on the vehicle's type -- PricePerHour is then nil.
+	PricePerHourByVehicleType map[string]float64 `json:"pricePerHourByVehicleType"`
+	// Only whether it's set matters here: parking-service prices the stay itself (see
+	// GetStayQuote), by the vehicle type it's handed.
+	StayPricesByVehicleType map[string]json.RawMessage `json:"stayPricesByVehicleType"`
+	RequireVehicle          bool                       `json:"requireVehicle"`
+	VehicleTypes            []string                   `json:"vehicleTypes"`
 }
 
 // Client calls parking-service directly inside the docker network, the same
@@ -140,15 +147,45 @@ func (client *Client) GetSpotIDsForOwner(ctx context.Context, ownerID string) ([
 // receives per hour, before the platform commission is added on top for the
 // driver -- see Service.priceHourly). Returns an error if the spot has no
 // hourly rate configured (stay-only spots have a nil pricePerHour).
-func (client *Client) GetHourlyPrice(ctx context.Context, spotID string) (float64, error) {
+//
+// vehicleType picks the rate of a spot priced per vehicle type ("" when the driver named
+// none -- Service.checkVehicle already requires one for such a spot).
+func (client *Client) GetHourlyPrice(ctx context.Context, spotID, vehicleType string) (float64, error) {
 	spot, err := client.getSpot(ctx, spotID)
 	if err != nil {
 		return 0, err
+	}
+	if spot.PricePerHourByVehicleType != nil {
+		price, ok := spot.PricePerHourByVehicleType[vehicleType]
+		if !ok || price <= 0 {
+			return 0, errors.NewInvalidInput("VEHICLE_TYPE_NOT_ACCEPTED", "this parking spot has no hourly price for that type of vehicle")
+		}
+		return price, nil
 	}
 	if spot.PricePerHour == nil {
 		return 0, errors.NewInvalidInput("HOURLY_NOT_AVAILABLE", "this parking spot does not accept hourly bookings")
 	}
 	return *spot.PricePerHour, nil
+}
+
+// GetVehicleRules returns what a spot asks of a booking's vehicle -- see
+// entity.SpotVehicleRules. A spot saved before vehicle types existed fits cars only, same
+// fallback parking-service applies.
+func (client *Client) GetVehicleRules(ctx context.Context, spotID string) (entity.SpotVehicleRules, error) {
+	spot, err := client.getSpot(ctx, spotID)
+	if err != nil {
+		return entity.SpotVehicleRules{}, err
+	}
+	accepted := spot.VehicleTypes
+	if len(accepted) == 0 {
+		accepted = []string{"car"}
+	}
+	return entity.SpotVehicleRules{
+		RequireVehicle:        spot.RequireVehicle,
+		HourlyPricedByVehicle: spot.PricePerHourByVehicleType != nil,
+		StayPricedByVehicle:   spot.StayPricesByVehicleType != nil,
+		AcceptedTypes:         accepted,
+	}, nil
 }
 
 // IsSpotActive reports whether a parking spot currently accepts new reservations. A spot
@@ -191,11 +228,17 @@ type parkingServiceError struct {
 // instead of whatever the create-booking request carried, so a modified mobile client
 // can't substitute a cheaper price or a shorter/longer range than what the spot's owner
 // actually configured.
-func (client *Client) GetStayQuote(ctx context.Context, spotID, startDate, endDate string, startHour int) (StayQuote, error) {
+//
+// vehicleType ("" when the driver named none) is what a spot that prices stays per vehicle
+// type quotes by.
+func (client *Client) GetStayQuote(ctx context.Context, spotID, startDate, endDate string, startHour int, vehicleType string) (StayQuote, error) {
 	query := url.Values{
 		"startDate": {startDate},
 		"endDate":   {endDate},
 		"startHour": {strconv.Itoa(startHour)},
+	}
+	if vehicleType != "" {
+		query.Set("vehicleType", vehicleType)
 	}
 	requestURL := fmt.Sprintf("%s/parking-spots/%s/stays/quote?%s", client.baseURL, spotID, query.Encode())
 

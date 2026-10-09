@@ -16,7 +16,7 @@ func (repository *Repository) GetByID(ctx context.Context, bookingID string) (en
 			lower(time_range), upper(time_range),
 			status, hold_expires_at, owner_response_deadline, amount, owner_amount, COALESCE(payment_id, ''), paid_at,
 			cancellation_reason, kind, verification_code, verification_attempts, verified_at, created_at, updated_at,
-			vehicle_plate, vehicle_brand, vehicle_model, vehicle_country
+			vehicle_plate, vehicle_brand, vehicle_model, vehicle_country, vehicle_type
 		FROM `+constants.BookingsTableName+`
 		WHERE id = $1
 	`, bookingID)
@@ -28,7 +28,7 @@ func (repository *Repository) GetByID(ctx context.Context, bookingID string) (en
 		&b.Start, &b.End,
 		&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.OwnerAmount, &b.PaymentID, &b.PaidAt,
 		&b.CancellationReason, &kindLabel, &b.VerificationCode, &b.VerificationAttempts, &b.VerifiedAt, &b.CreatedAt, &b.UpdatedAt,
-		&b.VehiclePlate, &b.VehicleBrand, &b.VehicleModel, &b.VehicleCountry,
+		&b.VehiclePlate, &b.VehicleBrand, &b.VehicleModel, &b.VehicleCountry, &b.VehicleType,
 	); err != nil {
 		return entity.Booking{}, errors.NewNotFound("booking", bookingID)
 	}

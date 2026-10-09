@@ -66,7 +66,7 @@ func verificationReviewResponseFromEntity(booking entity.Booking, location *time
 		OwnerAmount:   booking.OwnerAmount,
 		PaymentID:     booking.PaymentID,
 		UpdatedAt:     booking.UpdatedAt.In(location).Format(time.RFC3339),
-		Vehicle:       vehicleResponseFromEntity(booking.VehiclePlate, booking.VehicleBrand, booking.VehicleModel, booking.VehicleCountry),
+		Vehicle:       vehicleResponseFromEntity(booking),
 	}
 	if booking.PaidAt != nil {
 		formatted := booking.PaidAt.In(location).Format(time.RFC3339)

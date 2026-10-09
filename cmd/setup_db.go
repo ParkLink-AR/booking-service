@@ -252,6 +252,11 @@ func runMigrations(database *sql.DB) error {
 		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS vehicle_model TEXT;
 		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS vehicle_country TEXT;
 
+		-- migrations/022: the type of that vehicle (car/suv/pickup/van/motorcycle/bicycle)
+		-- -- decides the price of a spot that charges per vehicle type. A bicycle has a type
+		-- but no plate.
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS vehicle_type TEXT;
+
 		-- migrations/020: flags a paid booking that completed without its in-person arrival
 		-- code ever being verified, for an admin to review before the owner is paid --
 		-- PENDING blocks the payout until it's APPROVED (paid out) or REFUNDED (driver gets
