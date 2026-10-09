@@ -13,13 +13,19 @@ import (
 
 // internalBookingResponse is what payment-service needs to charge for a booking: whose it
 // is, whether it's still awaiting payment, and the server-side price -- so the checkout
-// amount never comes from the client.
+// amount never comes from the client. The spot, dates and kind (and why it was cancelled)
+// are for the admin panel's failed refunds, which payment-service lists with their booking.
 type internalBookingResponse struct {
-	ID            string  `json:"id"`
-	UserID        string  `json:"user_id"`
-	Status        string  `json:"status"`
-	Amount        int     `json:"amount"`
-	HoldExpiresAt *string `json:"hold_expires_at,omitempty"`
+	ID                 string  `json:"id"`
+	UserID             string  `json:"user_id"`
+	ParkingSpotID      string  `json:"parking_spot_id"`
+	Status             string  `json:"status"`
+	Kind               string  `json:"kind"`
+	Start              string  `json:"start"`
+	End                string  `json:"end"`
+	Amount             int     `json:"amount"`
+	CancellationReason *string `json:"cancellation_reason,omitempty"`
+	HoldExpiresAt      *string `json:"hold_expires_at,omitempty"`
 }
 
 // GetInternalBookingEndpoint serves GET /internal/bookings/{id}, service-to-service only
@@ -46,10 +52,15 @@ func (handler *Handler) GetInternalBookingEndpoint(responseWriter http.ResponseW
 	}
 
 	response := internalBookingResponse{
-		ID:     booking.ID,
-		UserID: booking.UserID,
-		Status: booking.Status.String(),
-		Amount: booking.Amount,
+		ID:                 booking.ID,
+		UserID:             booking.UserID,
+		ParkingSpotID:      booking.ParkingSpotID,
+		Status:             booking.Status.String(),
+		Kind:               booking.Kind.String(),
+		Start:              booking.Start.UTC().Format(time.RFC3339),
+		End:                booking.End.UTC().Format(time.RFC3339),
+		Amount:             booking.Amount,
+		CancellationReason: booking.CancellationReason,
 	}
 	if booking.HoldExpiresAt != nil {
 		formatted := booking.HoldExpiresAt.UTC().Format(time.RFC3339)

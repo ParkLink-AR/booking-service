@@ -59,8 +59,16 @@ func (client *Client) RefundPayment(ctx context.Context, paymentID string) error
 	}
 	defer response.Body.Close()
 
-	if response.StatusCode != http.StatusOK {
+	switch response.StatusCode {
+	case http.StatusOK:
+		return nil
+	case http.StatusAccepted:
+		// Mercado Pago failed the refund, but payment-service has it on record as owed: its
+		// retry job tries again and the admin panel lists it until someone resolves it. The
+		// cancellation that asked for it stands -- not an error for whoever called it off
+		// (payment-service logs the failure itself).
+		return nil
+	default:
 		return errors.NewUpstream("paymentclient.RefundPayment", fmt.Errorf("unexpected status %d", response.StatusCode))
 	}
-	return nil
 }

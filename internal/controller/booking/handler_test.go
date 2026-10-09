@@ -440,6 +440,28 @@ func (s *handlerSuite) TestGetInternalBookingEndpoint_ReturnsServerSidePrice() {
 	s.Contains(recorder.Body.String(), `"status":"PENDING_PAYMENT"`)
 }
 
+func (s *handlerSuite) TestGetInternalBookingEndpoint_IncludesSpotDatesAndCancellation() {
+	reason := "OWNER_REJECTED"
+	start := time.Date(2026, 10, 17, 0, 0, 0, 0, time.UTC)
+	s.getBookingUseCase.EXPECT().Execute(gomock.Any(), validParkingSpotID, entity.BookingViewer{Privileged: true}).
+		Return(entity.Booking{
+			ID: validParkingSpotID, UserID: validUserID, ParkingSpotID: validParkingSpotID,
+			Status: enum.BookingStatusCancelled, Kind: enum.BookingKindStay,
+			Start: start, End: start.Add(24 * time.Hour), Amount: 864000, CancellationReason: &reason,
+		}, nil)
+
+	recorder := s.doWithHeaders(http.MethodGet, "/internal/bookings/"+validParkingSpotID, "",
+		map[string]string{"X-Internal-Key": testInternalServiceKey})
+
+	s.Equal(http.StatusOK, recorder.Code)
+	body := recorder.Body.String()
+	s.Contains(body, `"parking_spot_id":"`+validParkingSpotID+`"`)
+	s.Contains(body, `"start":"2026-10-17T00:00:00Z"`)
+	s.Contains(body, `"end":"2026-10-18T00:00:00Z"`)
+	s.Contains(body, `"cancellation_reason":"OWNER_REJECTED"`)
+	s.Contains(body, `"status":"CANCELLED"`)
+}
+
 func (s *handlerSuite) TestListBookingsByUserEndpoint_ForbidsOtherUsers() {
 	recorder := s.doWithHeaders(http.MethodGet, "/users/"+validParkingSpotID+"/bookings/history", "",
 		map[string]string{"X-User-Id": validUserID})

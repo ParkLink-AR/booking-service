@@ -59,11 +59,12 @@ func (uc *RejectBookingUseCase) Execute(ctx context.Context, bookingID, callerID
 	emitBookingEvent(ctx, uc.events, RoutingKeyBookingCancelled,
 		newBookingCancelledEvent(rejected, spot, CancelledByOwnerRejected))
 
-	// The booking is already CANCELLED at this point even if the refund call
-	// below fails -- retrying by calling reject again won't work (status is
-	// no longer PENDING_OWNER_APPROVAL), so a failure here needs manual
-	// follow-up. Surfaced to the caller as an upstream error rather than
-	// silently swallowed.
+	// The booking is already CANCELLED at this point. A refund Mercado Pago fails is not
+	// an error here: payment-service keeps it on record as owed (its retry job, and the
+	// admin panel's "Reembolsos pendientes"). Only a refund that couldn't even be put on
+	// record (payment-service unreachable, no transaction to flag) is surfaced to the
+	// caller -- retrying the reject won't work (no longer PENDING_OWNER_APPROVAL), so it
+	// needs manual follow-up.
 	if err := uc.refunder.RefundPayment(ctx, rejected.PaymentID); err != nil {
 		return entity.Booking{}, err
 	}

@@ -56,6 +56,19 @@ func (s *paymentClientSuite) TestRefundPayment_RealPaymentID_CallsPaymentService
 	s.Equal(1, s.requestCount)
 }
 
+func (s *paymentClientSuite) TestRefundPayment_RefundQueuedForRetry_IsNotAnError() {
+	// 202: Mercado Pago failed it, but payment-service has the refund on record as owed
+	// (retry job + admin panel) -- the cancellation that asked for it must still succeed.
+	server := s.newServer(http.StatusAccepted)
+	defer server.Close()
+	client := paymentclient.NewClient(server.URL, "internal-key")
+
+	err := client.RefundPayment(s.context, "mp-payment-123")
+
+	s.NoError(err)
+	s.Equal(1, s.requestCount)
+}
+
 func (s *paymentClientSuite) TestRefundPayment_PaymentServiceRejects_ReturnsUpstreamError() {
 	server := s.newServer(http.StatusBadGateway)
 	defer server.Close()
