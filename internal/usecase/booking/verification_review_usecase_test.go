@@ -33,7 +33,7 @@ func (s *resolveVerificationReviewUseCaseSuite) SetupTest() {
 	s.controller = gomock.NewController(s.T())
 	s.resolver = mocks.NewMockVerificationReviewResolver(s.controller)
 	s.refunder = mocks.NewMockPaymentRefunder(s.controller)
-	s.useCase = booking.NewResolveVerificationReviewUseCase(s.resolver, s.refunder)
+	s.useCase = booking.NewResolveVerificationReviewUseCase(s.resolver, s.refunder, nil, nil)
 	s.context = context.Background()
 	s.bookingID = "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"
 }

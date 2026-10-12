@@ -274,6 +274,13 @@ func runMigrations(database *sql.DB) error {
 			));
 		CREATE INDEX IF NOT EXISTS idx_bookings_verification_review_pending
 			ON bookings (updated_at) WHERE verification_review = 'PENDING';
+
+		-- migrations/023: when each reminder about a booking went out (see
+		-- SendBookingRemindersUseCase) -- set in the same UPDATE that picks it up, so each
+		-- reminder is sent once.
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS approval_reminder_sent_at TIMESTAMPTZ;
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS start_reminder_sent_at TIMESTAMPTZ;
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS end_reminder_sent_at TIMESTAMPTZ;
 	`)
 	return err
 }

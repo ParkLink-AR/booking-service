@@ -40,7 +40,7 @@ func (s *submitReviewUseCaseSuite) SetupTest() {
 	s.getter = mocks.NewMockBookingGetter(s.controller)
 	s.owners = mocks.NewMockSpotOwnerLookup(s.controller)
 	s.reviews = mocks.NewMockReviewCreator(s.controller)
-	s.useCase = booking.NewSubmitReviewUseCase(s.getter, s.owners, s.reviews)
+	s.useCase = booking.NewSubmitReviewUseCase(s.getter, s.owners, s.reviews, nil, nil)
 	s.context = context.Background()
 }
 

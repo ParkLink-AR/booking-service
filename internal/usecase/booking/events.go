@@ -21,6 +21,9 @@ const (
 	RoutingKeyBookingMessageSent     = "booking.message_sent"
 	RoutingKeySupportTicketReplied   = "support.ticket_replied"
 	RoutingKeySettlementPaid         = "settlement.paid"
+	// An admin drafted a settlement (froze the owner's pending payouts into it) -- the
+	// bank transfer comes next, announced by settlement.paid.
+	RoutingKeySettlementDrafted = "settlement.drafted"
 	// A paid booking was cancelled before it started -- by the owner (rejected it, or never
 	// answered in time), by the driver, or because one side's account was closed or
 	// suspended (see AccountClosureUseCase). cancelled_by says which.
@@ -28,6 +31,26 @@ const (
 	// A stay's time window ended (see CompleteFinishedBookingsUseCase): both sides are
 	// asked to review each other.
 	RoutingKeyBookingCompleted = "booking.completed"
+	// An admin decided on a booking that completed without its arrival code verified (see
+	// ResolveVerificationReviewUseCase): decision "approved" releases the owner's payout,
+	// "refunded" gives the driver their money back.
+	RoutingKeyBookingVerificationReviewed = "booking.verification_reviewed"
+	// Reminders (see SendBookingRemindersUseCase): to the owner before a booking request
+	// expires unanswered, to both sides before a booking starts, and to the driver before a
+	// stay ends.
+	RoutingKeyBookingApprovalReminder = "booking.approval_reminder"
+	RoutingKeyBookingStartingSoon     = "booking.starting_soon"
+	RoutingKeyBookingEndingSoon       = "booking.ending_soon"
+	// Someone reviewed the other side of a booking (the owner, or the driver).
+	RoutingKeyReviewReceived = "review.received"
+	// Staff resolved or closed a support ticket.
+	RoutingKeySupportTicketClosed = "support.ticket_closed"
+)
+
+// Values of booking.verification_reviewed's decision.
+const (
+	VerificationDecisionApproved = "approved"
+	VerificationDecisionRefunded = "refunded"
 )
 
 // Values of booking.cancelled's cancelled_by: who or what called the booking off.
@@ -101,6 +124,79 @@ func newBookingCancelledEvent(b entity.Booking, spot entity.SpotDetails, cancell
 	return bookingCancelledEvent{
 		bookingEvent: newBookingEvent(RoutingKeyBookingCancelled, b, spot),
 		CancelledBy:  cancelledBy,
+	}
+}
+
+// bookingVerificationReviewedEvent is the wire shape of booking.verification_reviewed: the
+// booking plus the admin's decision (one of the VerificationDecision* values).
+type bookingVerificationReviewedEvent struct {
+	bookingEvent
+	Decision string `json:"decision"`
+}
+
+func newBookingVerificationReviewedEvent(b entity.Booking, spot entity.SpotDetails, decision string) bookingVerificationReviewedEvent {
+	return bookingVerificationReviewedEvent{
+		bookingEvent: newBookingEvent(RoutingKeyBookingVerificationReviewed, b, spot),
+		Decision:     decision,
+	}
+}
+
+// reviewReceivedEvent is the wire shape of review.received: who got reviewed, by which
+// side, on which booking, and how many stars.
+type reviewReceivedEvent struct {
+	EventID          string    `json:"event_id"`
+	EventType        string    `json:"event_type"`
+	OccurredAt       time.Time `json:"occurred_at"`
+	BookingID        string    `json:"booking_id"`
+	ParkingSpotID    string    `json:"parking_spot_id"`
+	ParkingSpotTitle string    `json:"parking_spot_title"`
+	ReviewerUserID   string    `json:"reviewer_user_id"`
+	RecipientUserID  string    `json:"recipient_user_id"`
+	RecipientRole    string    `json:"recipient_role"`
+	Rating           int       `json:"rating"`
+}
+
+func newReviewReceivedEvent(review entity.Review, b entity.Booking, spot entity.SpotDetails, recipientRole string) reviewReceivedEvent {
+	return reviewReceivedEvent{
+		EventID:          uuid.NewString(),
+		EventType:        RoutingKeyReviewReceived,
+		OccurredAt:       time.Now().UTC(),
+		BookingID:        b.ID,
+		ParkingSpotID:    b.ParkingSpotID,
+		ParkingSpotTitle: spot.Title,
+		ReviewerUserID:   review.ReviewerID,
+		RecipientUserID:  review.TargetID,
+		RecipientRole:    recipientRole,
+		Rating:           review.Rating,
+	}
+}
+
+// supportTicketClosedEvent is the wire shape of support.ticket_closed -- staff marked a
+// ticket RESOLVED or CLOSED.
+type supportTicketClosedEvent struct {
+	EventID         string    `json:"event_id"`
+	EventType       string    `json:"event_type"`
+	OccurredAt      time.Time `json:"occurred_at"`
+	TicketID        string    `json:"ticket_id"`
+	BookingID       string    `json:"booking_id"`
+	TicketSubject   string    `json:"ticket_subject"`
+	RecipientUserID string    `json:"recipient_user_id"`
+	// Empty when the ticket's booking couldn't be looked up.
+	RecipientRole string `json:"recipient_role"`
+	Status        string `json:"status"`
+}
+
+func newSupportTicketClosedEvent(ticket entity.SupportTicket, recipientRole string) supportTicketClosedEvent {
+	return supportTicketClosedEvent{
+		EventID:         uuid.NewString(),
+		EventType:       RoutingKeySupportTicketClosed,
+		OccurredAt:      time.Now().UTC(),
+		TicketID:        ticket.ID,
+		BookingID:       ticket.BookingID,
+		TicketSubject:   ticket.Subject,
+		RecipientUserID: ticket.CreatedBy,
+		RecipientRole:   recipientRole,
+		Status:          ticket.Status.String(),
 	}
 }
 
@@ -183,9 +279,18 @@ type settlementPaidEvent struct {
 }
 
 func newSettlementPaidEvent(settlement entity.Settlement, bookingCount int) settlementPaidEvent {
+	return newSettlementEvent(RoutingKeySettlementPaid, settlement, bookingCount)
+}
+
+// newSettlementDraftedEvent is settlement.drafted -- same shape as settlement.paid.
+func newSettlementDraftedEvent(settlement entity.Settlement, bookingCount int) settlementPaidEvent {
+	return newSettlementEvent(RoutingKeySettlementDrafted, settlement, bookingCount)
+}
+
+func newSettlementEvent(eventType string, settlement entity.Settlement, bookingCount int) settlementPaidEvent {
 	return settlementPaidEvent{
 		EventID:         uuid.NewString(),
-		EventType:       RoutingKeySettlementPaid,
+		EventType:       eventType,
 		OccurredAt:      time.Now().UTC(),
 		SettlementID:    settlement.ID,
 		RecipientUserID: settlement.OwnerID,

@@ -80,7 +80,12 @@ func extensionFor(contentType string) string {
 // proof for the same settlement overwrites the previous object at that key -- acceptable since
 // a settlement can only be confirmed once (see ConfirmSettlement's PENDING-only check), so this
 // path is never written twice for the same settlement.
+//
+// An image proof is compressed first (see compressImage); anything else is stored as sent.
 func (client *Client) UploadPayoutProof(ctx context.Context, ownerID, key, contentType string, data []byte) (string, error) {
+	if compressed, ok := compressImage(data); ok {
+		data, contentType = compressed, "image/jpeg"
+	}
 	objectKey := fmt.Sprintf("payout-proofs/%s/%s.%s", ownerID, key, extensionFor(contentType))
 
 	if _, err := client.s3Client.PutObject(ctx, &s3.PutObjectInput{

@@ -31,7 +31,7 @@ type draftSettlementUseCaseSuite struct {
 func (s *draftSettlementUseCaseSuite) SetupTest() {
 	s.controller = gomock.NewController(s.T())
 	s.settlements = mocks.NewMockSettlementDrafter(s.controller)
-	s.useCase = booking.NewDraftSettlementUseCase(s.settlements)
+	s.useCase = booking.NewDraftSettlementUseCase(s.settlements, nil)
 	s.context = context.Background()
 
 	s.ownerID = "11111111-1111-1111-1111-111111111111"

@@ -31,7 +31,7 @@ type updateTicketStatusUseCaseSuite struct {
 func (s *updateTicketStatusUseCaseSuite) SetupTest() {
 	s.controller = gomock.NewController(s.T())
 	s.status = mocks.NewMockTicketStatusUpdater(s.controller)
-	s.useCase = booking.NewUpdateTicketStatusUseCase(s.status)
+	s.useCase = booking.NewUpdateTicketStatusUseCase(s.status, nil, nil)
 	s.context = context.Background()
 
 	s.ticketID = "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"

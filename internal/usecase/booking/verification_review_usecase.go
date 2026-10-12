@@ -41,13 +41,23 @@ func (uc *ListPendingVerificationReviewsUseCase) Execute(ctx context.Context) ([
 // ResolveVerificationReviewUseCase records an admin's decision on a booking that completed
 // without its arrival ever being verified: APPROVED lets the owner's payout go ahead,
 // REFUNDED gives the driver their money back and the owner is never paid for it.
+//
+// Both sides hear about the decision (booking.verification_reviewed): the owner, whether
+// they get paid for it; the driver, when they're refunded.
 type ResolveVerificationReviewUseCase struct {
 	resolver VerificationReviewResolver
 	refunder PaymentRefunder
+	spots    SpotDetailsLookup
+	events   EventPublisher
 }
 
-func NewResolveVerificationReviewUseCase(resolver VerificationReviewResolver, refunder PaymentRefunder) *ResolveVerificationReviewUseCase {
-	return &ResolveVerificationReviewUseCase{resolver: resolver, refunder: refunder}
+func NewResolveVerificationReviewUseCase(
+	resolver VerificationReviewResolver,
+	refunder PaymentRefunder,
+	spots SpotDetailsLookup,
+	events EventPublisher,
+) *ResolveVerificationReviewUseCase {
+	return &ResolveVerificationReviewUseCase{resolver: resolver, refunder: refunder, spots: spots, events: events}
 }
 
 // Execute resolves bookingID's PENDING review as review, which must be APPROVED or
@@ -73,6 +83,16 @@ func (uc *ResolveVerificationReviewUseCase) Execute(
 		if err := uc.refunder.RefundPayment(ctx, resolved.PaymentID); err != nil {
 			return entity.Booking{}, err
 		}
+	}
+
+	decision := VerificationDecisionApproved
+	if review == enum.VerificationReviewRefunded {
+		decision = VerificationDecisionRefunded
+	}
+	if uc.events != nil {
+		spot, _ := uc.spots.GetSpotDetails(ctx, resolved.ParkingSpotID)
+		emitBookingEvent(ctx, uc.events, RoutingKeyBookingVerificationReviewed,
+			newBookingVerificationReviewedEvent(resolved, spot, decision))
 	}
 	return resolved, nil
 }

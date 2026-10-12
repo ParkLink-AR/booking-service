@@ -20,14 +20,21 @@ type SettlementDrafter interface {
 // owner's payouts. It only freezes the amount owed; it does NOT assert any money has moved
 // and does NOT publish any event -- that's ConfirmSettlementUseCase's job, once an admin
 // confirms the bank transfer actually went out.
+// The owner is told their settlement is being prepared (settlement.drafted).
 type DraftSettlementUseCase struct {
 	settlements SettlementDrafter
+	events      EventPublisher
 }
 
-func NewDraftSettlementUseCase(settlements SettlementDrafter) *DraftSettlementUseCase {
-	return &DraftSettlementUseCase{settlements: settlements}
+func NewDraftSettlementUseCase(settlements SettlementDrafter, events EventPublisher) *DraftSettlementUseCase {
+	return &DraftSettlementUseCase{settlements: settlements, events: events}
 }
 
 func (uc *DraftSettlementUseCase) Execute(ctx context.Context, ownerID, adminUserID string) (entity.Settlement, []entity.Payout, error) {
-	return uc.settlements.CreateSettlementDraft(ctx, ownerID, adminUserID)
+	settlement, payouts, err := uc.settlements.CreateSettlementDraft(ctx, ownerID, adminUserID)
+	if err != nil {
+		return entity.Settlement{}, nil, err
+	}
+	emitBookingEvent(ctx, uc.events, RoutingKeySettlementDrafted, newSettlementDraftedEvent(settlement, len(payouts)))
+	return settlement, payouts, nil
 }

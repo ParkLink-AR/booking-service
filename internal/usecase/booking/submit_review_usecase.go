@@ -23,10 +23,18 @@ type SubmitReviewUseCase struct {
 	getter  BookingGetter
 	owners  SpotOwnerLookup
 	reviews ReviewCreator
+	spots   SpotDetailsLookup
+	events  EventPublisher
 }
 
-func NewSubmitReviewUseCase(getter BookingGetter, owners SpotOwnerLookup, reviews ReviewCreator) *SubmitReviewUseCase {
-	return &SubmitReviewUseCase{getter: getter, owners: owners, reviews: reviews}
+func NewSubmitReviewUseCase(
+	getter BookingGetter,
+	owners SpotOwnerLookup,
+	reviews ReviewCreator,
+	spots SpotDetailsLookup,
+	events EventPublisher,
+) *SubmitReviewUseCase {
+	return &SubmitReviewUseCase{getter: getter, owners: owners, reviews: reviews, spots: spots, events: events}
 }
 
 func (uc *SubmitReviewUseCase) Execute(
@@ -69,7 +77,28 @@ func (uc *SubmitReviewUseCase) Execute(
 	if !created {
 		return entity.Review{}, errors.NewConflict("ya calificaste esto")
 	}
+	uc.announce(ctx, saved, booking)
 	return saved, nil
+}
+
+// announce tells the reviewed person they got a review (review.received). Only reviews of
+// a person: the driver rates the spot and its owner together, so the owner hears about it
+// once, from the owner review.
+func (uc *SubmitReviewUseCase) announce(ctx context.Context, review entity.Review, booking entity.Booking) {
+	if uc.events == nil {
+		return
+	}
+	var recipientRole string
+	switch review.TargetType {
+	case enum.ReviewTargetOwner:
+		recipientRole = RecipientRoleOwner
+	case enum.ReviewTargetDriver:
+		recipientRole = RecipientRoleDriver
+	default:
+		return
+	}
+	spot, _ := uc.spots.GetSpotDetails(ctx, booking.ParkingSpotID)
+	emitBookingEvent(ctx, uc.events, RoutingKeyReviewReceived, newReviewReceivedEvent(review, booking, spot, recipientRole))
 }
 
 // resolveTarget maps a target type to the user/spot id being rated, and checks that
