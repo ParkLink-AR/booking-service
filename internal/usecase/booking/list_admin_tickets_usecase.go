@@ -12,7 +12,7 @@ import (
 // AllTicketLister reads every support ticket across every booking, optionally filtered by
 // status. Implemented by internal/repository/booking.
 type AllTicketLister interface {
-	ListAllTickets(ctx context.Context, status *enum.TicketStatus) ([]entity.SupportTicket, error)
+	ListAllTickets(ctx context.Context, status *enum.TicketStatus) ([]entity.AdminTicket, error)
 }
 
 // ListAdminTicketsUseCase powers GET /admin/tickets. There's no per-caller ownership check
@@ -26,6 +26,6 @@ func NewListAdminTicketsUseCase(tickets AllTicketLister) *ListAdminTicketsUseCas
 	return &ListAdminTicketsUseCase{tickets: tickets}
 }
 
-func (uc *ListAdminTicketsUseCase) Execute(ctx context.Context, status *enum.TicketStatus) ([]entity.SupportTicket, error) {
+func (uc *ListAdminTicketsUseCase) Execute(ctx context.Context, status *enum.TicketStatus) ([]entity.AdminTicket, error) {
 	return uc.tickets.ListAllTickets(ctx, status)
 }

@@ -175,6 +175,25 @@ func (s *serviceSuite) TestListBookings_ActiveOnlyExcludesInactiveAndExpiredHold
 	s.Equal(enum.BookingStatusInProgress, got[0].Bookings[1].Status)
 }
 
+// A booking that's already paid and only waits for the owner holds its spot: availability
+// must show it as taken, or the driver is offered a slot that CreateBooking then refuses.
+func (s *serviceSuite) TestListBookings_ActiveOnlyCountsPendingOwnerApproval() {
+	start := s.localDate(18).Add(10 * time.Hour).UTC()
+	end := s.localDate(18).Add(11 * time.Hour).UTC()
+	awaitingOwner := entity.BookingWindow{Start: start, End: end, Status: enum.BookingStatusPendingOwnerApproval}
+
+	s.bookingRepository.EXPECT().
+		ListBookings(gomock.Any(), s.parkingSpotID, (*time.Time)(nil), (*time.Time)(nil), (*enum.BookingStatus)(nil)).
+		Return([]entity.BookingWindow{awaitingOwner}, nil)
+
+	got, err := s.service.ListBookings(s.context, s.parkingSpotID, nil, nil, nil, true)
+
+	s.Require().NoError(err)
+	s.Require().Len(got, 1)
+	s.Require().Len(got[0].Bookings, 1)
+	s.Equal(enum.BookingStatusPendingOwnerApproval, got[0].Bookings[0].Status)
+}
+
 // The grace period only shows up in the occupancy view: active listings are padded on both
 // sides and the requested range is widened to match, while the plain listing is untouched.
 func (s *serviceSuite) TestListBookings_ActiveOnlyPadsWindowsAndWidensRangeByGracePeriod() {

@@ -37,7 +37,7 @@ func (s *listAdminTicketsUseCaseSuite) TearDownTest() {
 }
 
 func (s *listAdminTicketsUseCaseSuite) TestExecute_NoFilter_ListsEverything() {
-	want := []entity.SupportTicket{{ID: "ticket-1"}, {ID: "ticket-2"}}
+	want := []entity.AdminTicket{{SupportTicket: entity.SupportTicket{ID: "ticket-1"}}, {SupportTicket: entity.SupportTicket{ID: "ticket-2"}}}
 	s.tickets.EXPECT().ListAllTickets(gomock.Any(), (*enum.TicketStatus)(nil)).Return(want, nil)
 
 	got, err := s.useCase.Execute(s.context, nil)

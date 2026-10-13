@@ -25,6 +25,7 @@ type createTicketUseCaseSuite struct {
 	owners     *mocks.MockSpotOwnerLookup
 	tickets    *mocks.MockTicketCreator
 	messages   *mocks.MockTicketMessageCreator
+	events     *mocks.MockEventPublisher
 	useCase    *booking.CreateTicketUseCase
 	context    context.Context
 
@@ -39,7 +40,8 @@ func (s *createTicketUseCaseSuite) SetupTest() {
 	s.owners = mocks.NewMockSpotOwnerLookup(s.controller)
 	s.tickets = mocks.NewMockTicketCreator(s.controller)
 	s.messages = mocks.NewMockTicketMessageCreator(s.controller)
-	s.useCase = booking.NewCreateTicketUseCase(s.getter, s.owners, s.tickets, s.messages)
+	s.events = mocks.NewMockEventPublisher(s.controller)
+	s.useCase = booking.NewCreateTicketUseCase(s.getter, s.owners, s.tickets, s.messages, s.events)
 	s.context = context.Background()
 
 	s.bookingID = "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"
@@ -75,6 +77,17 @@ func (s *createTicketUseCaseSuite) TestExecute_Driver_CreatesTicketAndOpeningMes
 		},
 	)
 
+	s.events.EXPECT().Publish(gomock.Any(), booking.RoutingKeySupportTicketOpened, gomock.Any()).DoAndReturn(
+		func(_ context.Context, _ string, payload any) error {
+			event := toJSONMap(s.T(), payload)
+			s.Equal("ticket-1", event["ticket_id"])
+			s.Equal("No me devolvieron el pago", event["ticket_subject"])
+			s.Equal(booking.RecipientRoleDriver, event["author_role"])
+			s.Equal("Cancelé hace 3 días y no vi el reembolso", event["body"])
+			return nil
+		},
+	)
+
 	got, err := s.useCase.Execute(s.context, s.bookingID, s.driverID, "No me devolvieron el pago", "Cancelé hace 3 días y no vi el reembolso")
 
 	s.Require().NoError(err)
@@ -92,6 +105,12 @@ func (s *createTicketUseCaseSuite) TestExecute_Owner_CreatesTicket() {
 		},
 	)
 	s.messages.EXPECT().CreateTicketMessage(gomock.Any(), gomock.Any()).Return(entity.SupportTicketMessage{}, nil)
+	s.events.EXPECT().Publish(gomock.Any(), booking.RoutingKeySupportTicketOpened, gomock.Any()).DoAndReturn(
+		func(_ context.Context, _ string, payload any) error {
+			s.Equal(booking.RecipientRoleOwner, toJSONMap(s.T(), payload)["author_role"])
+			return nil
+		},
+	)
 
 	_, err := s.useCase.Execute(s.context, s.bookingID, s.ownerID, "El conductor rompió la barrera", "Necesito coordinar la reparación")
 

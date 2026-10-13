@@ -30,3 +30,34 @@ type TicketSummary struct {
 	LastAdminReplyID *string
 	LastAdminReplyAt *time.Time
 }
+
+// AdminTicket is a support ticket as ParkLink staff triage it: who opened it (the booking's
+// driver or the spot's owner), where the conversation stands (who wrote last, and when), and
+// the booking it's about -- everything the support list needs without a request per ticket.
+type AdminTicket struct {
+	SupportTicket
+	// When the last message on the thread was sent, and whether it came from staff. Nil when
+	// the thread has no messages (a ticket is always created with its first one).
+	LastMessageAt        *time.Time
+	LastMessageFromStaff bool
+	// The booking's driver: the ticket's creator is either them or the spot's owner.
+	BookingUserID string
+	ParkingSpotID string
+	BookingStart  time.Time
+	BookingEnd    time.Time
+	BookingStatus string
+	BookingKind   string
+}
+
+// CreatorIsDriver reports whether the ticket was opened by the booking's driver (otherwise
+// it was the spot's owner -- the only other side allowed to open one).
+func (ticket AdminTicket) CreatorIsDriver() bool {
+	return ticket.CreatedBy == ticket.BookingUserID
+}
+
+// AwaitingReply reports whether the ticket is waiting on ParkLink: still open or in progress,
+// and the user wrote last.
+func (ticket AdminTicket) AwaitingReply() bool {
+	active := ticket.Status == enum.TicketStatusOpen || ticket.Status == enum.TicketStatusInProgress
+	return active && ticket.LastMessageAt != nil && !ticket.LastMessageFromStaff
+}

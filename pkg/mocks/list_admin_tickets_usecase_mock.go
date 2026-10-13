@@ -42,10 +42,10 @@ func (m *MockListAdminTicketsUseCase) EXPECT() *MockListAdminTicketsUseCaseMockR
 }
 
 // Execute mocks base method.
-func (m *MockListAdminTicketsUseCase) Execute(ctx context.Context, status *enum.TicketStatus) ([]entity.SupportTicket, error) {
+func (m *MockListAdminTicketsUseCase) Execute(ctx context.Context, status *enum.TicketStatus) ([]entity.AdminTicket, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Execute", ctx, status)
-	ret0, _ := ret[0].([]entity.SupportTicket)
+	ret0, _ := ret[0].([]entity.AdminTicket)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

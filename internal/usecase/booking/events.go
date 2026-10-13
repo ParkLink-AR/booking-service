@@ -45,6 +45,10 @@ const (
 	RoutingKeyReviewReceived = "review.received"
 	// Staff resolved or closed a support ticket.
 	RoutingKeySupportTicketClosed = "support.ticket_closed"
+	// A user opened a support ticket, or wrote on one: ParkLink staff are told (by email to
+	// the support inbox), since nobody may be looking at the admin panel at the time.
+	RoutingKeySupportTicketOpened      = "support.ticket_opened"
+	RoutingKeySupportTicketUserMessage = "support.ticket_user_message"
 )
 
 // Values of booking.verification_reviewed's decision.
@@ -309,4 +313,34 @@ func emitBookingEvent(ctx context.Context, publisher EventPublisher, routingKey 
 		return
 	}
 	_ = publisher.Publish(ctx, routingKey, e)
+}
+
+// supportTicketStaffEvent is the wire shape of support.ticket_opened and
+// support.ticket_user_message: what a user wrote on a ticket, for the email to ParkLink's
+// support inbox.
+type supportTicketStaffEvent struct {
+	EventID       string    `json:"event_id"`
+	EventType     string    `json:"event_type"`
+	OccurredAt    time.Time `json:"occurred_at"`
+	TicketID      string    `json:"ticket_id"`
+	BookingID     string    `json:"booking_id"`
+	TicketSubject string    `json:"ticket_subject"`
+	AuthorUserID  string    `json:"author_user_id"`
+	// "driver" or "owner"; empty when the ticket's booking couldn't be looked up.
+	AuthorRole string `json:"author_role"`
+	Body       string `json:"body"`
+}
+
+func newSupportTicketStaffEvent(eventType string, ticket entity.SupportTicket, authorRole, body string) supportTicketStaffEvent {
+	return supportTicketStaffEvent{
+		EventID:       uuid.NewString(),
+		EventType:     eventType,
+		OccurredAt:    time.Now().UTC(),
+		TicketID:      ticket.ID,
+		BookingID:     ticket.BookingID,
+		TicketSubject: ticket.Subject,
+		AuthorUserID:  ticket.CreatedBy,
+		AuthorRole:    authorRole,
+		Body:          body,
+	}
 }

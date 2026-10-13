@@ -40,7 +40,7 @@ func (repository *Repository) CreateBooking(ctx context.Context, booking entity.
 		FROM `+constants.BookingsTableName+`
 		WHERE parking_spot_id = $1
 		  AND (
-		    status IN ('CONFIRMED', 'IN_PROGRESS')
+		    status IN ('CONFIRMED', 'IN_PROGRESS', 'PENDING_OWNER_APPROVAL')
 		    OR (status = 'PENDING_PAYMENT' AND hold_expires_at > now())
 		  )
 		  AND time_range && tstzrange($2, $3, '[)')

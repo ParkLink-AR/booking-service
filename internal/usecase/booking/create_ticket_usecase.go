@@ -34,10 +34,11 @@ type CreateTicketUseCase struct {
 	owners   SpotOwnerLookup
 	tickets  TicketCreator
 	messages TicketMessageCreator
+	events   EventPublisher
 }
 
-func NewCreateTicketUseCase(getter BookingGetter, owners SpotOwnerLookup, tickets TicketCreator, messages TicketMessageCreator) *CreateTicketUseCase {
-	return &CreateTicketUseCase{getter: getter, owners: owners, tickets: tickets, messages: messages}
+func NewCreateTicketUseCase(getter BookingGetter, owners SpotOwnerLookup, tickets TicketCreator, messages TicketMessageCreator, events EventPublisher) *CreateTicketUseCase {
+	return &CreateTicketUseCase{getter: getter, owners: owners, tickets: tickets, messages: messages, events: events}
 }
 
 func (uc *CreateTicketUseCase) Execute(ctx context.Context, bookingID, callerID, subject, body string) (entity.SupportTicket, error) {
@@ -88,6 +89,14 @@ func (uc *CreateTicketUseCase) Execute(ctx context.Context, bookingID, callerID,
 	}); err != nil {
 		return entity.SupportTicket{}, err
 	}
+
+	// ParkLink staff hear about it right away (email to the support inbox).
+	authorRole := RecipientRoleOwner
+	if callerID == booking.UserID {
+		authorRole = RecipientRoleDriver
+	}
+	emitBookingEvent(ctx, uc.events, RoutingKeySupportTicketOpened,
+		newSupportTicketStaffEvent(RoutingKeySupportTicketOpened, ticket, authorRole, trimmedBody))
 
 	return ticket, nil
 }

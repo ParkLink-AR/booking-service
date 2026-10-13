@@ -26,6 +26,18 @@ type adminTicketResponse struct {
 	ParkingSpotTitle string `json:"parking_spot_title"`
 	BookingStart     string `json:"booking_start"`
 	BookingEnd       string `json:"booking_end"`
+	// The rest of the booking, so staff can answer without opening it: who's who, where it
+	// stands and what was paid.
+	ParkingSpotID string `json:"parking_spot_id"`
+	DriverID      string `json:"driver_id"`
+	OwnerID       string `json:"owner_id"`
+	// "driver" or "owner": which of them opened the ticket.
+	CreatorRole   string `json:"creator_role"`
+	BookingStatus string `json:"booking_status"`
+	BookingKind   string `json:"booking_kind"`
+	// Centavos.
+	BookingAmount int    `json:"booking_amount"`
+	PaymentID     string `json:"payment_id,omitempty"`
 }
 
 func (handler *Handler) GetAdminTicketEndpoint(responseWriter http.ResponseWriter, request *http.Request) {
@@ -50,5 +62,22 @@ func (handler *Handler) GetAdminTicketEndpoint(responseWriter http.ResponseWrite
 		ParkingSpotTitle: spot.Title,
 		BookingStart:     booking.Start.In(handler.location).Format(time.RFC3339),
 		BookingEnd:       booking.End.In(handler.location).Format(time.RFC3339),
+		ParkingSpotID:    booking.ParkingSpotID,
+		DriverID:         booking.UserID,
+		OwnerID:          spot.OwnerID,
+		CreatorRole:      creatorRoleOf(ticket, booking),
+		BookingStatus:    booking.Status.String(),
+		BookingKind:      booking.Kind.String(),
+		BookingAmount:    booking.Amount,
+		PaymentID:        booking.PaymentID,
 	})
+}
+
+// creatorRoleOf is which side of the booking opened the ticket: its driver, or else the
+// spot's owner (the only other party allowed to open one).
+func creatorRoleOf(ticket entity.SupportTicket, booking entity.Booking) string {
+	if ticket.CreatedBy == booking.UserID {
+		return "driver"
+	}
+	return "owner"
 }

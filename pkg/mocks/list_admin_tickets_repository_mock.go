@@ -42,10 +42,10 @@ func (m *MockAllTicketLister) EXPECT() *MockAllTicketListerMockRecorder {
 }
 
 // ListAllTickets mocks base method.
-func (m *MockAllTicketLister) ListAllTickets(ctx context.Context, status *enum.TicketStatus) ([]entity.SupportTicket, error) {
+func (m *MockAllTicketLister) ListAllTickets(ctx context.Context, status *enum.TicketStatus) ([]entity.AdminTicket, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListAllTickets", ctx, status)
-	ret0, _ := ret[0].([]entity.SupportTicket)
+	ret0, _ := ret[0].([]entity.AdminTicket)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
