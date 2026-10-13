@@ -4,11 +4,13 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
 	"github.com/example/bookings-service/internal/domain/entity"
+	"github.com/example/bookings-service/internal/domain/enum"
 	"github.com/example/bookings-service/internal/domain/errors"
 	"github.com/example/bookings-service/internal/usecase/booking"
 	"github.com/example/bookings-service/pkg/mocks"
@@ -53,8 +55,54 @@ func (s *sendMessageUseCaseSuite) TearDownTest() {
 	s.controller.Finish()
 }
 
+// booking is a paid one -- messages only open up once the payment went through.
 func (s *sendMessageUseCaseSuite) booking() entity.Booking {
-	return entity.Booking{ID: s.bookingID, UserID: s.driverID, ParkingSpotID: "spot-1"}
+	paidAt := time.Date(2026, 10, 12, 20, 0, 0, 0, time.UTC)
+	return entity.Booking{
+		ID: s.bookingID, UserID: s.driverID, ParkingSpotID: "spot-1",
+		Status: enum.BookingStatusConfirmed, PaymentID: "mp-1", PaidAt: &paidAt,
+	}
+}
+
+func (s *sendMessageUseCaseSuite) TestExecute_UnpaidBooking_ReturnsNotPaidWithoutSending() {
+	unpaid := entity.Booking{
+		ID: s.bookingID, UserID: s.driverID, ParkingSpotID: "spot-1", Status: enum.BookingStatusPendingPayment,
+	}
+	s.getter.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(unpaid, nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), "spot-1").Return(s.spot, nil)
+
+	_, err := s.useCase.Execute(s.context, s.bookingID, s.driverID, "Hola")
+
+	s.Require().Error(err)
+	s.True(errors.IsInvalidInput(err))
+	s.Equal("BOOKING_NOT_PAID", errors.InvalidInputCode(err))
+}
+
+func (s *sendMessageUseCaseSuite) TestExecute_ExpiredWithoutPayment_ReturnsNotPaid() {
+	expired := entity.Booking{
+		ID: s.bookingID, UserID: s.driverID, ParkingSpotID: "spot-1", Status: enum.BookingStatusExpired,
+	}
+	s.getter.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(expired, nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), "spot-1").Return(s.spot, nil)
+
+	_, err := s.useCase.Execute(s.context, s.bookingID, s.driverID, "Hola")
+
+	s.Equal("BOOKING_NOT_PAID", errors.InvalidInputCode(err))
+}
+
+func (s *sendMessageUseCaseSuite) TestExecute_PaidBeforePaidAtExisted_StillSends() {
+	legacy := entity.Booking{
+		ID: s.bookingID, UserID: s.driverID, ParkingSpotID: "spot-1",
+		Status: enum.BookingStatusCompleted, PaymentID: "CASH",
+	}
+	s.getter.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(legacy, nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), "spot-1").Return(s.spot, nil)
+	s.creator.EXPECT().CreateMessage(gomock.Any(), gomock.Any()).Return(entity.BookingMessage{ID: "msg-1"}, nil)
+	s.events.EXPECT().Publish(gomock.Any(), booking.RoutingKeyBookingMessageSent, gomock.Any()).Return(nil)
+
+	_, err := s.useCase.Execute(s.context, s.bookingID, s.driverID, "Gracias")
+
+	s.Require().NoError(err)
 }
 
 func (s *sendMessageUseCaseSuite) TestExecute_DriverSendsToOwner_CreatesAndPublishes() {

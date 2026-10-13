@@ -20,10 +20,11 @@ type MessageCreator interface {
 }
 
 // SendMessageUseCase lets either side of a booking (the driver or the spot's owner) send
-// a message to the other -- e.g. access instructions before the driver arrives. Unlike
-// reviews, there's no status restriction: a message can be sent as soon as the booking
-// exists, all the way through COMPLETED, since coordination is often needed right up to
-// (and sometimes after) the visit.
+// a message to the other -- e.g. access instructions before the driver arrives. Only once
+// the booking has been paid: an unpaid one (still awaiting payment, or expired without it)
+// isn't a real booking yet, and mustn't open a channel to the owner. From then on there's
+// no status restriction, all the way through COMPLETED (or CANCELLED), since coordination
+// is often needed right up to (and sometimes after) the visit.
 type SendMessageUseCase struct {
 	getter  BookingGetter
 	spots   SpotDetailsLookup
@@ -64,6 +65,11 @@ func (uc *SendMessageUseCase) Execute(ctx context.Context, bookingID, callerID, 
 		return entity.BookingMessage{}, errors.NewForbidden("no sos parte de esta reserva")
 	}
 
+	if !bookingWasPaid(booking) {
+		return entity.BookingMessage{}, errors.NewInvalidInput("BOOKING_NOT_PAID",
+			"la reserva todavía no está pagada: los mensajes se habilitan cuando se acredita el pago")
+	}
+
 	created, err := uc.creator.CreateMessage(ctx, entity.BookingMessage{
 		BookingID: bookingID,
 		SenderID:  callerID,
@@ -77,4 +83,11 @@ func (uc *SendMessageUseCase) Execute(ctx context.Context, bookingID, callerID, 
 		newBookingMessageEvent(created, spot.Title, booking.ParkingSpotID, recipientID, recipientRole))
 
 	return created, nil
+}
+
+// bookingWasPaid reports whether the booking's payment ever went through. PaidAt is the
+// record of that, but bookings from before it existed only have their PaymentID (and a
+// cash one is "CASH") -- either means the money moved.
+func bookingWasPaid(booking entity.Booking) bool {
+	return booking.PaidAt != nil || booking.PaymentID != ""
 }
