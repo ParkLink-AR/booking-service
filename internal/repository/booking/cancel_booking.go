@@ -9,15 +9,17 @@ import (
 )
 
 // CancelBooking transitions a booking from CONFIRMED or PENDING_OWNER_APPROVAL to
-// CANCELLED. The time-window guard (must cancel at least 1 hour before start) is
+// CANCELLED, as the driver's doing: reason is DRIVER_CANCELLED, or DRIVER_LATE_CANCELLED
+// when only refundedAmount (centavos) of it goes back to them. The time-window rules are
 // enforced by the use case, not here. Returns the full row so the caller can trigger a
 // refund.
-func (repository *Repository) CancelBooking(ctx context.Context, bookingID string) (entity.Booking, error) {
+func (repository *Repository) CancelBooking(ctx context.Context, bookingID, reason string, refundedAmount int) (entity.Booking, error) {
 	row := repository.database.QueryRowContext(ctx, `
 		UPDATE `+constants.BookingsTableName+`
 		SET
 			status              = 'CANCELLED'::booking_status,
 			cancellation_reason = $2,
+			refunded_amount     = $3,
 			updated_at          = now()
 		WHERE id     = $1
 		  AND status IN ('CONFIRMED', 'PENDING_OWNER_APPROVAL')
@@ -26,7 +28,7 @@ func (repository *Repository) CancelBooking(ctx context.Context, bookingID strin
 			lower(time_range), upper(time_range),
 			status, hold_expires_at, owner_response_deadline, amount, COALESCE(payment_id, ''), paid_at,
 			cancellation_reason, kind, created_at, updated_at
-	`, bookingID, constants.CancellationReasonDriverCancelled)
+	`, bookingID, reason, refundedAmount)
 
 	var b entity.Booking
 	var statusLabel, kindLabel string

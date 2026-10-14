@@ -41,18 +41,33 @@ func (m *MockBookingCanceller) EXPECT() *MockBookingCancellerMockRecorder {
 }
 
 // CancelBooking mocks base method.
-func (m *MockBookingCanceller) CancelBooking(ctx context.Context, bookingID string) (entity.Booking, error) {
+func (m *MockBookingCanceller) CancelBooking(ctx context.Context, bookingID, reason string, refundedAmount int) (entity.Booking, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CancelBooking", ctx, bookingID)
+	ret := m.ctrl.Call(m, "CancelBooking", ctx, bookingID, reason, refundedAmount)
 	ret0, _ := ret[0].(entity.Booking)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CancelBooking indicates an expected call of CancelBooking.
-func (mr *MockBookingCancellerMockRecorder) CancelBooking(ctx, bookingID any) *gomock.Call {
+func (mr *MockBookingCancellerMockRecorder) CancelBooking(ctx, bookingID, reason, refundedAmount any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelBooking", reflect.TypeOf((*MockBookingCanceller)(nil).CancelBooking), ctx, bookingID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelBooking", reflect.TypeOf((*MockBookingCanceller)(nil).CancelBooking), ctx, bookingID, reason, refundedAmount)
+}
+
+// CancelExtensions mocks base method.
+func (m *MockBookingCanceller) CancelExtensions(ctx context.Context, parentID, reason string) ([]entity.Booking, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CancelExtensions", ctx, parentID, reason)
+	ret0, _ := ret[0].([]entity.Booking)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CancelExtensions indicates an expected call of CancelExtensions.
+func (mr *MockBookingCancellerMockRecorder) CancelExtensions(ctx, parentID, reason any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelExtensions", reflect.TypeOf((*MockBookingCanceller)(nil).CancelExtensions), ctx, parentID, reason)
 }
 
 // GetByID mocks base method.
@@ -68,4 +83,55 @@ func (m *MockBookingCanceller) GetByID(ctx context.Context, bookingID string) (e
 func (mr *MockBookingCancellerMockRecorder) GetByID(ctx, bookingID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockBookingCanceller)(nil).GetByID), ctx, bookingID)
+}
+
+// MockCancellationRefunder is a mock of CancellationRefunder interface.
+type MockCancellationRefunder struct {
+	ctrl     *gomock.Controller
+	recorder *MockCancellationRefunderMockRecorder
+}
+
+// MockCancellationRefunderMockRecorder is the mock recorder for MockCancellationRefunder.
+type MockCancellationRefunderMockRecorder struct {
+	mock *MockCancellationRefunder
+}
+
+// NewMockCancellationRefunder creates a new mock instance.
+func NewMockCancellationRefunder(ctrl *gomock.Controller) *MockCancellationRefunder {
+	mock := &MockCancellationRefunder{ctrl: ctrl}
+	mock.recorder = &MockCancellationRefunderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockCancellationRefunder) EXPECT() *MockCancellationRefunderMockRecorder {
+	return m.recorder
+}
+
+// RefundPayment mocks base method.
+func (m *MockCancellationRefunder) RefundPayment(ctx context.Context, paymentID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RefundPayment", ctx, paymentID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RefundPayment indicates an expected call of RefundPayment.
+func (mr *MockCancellationRefunderMockRecorder) RefundPayment(ctx, paymentID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefundPayment", reflect.TypeOf((*MockCancellationRefunder)(nil).RefundPayment), ctx, paymentID)
+}
+
+// RefundPaymentAmount mocks base method.
+func (m *MockCancellationRefunder) RefundPaymentAmount(ctx context.Context, paymentID string, amountCentavos int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RefundPaymentAmount", ctx, paymentID, amountCentavos)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RefundPaymentAmount indicates an expected call of RefundPaymentAmount.
+func (mr *MockCancellationRefunderMockRecorder) RefundPaymentAmount(ctx, paymentID, amountCentavos any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefundPaymentAmount", reflect.TypeOf((*MockCancellationRefunder)(nil).RefundPaymentAmount), ctx, paymentID, amountCentavos)
 }

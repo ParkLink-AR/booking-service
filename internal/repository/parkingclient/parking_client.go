@@ -33,6 +33,26 @@ type spotResponse struct {
 	StayPricesByVehicleType map[string]json.RawMessage `json:"stayPricesByVehicleType"`
 	RequireVehicle          bool                       `json:"requireVehicle"`
 	VehicleTypes            []string                   `json:"vehicleTypes"`
+	HourlyEnabled           bool                       `json:"hourlyEnabled"`
+	Capacity                int                        `json:"capacity"`
+	Schedule                []scheduleEntryResponse    `json:"schedule"`
+	// The days its owner closed by hand (only those that haven't passed).
+	BlockedDates []blockedDateResponse `json:"blockedDates"`
+}
+
+type scheduleEntryResponse struct {
+	DayOfWeek int `json:"dayOfWeek"`
+	StartHour int `json:"startHour"`
+	EndHour   int `json:"endHour"`
+}
+
+type blockedDateResponse struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+type accessInstructionsResponse struct {
+	AccessInstructions *string `json:"accessInstructions"`
 }
 
 // Client calls parking-service directly inside the docker network, the same
@@ -93,6 +113,73 @@ func (client *Client) GetSpotDetails(ctx context.Context, spotID string) (entity
 		OwnerID: spot.OwnerID,
 		Title:   spot.Title,
 	}, nil
+}
+
+// GetSpotBookingRules returns what deciding on an hourly booking (or an extension) needs
+// about the spot: whether it takes new bookings, its hours, capacity and closed days.
+func (client *Client) GetSpotBookingRules(ctx context.Context, spotID string) (entity.SpotBookingRules, error) {
+	spot, err := client.getSpot(ctx, spotID)
+	if err != nil {
+		return entity.SpotBookingRules{}, err
+	}
+	schedule := make([]entity.ScheduleEntry, len(spot.Schedule))
+	for index, entry := range spot.Schedule {
+		schedule[index] = entity.ScheduleEntry{DayOfWeek: entry.DayOfWeek, StartHour: entry.StartHour, EndHour: entry.EndHour}
+	}
+	capacity := spot.Capacity
+	if capacity < 1 {
+		capacity = 1
+	}
+	return entity.SpotBookingRules{
+		Active:        spot.Status == "active",
+		HourlyEnabled: spot.HourlyEnabled,
+		Schedule:      schedule,
+		Capacity:      capacity,
+		BlockedDates:  toDateRanges(spot.BlockedDates),
+	}, nil
+}
+
+// GetBlockedDates returns the days the spot's owner closed by hand.
+func (client *Client) GetBlockedDates(ctx context.Context, spotID string) ([]entity.DateRange, error) {
+	spot, err := client.getSpot(ctx, spotID)
+	if err != nil {
+		return nil, err
+	}
+	return toDateRanges(spot.BlockedDates), nil
+}
+
+func toDateRanges(blocked []blockedDateResponse) []entity.DateRange {
+	ranges := make([]entity.DateRange, len(blocked))
+	for index, dateRange := range blocked {
+		ranges[index] = entity.DateRange{From: dateRange.From, To: dateRange.To}
+	}
+	return ranges
+}
+
+// GetAccessInstructions returns how to get into the spot (gate code, floor...) -- private
+// to its owner and the driver of a confirmed booking, so it comes from an internal route
+// the gateway never exposes. "" when the owner wrote none.
+func (client *Client) GetAccessInstructions(ctx context.Context, spotID string) (string, error) {
+	request, err := client.newGetRequest(ctx, fmt.Sprintf("%s/internal/parking-spots/%s/access", client.baseURL, spotID))
+	if err != nil {
+		return "", errors.NewUpstream("parkingclient.GetAccessInstructions", err)
+	}
+	response, err := client.httpClient.Do(request)
+	if err != nil {
+		return "", errors.NewUpstream("parkingclient.GetAccessInstructions", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return "", errors.NewUpstream("parkingclient.GetAccessInstructions", fmt.Errorf("unexpected status %d", response.StatusCode))
+	}
+	var body accessInstructionsResponse
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		return "", errors.NewUpstream("parkingclient.GetAccessInstructions", err)
+	}
+	if body.AccessInstructions == nil {
+		return "", nil
+	}
+	return *body.AccessInstructions, nil
 }
 
 // GetSpotOwnerID returns the owner id of a parking spot, used to verify that

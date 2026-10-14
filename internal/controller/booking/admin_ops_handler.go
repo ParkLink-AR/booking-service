@@ -77,6 +77,10 @@ type adminBookingResponse struct {
 	PaidAt             *string `json:"paid_at,omitempty"`
 	CancellationReason *string `json:"cancellation_reason,omitempty"`
 	AdminNote          *string `json:"admin_note,omitempty"`
+	// The owner's reason, when they cancelled a booking they had accepted.
+	CancellationNote *string `json:"cancellation_note,omitempty"`
+	// Set on an extension: the booking it continues.
+	ParentBookingID    *string `json:"parent_booking_id,omitempty"`
 	VerificationReview *string `json:"verification_review,omitempty"`
 	VerifiedAt         *string `json:"verified_at,omitempty"`
 	VehiclePlate       *string `json:"vehicle_plate,omitempty"`
@@ -111,6 +115,8 @@ func (handler *AdminOpsHandler) bookingResponse(booking entity.AdminBooking) adm
 		PaidAt:             handler.formatTime(booking.PaidAt),
 		CancellationReason: booking.CancellationReason,
 		AdminNote:          booking.AdminNote,
+		CancellationNote:   booking.CancellationNote,
+		ParentBookingID:    booking.ParentBookingID,
 		VerificationReview: booking.VerificationReview,
 		VerifiedAt:         handler.formatTime(booking.VerifiedAt),
 		VehiclePlate:       booking.VehiclePlate,

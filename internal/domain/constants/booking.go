@@ -52,4 +52,10 @@ const (
 	// usecase.AccountClosureUseCase. The driver always gets a full refund.
 	CancellationReasonOwnerAccountClosed  = "OWNER_ACCOUNT_CLOSED"
 	CancellationReasonDriverAccountClosed = "DRIVER_ACCOUNT_CLOSED"
+	// The owner called off a booking they had already accepted (with a reason, see
+	// OwnerCancelBooking): the driver always gets a full refund.
+	CancellationReasonOwnerCancelled = "OWNER_CANCELLED"
+	// The driver cancelled an accepted booking less than an hour before it started: part of
+	// it goes back to them and the owner is paid the rest (see CancelBookingUseCase).
+	CancellationReasonDriverLateCancelled = "DRIVER_LATE_CANCELLED"
 )

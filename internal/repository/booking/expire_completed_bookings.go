@@ -30,7 +30,12 @@ func (repository *Repository) ExpireCompletedBookings(ctx context.Context) ([]en
 		RETURNING
 			id, parking_spot_id, user_id,
 			lower(time_range), upper(time_range),
-			status, amount, COALESCE(payment_id, ''), paid_at, created_at, updated_at
+			status, amount, COALESCE(payment_id, ''), paid_at, created_at, updated_at,
+			EXISTS (
+				SELECT 1 FROM `+constants.BookingsTableName+` child
+				WHERE child.parent_booking_id = `+constants.BookingsTableName+`.id
+				  AND child.status IN ('CONFIRMED', 'IN_PROGRESS')
+			)
 	`)
 	if err != nil {
 		return nil, errors.NewInternalError("booking.ExpireCompletedBookings", err)
@@ -41,14 +46,21 @@ func (repository *Repository) ExpireCompletedBookings(ctx context.Context) ([]en
 	for rows.Next() {
 		var b entity.Booking
 		var statusLabel string
+		var extended bool
 		if err := rows.Scan(
 			&b.ID, &b.ParkingSpotID, &b.UserID,
 			&b.Start, &b.End,
 			&statusLabel, &b.Amount, &b.PaymentID, &b.PaidAt, &b.CreatedAt, &b.UpdatedAt,
+			&extended,
 		); err != nil {
 			return nil, errors.NewInternalError("booking.ExpireCompletedBookings", err)
 		}
 		b.Status, _ = parseBookingStatus(statusLabel)
+		if extended {
+			// Its paid extension carries on: only marks that it has one (see
+			// CompleteFinishedBookingsUseCase, which leaves the review prompt to the extension).
+			b.Extension = &entity.BookingExtension{}
+		}
 		completed = append(completed, b)
 	}
 	if err := rows.Err(); err != nil {

@@ -20,6 +20,17 @@ func (repository *Repository) GetActiveBookingsInRange(
 	parkingSpotID string,
 	from, to time.Time,
 ) ([]entity.TimeWindow, error) {
+	return repository.GetActiveBookingsInRangeExcluding(ctx, parkingSpotID, from, to, "")
+}
+
+// GetActiveBookingsInRangeExcluding is GetActiveBookingsInRange leaving out one booking --
+// the one an extension continues, which must not count against its own extension.
+func (repository *Repository) GetActiveBookingsInRangeExcluding(
+	ctx context.Context,
+	parkingSpotID string,
+	from, to time.Time,
+	excludedBookingID string,
+) ([]entity.TimeWindow, error) {
 	rows, err := repository.database.QueryContext(ctx, `
 		SELECT lower(time_range), upper(time_range)
 		FROM `+constants.BookingsTableName+`
@@ -29,7 +40,8 @@ func (repository *Repository) GetActiveBookingsInRange(
 		    OR (status = 'PENDING_PAYMENT' AND hold_expires_at > now())
 		  )
 		  AND time_range && tstzrange($2, $3, '[)')
-	`, parkingSpotID, from.Add(-entity.GracePeriod), to.Add(entity.GracePeriod))
+		  AND ($4 = '' OR id::text <> $4)
+	`, parkingSpotID, from.Add(-entity.GracePeriod), to.Add(entity.GracePeriod), excludedBookingID)
 	if err != nil {
 		return nil, errors.NewInternalError("booking.GetActiveBookingsInRange", err)
 	}

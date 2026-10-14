@@ -19,6 +19,7 @@ import (
 type BookingConfirmer interface {
 	ConfirmBooking(ctx context.Context, bookingID, paymentID string, status enum.BookingStatus, ownerResponseDeadline *time.Time, verificationCode *string) (entity.Booking, error)
 	GetByID(ctx context.Context, bookingID string) (entity.Booking, error)
+	PropagateVerificationToExtensions(ctx context.Context, parentID string) error
 }
 
 // SpotLookup resolves the parking spot behind a booking: who owns it and its title, to
@@ -30,7 +31,8 @@ type SpotLookup interface {
 
 // ConfirmBookingUseCase orchestrates the booking-confirmation step triggered by the
 // payment webhook: every paid booking moves to PENDING_OWNER_APPROVAL (awaiting the
-// owner), and it publishes the matching domain event (booking.pending_approval).
+// owner), and it publishes the matching domain event (booking.pending_approval) -- except
+// an extension, which is CONFIRMED right away (booking.extended).
 type ConfirmBookingUseCase struct {
 	confirmer  BookingConfirmer
 	spotLookup SpotLookup
@@ -77,8 +79,13 @@ func (uc *ConfirmBookingUseCase) Execute(ctx context.Context, bookingID, payment
 		return entity.Booking{}, err
 	}
 
-	deadline := time.Now().Add(ownerApprovalWindow())
-	pending, err := uc.confirmer.ConfirmBooking(ctx, bookingID, paymentID, enum.BookingStatusPendingOwnerApproval, &deadline, nil)
+	// An extension continues a stay the owner already accepted: it's confirmed outright.
+	status, deadline := enum.BookingStatusPendingOwnerApproval, time.Now().Add(ownerApprovalWindow())
+	deadlinePointer := &deadline
+	if booking.ParentBookingID != nil {
+		status, deadlinePointer = enum.BookingStatusConfirmed, nil
+	}
+	pending, err := uc.confirmer.ConfirmBooking(ctx, bookingID, paymentID, status, deadlinePointer, nil)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return entity.Booking{}, err
@@ -90,6 +97,13 @@ func (uc *ConfirmBookingUseCase) Execute(ctx context.Context, bookingID, payment
 			return current, nil
 		}
 		return entity.Booking{}, errors.NewInvalidInput(ConfirmErrorHoldExpired, "la reserva venció antes de que se acreditara el pago")
+	}
+	if booking.ParentBookingID != nil {
+		pending.ParentBookingID = booking.ParentBookingID
+		// If the driver's arrival was already checked, the extension is part of that same stay.
+		_ = uc.confirmer.PropagateVerificationToExtensions(ctx, *booking.ParentBookingID)
+		emitBookingEvent(ctx, uc.events, RoutingKeyBookingExtended, newBookingExtendedEvent(pending, spot))
+		return pending, nil
 	}
 	emitBookingEvent(ctx, uc.events, RoutingKeyBookingPendingApproval,
 		newBookingEvent(RoutingKeyBookingPendingApproval, pending, spot))

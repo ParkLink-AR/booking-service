@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
+	"github.com/example/bookings-service/internal/domain/constants"
 	"github.com/example/bookings-service/internal/domain/entity"
 	"github.com/example/bookings-service/internal/domain/enum"
 	"github.com/example/bookings-service/internal/domain/errors"
@@ -23,7 +24,7 @@ type cancelBookingUseCaseSuite struct {
 	suite.Suite
 	controller *gomock.Controller
 	canceller  *mocks.MockBookingCanceller
-	refunder   *mocks.MockPaymentRefunder
+	refunder   *mocks.MockCancellationRefunder
 	spots      *mocks.MockSpotDetailsLookup
 	events     *mocks.MockEventPublisher
 	useCase    *booking.CancelBookingUseCase
@@ -38,7 +39,7 @@ type cancelBookingUseCaseSuite struct {
 func (s *cancelBookingUseCaseSuite) SetupTest() {
 	s.controller = gomock.NewController(s.T())
 	s.canceller = mocks.NewMockBookingCanceller(s.controller)
-	s.refunder = mocks.NewMockPaymentRefunder(s.controller)
+	s.refunder = mocks.NewMockCancellationRefunder(s.controller)
 	s.spots = mocks.NewMockSpotDetailsLookup(s.controller)
 	s.events = mocks.NewMockEventPublisher(s.controller)
 	s.useCase = booking.NewCancelBookingUseCase(s.canceller, s.refunder, s.spots, s.events)
@@ -62,11 +63,11 @@ func (s *cancelBookingUseCaseSuite) confirmedBooking() entity.Booking {
 		ID:            s.bookingID,
 		ParkingSpotID: "spot-1",
 		UserID:        s.driverID,
-		Start:     start,
-		End:       start.Add(time.Hour),
-		Status:    enum.BookingStatusConfirmed,
-		PaymentID: s.paymentID,
-		Amount:    1000,
+		Start:         start,
+		End:           start.Add(time.Hour),
+		Status:        enum.BookingStatusConfirmed,
+		PaymentID:     s.paymentID,
+		Amount:        1000,
 	}
 }
 
@@ -76,7 +77,7 @@ func (s *cancelBookingUseCaseSuite) TestExecute_DriverCancelsWithinWindow_Cancel
 	cancelled.Status = enum.BookingStatusCancelled
 
 	s.canceller.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(b, nil)
-	s.canceller.EXPECT().CancelBooking(gomock.Any(), s.bookingID).Return(cancelled, nil)
+	s.canceller.EXPECT().CancelBooking(gomock.Any(), s.bookingID, constants.CancellationReasonDriverCancelled, 0).Return(cancelled, nil)
 	s.spots.EXPECT().GetSpotDetails(gomock.Any(), "spot-1").Return(entity.SpotDetails{OwnerID: "owner-1", Title: "Cochera Palermo"}, nil)
 	s.events.EXPECT().Publish(gomock.Any(), booking.RoutingKeyBookingCancelled, gomock.Any()).DoAndReturn(
 		func(_ context.Context, _ string, payload any) error {
@@ -88,6 +89,7 @@ func (s *cancelBookingUseCaseSuite) TestExecute_DriverCancelsWithinWindow_Cancel
 		},
 	)
 	s.refunder.EXPECT().RefundPayment(gomock.Any(), s.paymentID).Return(nil)
+	s.canceller.EXPECT().CancelExtensions(gomock.Any(), s.bookingID, constants.CancellationReasonDriverCancelled).Return(nil, nil)
 
 	got, err := s.useCase.Execute(s.context, s.bookingID, s.driverID)
 
@@ -103,9 +105,10 @@ func (s *cancelBookingUseCaseSuite) TestExecute_SpotLookupFails_StillCancelsWith
 	cancelled.Status = enum.BookingStatusCancelled
 
 	s.canceller.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(b, nil)
-	s.canceller.EXPECT().CancelBooking(gomock.Any(), s.bookingID).Return(cancelled, nil)
+	s.canceller.EXPECT().CancelBooking(gomock.Any(), s.bookingID, constants.CancellationReasonDriverCancelled, 0).Return(cancelled, nil)
 	s.spots.EXPECT().GetSpotDetails(gomock.Any(), "spot-1").Return(entity.SpotDetails{}, errors.NewNotFound("spot", "spot-1"))
 	s.refunder.EXPECT().RefundPayment(gomock.Any(), s.paymentID).Return(nil)
+	s.canceller.EXPECT().CancelExtensions(gomock.Any(), s.bookingID, constants.CancellationReasonDriverCancelled).Return(nil, nil)
 
 	got, err := s.useCase.Execute(s.context, s.bookingID, s.driverID)
 
@@ -122,11 +125,54 @@ func (s *cancelBookingUseCaseSuite) TestExecute_OtherUserTries_ForbiddenNoCancel
 	s.True(errors.IsForbidden(err))
 }
 
-func (s *cancelBookingUseCaseSuite) TestExecute_LessThanOneHourBefore_WindowExpiredError() {
+// In the booking's last hour the driver gets half back; the owner is paid the rest.
+func (s *cancelBookingUseCaseSuite) TestExecute_LessThanOneHourBefore_RefundsHalf() {
 	b := s.confirmedBooking()
-	// Move start to 30 minutes from now — past the 1-hour cutoff.
 	b.Start = time.Now().UTC().Add(30 * time.Minute)
 	b.End = b.Start.Add(time.Hour)
+	cancelled := b
+	cancelled.Status = enum.BookingStatusCancelled
+
+	s.canceller.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(b, nil)
+	s.canceller.EXPECT().CancelBooking(gomock.Any(), s.bookingID, constants.CancellationReasonDriverLateCancelled, 500).Return(cancelled, nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), "spot-1").Return(entity.SpotDetails{OwnerID: "owner-1"}, nil)
+	s.events.EXPECT().Publish(gomock.Any(), booking.RoutingKeyBookingCancelled, gomock.Any()).DoAndReturn(
+		func(_ context.Context, _ string, payload any) error {
+			s.EqualValues(500, toJSONMap(s.T(), payload)["refunded_amount"])
+			return nil
+		},
+	)
+	s.refunder.EXPECT().RefundPaymentAmount(gomock.Any(), s.paymentID, 500).Return(nil)
+	s.canceller.EXPECT().CancelExtensions(gomock.Any(), s.bookingID, constants.CancellationReasonDriverCancelled).Return(nil, nil)
+
+	got, err := s.useCase.Execute(s.context, s.bookingID, s.driverID)
+
+	s.Require().NoError(err)
+	s.Equal(500, got.RefundedAmount)
+}
+
+// A request the owner hasn't answered is always given back in full before it starts.
+func (s *cancelBookingUseCaseSuite) TestExecute_PendingApprovalInLastHour_FullRefund() {
+	b := s.confirmedBooking()
+	b.Status = enum.BookingStatusPendingOwnerApproval
+	b.Start = time.Now().UTC().Add(20 * time.Minute)
+	cancelled := b
+	cancelled.Status = enum.BookingStatusCancelled
+
+	s.canceller.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(b, nil)
+	s.canceller.EXPECT().CancelBooking(gomock.Any(), s.bookingID, constants.CancellationReasonDriverCancelled, 0).Return(cancelled, nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), "spot-1").Return(entity.SpotDetails{}, errors.NewNotFound("spot", "spot-1"))
+	s.refunder.EXPECT().RefundPayment(gomock.Any(), s.paymentID).Return(nil)
+	s.canceller.EXPECT().CancelExtensions(gomock.Any(), s.bookingID, constants.CancellationReasonDriverCancelled).Return(nil, nil)
+
+	_, err := s.useCase.Execute(s.context, s.bookingID, s.driverID)
+
+	s.Require().NoError(err)
+}
+
+func (s *cancelBookingUseCaseSuite) TestExecute_AlreadyStarted_WindowExpiredError() {
+	b := s.confirmedBooking()
+	b.Start = time.Now().UTC().Add(-time.Minute)
 
 	s.canceller.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(b, nil)
 
@@ -137,19 +183,23 @@ func (s *cancelBookingUseCaseSuite) TestExecute_LessThanOneHourBefore_WindowExpi
 	s.Equal("CANCELLATION_WINDOW_EXPIRED", errors.InvalidInputCode(err))
 }
 
-func (s *cancelBookingUseCaseSuite) TestExecute_ExactlyAtCutoff_WindowExpiredError() {
+// Its paid extensions go with it, each refunded in full.
+func (s *cancelBookingUseCaseSuite) TestExecute_WithExtension_CancelsAndRefundsIt() {
 	b := s.confirmedBooking()
-	// Exactly at the 1-hour mark is past the deadline (deadline = start - 1h, and now == deadline).
-	b.Start = time.Now().UTC().Add(time.Hour)
-	b.End = b.Start.Add(time.Hour)
+	cancelled := b
+	cancelled.Status = enum.BookingStatusCancelled
 
 	s.canceller.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(b, nil)
+	s.canceller.EXPECT().CancelBooking(gomock.Any(), s.bookingID, constants.CancellationReasonDriverCancelled, 0).Return(cancelled, nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), "spot-1").Return(entity.SpotDetails{}, errors.NewNotFound("spot", "spot-1"))
+	s.refunder.EXPECT().RefundPayment(gomock.Any(), s.paymentID).Return(nil)
+	s.canceller.EXPECT().CancelExtensions(gomock.Any(), s.bookingID, constants.CancellationReasonDriverCancelled).
+		Return([]entity.Booking{{ID: "ext-1", PaymentID: "pay_ext"}}, nil)
+	s.refunder.EXPECT().RefundPayment(gomock.Any(), "pay_ext").Return(nil)
 
-	got, err := s.useCase.Execute(s.context, s.bookingID, s.driverID)
+	_, err := s.useCase.Execute(s.context, s.bookingID, s.driverID)
 
-	s.Equal(entity.Booking{}, got)
-	s.True(errors.IsInvalidInput(err))
-	s.Equal("CANCELLATION_WINDOW_EXPIRED", errors.InvalidInputCode(err))
+	s.Require().NoError(err)
 }
 
 func (s *cancelBookingUseCaseSuite) TestExecute_BookingNotFound_ReturnsNotFoundError() {

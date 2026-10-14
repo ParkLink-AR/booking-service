@@ -73,6 +73,21 @@ func (mr *MockBookingRepositoryMockRecorder) GetActiveBookingsInRange(ctx, parki
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveBookingsInRange", reflect.TypeOf((*MockBookingRepository)(nil).GetActiveBookingsInRange), ctx, parkingSpotID, from, to)
 }
 
+// GetActiveBookingsInRangeExcluding mocks base method.
+func (m *MockBookingRepository) GetActiveBookingsInRangeExcluding(ctx context.Context, parkingSpotID string, from, to time.Time, excludedBookingID string) ([]entity.TimeWindow, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetActiveBookingsInRangeExcluding", ctx, parkingSpotID, from, to, excludedBookingID)
+	ret0, _ := ret[0].([]entity.TimeWindow)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetActiveBookingsInRangeExcluding indicates an expected call of GetActiveBookingsInRangeExcluding.
+func (mr *MockBookingRepositoryMockRecorder) GetActiveBookingsInRangeExcluding(ctx, parkingSpotID, from, to, excludedBookingID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveBookingsInRangeExcluding", reflect.TypeOf((*MockBookingRepository)(nil).GetActiveBookingsInRangeExcluding), ctx, parkingSpotID, from, to, excludedBookingID)
+}
+
 // GetBookingsForSpotsInRange mocks base method.
 func (m *MockBookingRepository) GetBookingsForSpotsInRange(ctx context.Context, parkingSpotIDs []string, start, end time.Time) ([]entity.SpotBooking, error) {
 	m.ctrl.T.Helper()
@@ -126,6 +141,21 @@ func (m *MockParkingClient) EXPECT() *MockParkingClientMockRecorder {
 	return m.recorder
 }
 
+// GetBlockedDates mocks base method.
+func (m *MockParkingClient) GetBlockedDates(ctx context.Context, spotID string) ([]entity.DateRange, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBlockedDates", ctx, spotID)
+	ret0, _ := ret[0].([]entity.DateRange)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBlockedDates indicates an expected call of GetBlockedDates.
+func (mr *MockParkingClientMockRecorder) GetBlockedDates(ctx, spotID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockedDates", reflect.TypeOf((*MockParkingClient)(nil).GetBlockedDates), ctx, spotID)
+}
+
 // GetHourlyPrice mocks base method.
 func (m *MockParkingClient) GetHourlyPrice(ctx context.Context, spotID, vehicleType string) (float64, error) {
 	m.ctrl.T.Helper()
@@ -139,6 +169,21 @@ func (m *MockParkingClient) GetHourlyPrice(ctx context.Context, spotID, vehicleT
 func (mr *MockParkingClientMockRecorder) GetHourlyPrice(ctx, spotID, vehicleType any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHourlyPrice", reflect.TypeOf((*MockParkingClient)(nil).GetHourlyPrice), ctx, spotID, vehicleType)
+}
+
+// GetSpotBookingRules mocks base method.
+func (m *MockParkingClient) GetSpotBookingRules(ctx context.Context, spotID string) (entity.SpotBookingRules, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSpotBookingRules", ctx, spotID)
+	ret0, _ := ret[0].(entity.SpotBookingRules)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSpotBookingRules indicates an expected call of GetSpotBookingRules.
+func (mr *MockParkingClientMockRecorder) GetSpotBookingRules(ctx, spotID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSpotBookingRules", reflect.TypeOf((*MockParkingClient)(nil).GetSpotBookingRules), ctx, spotID)
 }
 
 // GetSpotOwnerID mocks base method.

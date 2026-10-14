@@ -37,6 +37,8 @@ type serviceSuite struct {
 	// vehicleRules is what GetVehicleRules reports the spot asks of a booking's vehicle --
 	// nothing (a car-only spot where a vehicle is optional), unless a test sets it.
 	vehicleRules entity.SpotVehicleRules
+	// blockedDates is what GetBlockedDates reports: the days the owner closed (none by default).
+	blockedDates []entity.DateRange
 }
 
 func (s *serviceSuite) SetupTest() {
@@ -59,6 +61,10 @@ func (s *serviceSuite) SetupTest() {
 	s.vehicleRules = entity.SpotVehicleRules{AcceptedTypes: []string{"car"}}
 	s.parkingClient.EXPECT().GetVehicleRules(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, _ string) (entity.SpotVehicleRules, error) { return s.vehicleRules, nil }).
+		AnyTimes()
+	s.blockedDates = nil
+	s.parkingClient.EXPECT().GetBlockedDates(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ string) ([]entity.DateRange, error) { return s.blockedDates, nil }).
 		AnyTimes()
 }
 

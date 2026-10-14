@@ -68,6 +68,9 @@ func (repository *Repository) VerifyBookingCode(ctx context.Context, bookingID, 
 	}
 	b.Status, _ = parseBookingStatus(statusLabel)
 	b.Kind, _ = parseBookingKind(kindLabel)
+	// The driver arrived: the extensions already paid for continue the same stay, so they
+	// count as verified too (best effort -- a failure only leaves them to an admin's review).
+	_ = repository.PropagateVerificationToExtensions(ctx, b.ID)
 	return b, nil
 }
 

@@ -72,6 +72,20 @@ func (mr *MockBookingConfirmerMockRecorder) GetByID(ctx, bookingID any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockBookingConfirmer)(nil).GetByID), ctx, bookingID)
 }
 
+// PropagateVerificationToExtensions mocks base method.
+func (m *MockBookingConfirmer) PropagateVerificationToExtensions(ctx context.Context, parentID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PropagateVerificationToExtensions", ctx, parentID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PropagateVerificationToExtensions indicates an expected call of PropagateVerificationToExtensions.
+func (mr *MockBookingConfirmerMockRecorder) PropagateVerificationToExtensions(ctx, parentID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PropagateVerificationToExtensions", reflect.TypeOf((*MockBookingConfirmer)(nil).PropagateVerificationToExtensions), ctx, parentID)
+}
+
 // MockSpotLookup is a mock of SpotLookup interface.
 type MockSpotLookup struct {
 	ctrl     *gomock.Controller

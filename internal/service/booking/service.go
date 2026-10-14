@@ -20,6 +20,7 @@ type BookingRepository interface {
 		status *enum.BookingStatus,
 	) ([]entity.BookingWindow, error)
 	GetActiveBookingsInRange(ctx context.Context, parkingSpotID string, from, to time.Time) ([]entity.TimeWindow, error)
+	GetActiveBookingsInRangeExcluding(ctx context.Context, parkingSpotID string, from, to time.Time, excludedBookingID string) ([]entity.TimeWindow, error)
 	CreateBooking(ctx context.Context, booking entity.Booking) (entity.Booking, error)
 	GetBookingsForSpotsInRange(ctx context.Context, parkingSpotIDs []string, start, end time.Time) ([]entity.SpotBooking, error)
 }
@@ -34,6 +35,8 @@ type ParkingClient interface {
 	GetHourlyPrice(ctx context.Context, spotID, vehicleType string) (float64, error)
 	IsSpotActive(ctx context.Context, spotID string) (bool, error)
 	GetVehicleRules(ctx context.Context, spotID string) (entity.SpotVehicleRules, error)
+	GetBlockedDates(ctx context.Context, spotID string) ([]entity.DateRange, error)
+	GetSpotBookingRules(ctx context.Context, spotID string) (entity.SpotBookingRules, error)
 }
 
 // CommissionRateReader reads the platform's current commission settings -- same shape as

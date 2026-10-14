@@ -36,6 +36,10 @@ func (uc *CompleteFinishedBookingsUseCase) Execute(ctx context.Context) (int, er
 		return 0, err
 	}
 	for _, b := range completed {
+		// The stay goes on in its extension: both sides are asked to review once that ends.
+		if b.Extension != nil {
+			continue
+		}
 		spot, _ := uc.spots.GetSpotDetails(ctx, b.ParkingSpotID)
 		emitBookingEvent(ctx, uc.events, RoutingKeyBookingCompleted,
 			newBookingEvent(RoutingKeyBookingCompleted, b, spot))

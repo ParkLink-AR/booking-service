@@ -225,3 +225,32 @@ func (s *confirmBookingUseCaseSuite) TestExecute_LostRaceToSamePayment_ReturnsCo
 	s.Require().NoError(err)
 	s.Equal(confirmed, got)
 }
+
+// An extension continues a stay the owner already accepted: paying it confirms it outright,
+// carries over the arrival check, and tells both sides it was extended.
+func (s *confirmBookingUseCaseSuite) TestExecute_Extension_ConfirmsDirectlyAndPublishesExtended() {
+	parentID := "44444444-4444-4444-4444-444444444444"
+	pending := s.pendingBooking()
+	pending.ParentBookingID = &parentID
+	confirmed := pending
+	confirmed.Status = enum.BookingStatusConfirmed
+	confirmed.ParentBookingID = nil
+
+	s.confirmer.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(pending, nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), s.spotID).Return(entity.SpotDetails{OwnerID: s.ownerID, Title: "Cochera"}, nil)
+	s.confirmer.EXPECT().
+		ConfirmBooking(gomock.Any(), s.bookingID, s.paymentID, enum.BookingStatusConfirmed, gomock.Nil(), gomock.Nil()).
+		Return(confirmed, nil)
+	s.confirmer.EXPECT().PropagateVerificationToExtensions(gomock.Any(), parentID).Return(nil)
+
+	var gotKey string
+	var gotPayload map[string]any
+	s.captureEvent(&gotKey, &gotPayload)
+
+	got, err := s.useCase.Execute(s.context, s.bookingID, s.paymentID, s.amount)
+
+	s.Require().NoError(err)
+	s.Equal(enum.BookingStatusConfirmed, got.Status)
+	s.Equal("booking.extended", gotKey)
+	s.Equal(parentID, gotPayload["parent_booking_id"])
+}

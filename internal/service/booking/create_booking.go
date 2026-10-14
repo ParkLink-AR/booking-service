@@ -85,6 +85,14 @@ func (service *Service) CreateBooking(ctx context.Context, input entity.CreateBo
 			return entity.Booking{}, errors.NewInvalidInput("SPOT_NOT_ACTIVE",
 				"this parking spot is not accepting new reservations")
 		}
+		blocked, err := service.parkingClient.GetBlockedDates(ctx, input.ParkingSpotID)
+		if err != nil {
+			return entity.Booking{}, err
+		}
+		if entity.OverlapsDateRanges(blocked, input.Start, input.End, service.location) {
+			return entity.Booking{}, errors.NewInvalidInput("SPOT_DAY_BLOCKED",
+				"el propietario cerró la cochera ese día")
+		}
 		if !isWithinPublishedHours(input.Start, input.End, input.ParkingSpotSchedule, service.location) {
 			return entity.Booking{}, errors.NewInvalidInput("OUTSIDE_PUBLISHED_HOURS",
 				"requested time is outside the parking spot's published hours")

@@ -15,7 +15,8 @@ import (
 // active bookings). Instead this runs in a transaction that first takes a per-spot
 // advisory lock, then recounts the concurrent active bookings in the requested range: if
 // that already reaches booking.Capacity the insert is rejected as a conflict. The lock
-// serialises concurrent creates for the same spot, so the count-then-insert is atomic.
+// serialises concurrent creates for the same spot, so the count-then-insert is atomic. An
+// extension (ParentBookingID set) doesn't count the booking it continues against itself.
 func (repository *Repository) CreateBooking(ctx context.Context, booking entity.Booking) (entity.Booking, error) {
 	capacity := booking.Capacity
 	if capacity < 1 {
@@ -44,7 +45,8 @@ func (repository *Repository) CreateBooking(ctx context.Context, booking entity.
 		    OR (status = 'PENDING_PAYMENT' AND hold_expires_at > now())
 		  )
 		  AND time_range && tstzrange($2, $3, '[)')
-	`, booking.ParkingSpotID, booking.Start.Add(-entity.GracePeriod), booking.End.Add(entity.GracePeriod))
+		  AND ($4::uuid IS NULL OR id <> $4::uuid)
+	`, booking.ParkingSpotID, booking.Start.Add(-entity.GracePeriod), booking.End.Add(entity.GracePeriod), booking.ParentBookingID)
 	if err != nil {
 		return entity.Booking{}, errors.NewInternalError("booking.CreateBooking", err)
 	}
@@ -71,11 +73,11 @@ func (repository *Repository) CreateBooking(ctx context.Context, booking entity.
 	row := tx.QueryRowContext(ctx, `
 		INSERT INTO `+constants.BookingsTableName+`
 			(parking_spot_id, user_id, time_range, status, hold_expires_at, amount, owner_amount, capacity, kind,
-			 vehicle_plate, vehicle_brand, vehicle_model, vehicle_country, vehicle_type)
-		VALUES ($1, $2, tstzrange($3, $4, '[)'), $5::booking_status, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+			 vehicle_plate, vehicle_brand, vehicle_model, vehicle_country, vehicle_type, parent_booking_id)
+		VALUES ($1, $2, tstzrange($3, $4, '[)'), $5::booking_status, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		RETURNING id, created_at, updated_at
 	`, booking.ParkingSpotID, booking.UserID, booking.Start, booking.End, booking.Status.String(), booking.HoldExpiresAt, booking.Amount, booking.OwnerAmount, capacity, booking.Kind.String(),
-		booking.VehiclePlate, booking.VehicleBrand, booking.VehicleModel, booking.VehicleCountry, booking.VehicleType)
+		booking.VehiclePlate, booking.VehicleBrand, booking.VehicleModel, booking.VehicleCountry, booking.VehicleType, booking.ParentBookingID)
 
 	var id string
 	var createdAt, updatedAt time.Time

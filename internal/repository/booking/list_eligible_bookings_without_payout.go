@@ -14,7 +14,8 @@ import (
 // against payouts (rather than a NOT EXISTS/subquery) plus `p.id IS NULL` is what makes this
 // idempotent: a booking that already got a payout on a previous tick never comes back here.
 // A booking whose arrival was never verified only qualifies once an admin APPROVED it (see
-// ResolveVerificationReview) -- PENDING holds it back, REFUNDED excludes it for good.
+// ResolveVerificationReview) -- PENDING holds it back, REFUNDED excludes it for good. A
+// booking the driver cancelled in its last hour also pays the owner what wasn't refunded.
 func (repository *Repository) ListEligibleBookingsWithoutPayout(ctx context.Context) ([]entity.Booking, error) {
 	rows, err := repository.database.QueryContext(ctx, `
 		SELECT
@@ -25,7 +26,8 @@ func (repository *Repository) ListEligibleBookingsWithoutPayout(ctx context.Cont
 			b.created_at, b.updated_at, b.refunded_amount
 		FROM `+constants.BookingsTableName+` b
 		LEFT JOIN `+constants.PayoutsTableName+` p ON p.booking_id = b.id
-		WHERE b.status = 'COMPLETED'
+		WHERE (b.status = 'COMPLETED'
+		       OR (b.status = 'CANCELLED' AND b.cancellation_reason = '`+constants.CancellationReasonDriverLateCancelled+`'))
 		  AND b.paid_at IS NOT NULL
 		  AND upper(b.time_range) <= now() - interval '24 hours'
 		  AND p.id IS NULL

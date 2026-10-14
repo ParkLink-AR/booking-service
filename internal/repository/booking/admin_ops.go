@@ -19,7 +19,7 @@ const adminBookingColumns = `
 	status, hold_expires_at, owner_response_deadline, amount, owner_amount, COALESCE(payment_id, ''), paid_at,
 	cancellation_reason, kind, verification_code, verification_attempts, verified_at, created_at, updated_at,
 	vehicle_plate, vehicle_brand, vehicle_model, vehicle_country, vehicle_type,
-	refunded_amount, admin_note, verification_review`
+	refunded_amount, admin_note, verification_review, cancellation_note, parent_booking_id`
 
 func scanAdminBooking(row rowScanner) (entity.AdminBooking, error) {
 	var b entity.AdminBooking
@@ -30,7 +30,7 @@ func scanAdminBooking(row rowScanner) (entity.AdminBooking, error) {
 		&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.OwnerAmount, &b.PaymentID, &b.PaidAt,
 		&b.CancellationReason, &kindLabel, &b.VerificationCode, &b.VerificationAttempts, &b.VerifiedAt, &b.CreatedAt, &b.UpdatedAt,
 		&b.VehiclePlate, &b.VehicleBrand, &b.VehicleModel, &b.VehicleCountry, &b.VehicleType,
-		&b.RefundedAmount, &b.AdminNote, &b.VerificationReview,
+		&b.RefundedAmount, &b.AdminNote, &b.VerificationReview, &b.CancellationNote, &b.ParentBookingID,
 	); err != nil {
 		return entity.AdminBooking{}, err
 	}

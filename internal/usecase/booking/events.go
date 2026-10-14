@@ -49,7 +49,10 @@ const (
 	// the support inbox), since nobody may be looking at the admin panel at the time.
 	// ParkLink staff cancelled a booking, or refunded (part of) one, from the admin panel:
 	// the driver and the owner are told. action says which (one of the AdminAction* values).
-	RoutingKeyBookingAdminAction       = "booking.admin_action"
+	RoutingKeyBookingAdminAction = "booking.admin_action"
+	// The driver paid to extend a booking (see BookingChangesUseCase.Extend): the owner is
+	// told until when, and the driver gets the confirmation.
+	RoutingKeyBookingExtended          = "booking.extended"
 	RoutingKeySupportTicketOpened      = "support.ticket_opened"
 	RoutingKeySupportTicketUserMessage = "support.ticket_user_message"
 )
@@ -67,6 +70,8 @@ const (
 	CancelledByDriver        = "driver"
 	CancelledByOwnerAccount  = "owner_account"
 	CancelledByDriverAccount = "driver_account"
+	// The owner called off a booking they had already accepted, with a reason.
+	CancelledByOwner = "owner_cancelled"
 )
 
 // Which side of a booking an event's recipient is on -- lets the notification show the
@@ -125,13 +130,38 @@ func newBookingEvent(eventType string, b entity.Booking, spot entity.SpotDetails
 type bookingCancelledEvent struct {
 	bookingEvent
 	CancelledBy string `json:"cancelled_by"`
+	// The owner's reason, when they cancelled a booking they had accepted.
+	Note string `json:"note,omitempty"`
+	// Set when only part of it goes back to the driver (a cancellation in its last hour),
+	// in centavos. Absent means a full refund.
+	RefundedAmount int `json:"refunded_amount,omitempty"`
 }
 
 func newBookingCancelledEvent(b entity.Booking, spot entity.SpotDetails, cancelledBy string) bookingCancelledEvent {
-	return bookingCancelledEvent{
-		bookingEvent: newBookingEvent(RoutingKeyBookingCancelled, b, spot),
-		CancelledBy:  cancelledBy,
+	event := bookingCancelledEvent{
+		bookingEvent:   newBookingEvent(RoutingKeyBookingCancelled, b, spot),
+		CancelledBy:    cancelledBy,
+		RefundedAmount: b.RefundedAmount,
 	}
+	if b.CancellationNote != nil {
+		event.Note = *b.CancellationNote
+	}
+	return event
+}
+
+// bookingExtendedEvent is the wire shape of booking.extended: the extension (its start is
+// where the original booking ended) plus the booking it continues.
+type bookingExtendedEvent struct {
+	bookingEvent
+	ParentBookingID string `json:"parent_booking_id"`
+}
+
+func newBookingExtendedEvent(extension entity.Booking, spot entity.SpotDetails) bookingExtendedEvent {
+	event := bookingExtendedEvent{bookingEvent: newBookingEvent(RoutingKeyBookingExtended, extension, spot)}
+	if extension.ParentBookingID != nil {
+		event.ParentBookingID = *extension.ParentBookingID
+	}
+	return event
 }
 
 // bookingVerificationReviewedEvent is the wire shape of booking.verification_reviewed: the

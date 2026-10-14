@@ -37,6 +37,15 @@ type Booking struct {
 	// for every booking no admin refunded (an automatic full refund on cancellation isn't
 	// recorded here).
 	RefundedAmount int
+	// ParentBookingID is set on an extension: the booking it continues -- same spot, same
+	// driver, starting right where the parent ends (see BookingChangesUseCase.Extend).
+	ParentBookingID *string
+	// CancellationNote is the reason the owner gave for cancelling a booking they had
+	// already accepted (CancellationReason OWNER_CANCELLED). Nil otherwise.
+	CancellationNote *string
+	// Extension is this booking's latest extension that's still live (awaiting payment or
+	// paid), if any. Only filled by GetByID.
+	Extension *BookingExtension
 	// CancellationReason distinguishes *why* a CANCELLED booking got there --
 	// "OWNER_REJECTED" (RejectBooking), "OWNER_EXPIRED" (owner never responded in time,
 	// see ExpireStalePendingApprovals), or "DRIVER_CANCELLED" (the driver cancelled it

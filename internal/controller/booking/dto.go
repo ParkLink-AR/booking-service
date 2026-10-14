@@ -79,10 +79,25 @@ type bookingResponse struct {
 	VerificationCode *string `json:"verification_code,omitempty"`
 	VerifiedAt       *string `json:"verified_at,omitempty"`
 	UpdatedAt        string  `json:"updated_at"`
+	// RefundedAmount is what went back to the driver when only part did (a late
+	// cancellation, an admin's partial refund), centavos. Absent when nothing or everything.
+	RefundedAmount int `json:"refunded_amount,omitempty"`
+	// CancellationNote is the owner's reason for cancelling a booking they had accepted.
+	CancellationNote *string `json:"cancellation_note,omitempty"`
+	// ParentBookingID is set on an extension: the booking it continues.
+	ParentBookingID *string `json:"parent_booking_id,omitempty"`
+	// Extension is this booking's latest live extension, if any.
+	Extension *extensionResponse `json:"extension,omitempty"`
 	// Vehicle is nil when the driver didn't pick one for this booking (entirely optional --
 	// see entity.Booking.VehiclePlate). Visible to both the driver and the owner, unlike
 	// VerificationCode -- showing the owner which plate to expect is the whole point.
 	Vehicle *vehicleResponse `json:"vehicle,omitempty"`
+}
+
+type extensionResponse struct {
+	ID     string `json:"id"`
+	End    string `json:"end"`
+	Status string `json:"status"`
 }
 
 type vehicleResponse struct {
@@ -145,6 +160,16 @@ func bookingResponseFromEntity(booking entity.Booking, location *time.Location, 
 		response.OwnerResponseDeadline = &formatted
 	}
 	response.CancellationReason = booking.CancellationReason
+	response.CancellationNote = booking.CancellationNote
+	response.RefundedAmount = booking.RefundedAmount
+	response.ParentBookingID = booking.ParentBookingID
+	if booking.Extension != nil && booking.Extension.ID != "" {
+		response.Extension = &extensionResponse{
+			ID:     booking.Extension.ID,
+			End:    booking.Extension.End.In(location).Format(time.RFC3339),
+			Status: booking.Extension.Status.String(),
+		}
+	}
 	if viewerID == "" || viewerID != booking.UserID {
 		response.OwnerAmount = booking.OwnerAmount
 	}
