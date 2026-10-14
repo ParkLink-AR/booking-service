@@ -19,7 +19,7 @@ func (repository *Repository) ListReviewsByTarget(
 	rows, err := repository.database.QueryContext(ctx, `
 		SELECT id, booking_id, reviewer_id, target_type, target_id, rating, COALESCE(comment, ''), created_at
 		FROM `+constants.ReviewsTableName+`
-		WHERE target_type = $1 AND target_id = $2
+		WHERE target_type = $1 AND target_id = $2 AND hidden_at IS NULL -- hidden by ParkLink staff
 		ORDER BY created_at DESC
 	`, targetType.String(), targetID)
 	if err != nil {

@@ -16,7 +16,7 @@ func (repository *Repository) GetSpotRatings(ctx context.Context, spotIDs []stri
 	rows, err := repository.database.QueryContext(ctx, `
 		SELECT target_id, AVG(rating), COUNT(*)
 		FROM `+constants.ReviewsTableName+`
-		WHERE target_type = 'spot' AND target_id = ANY($1)
+		WHERE target_type = 'spot' AND target_id = ANY($1) AND hidden_at IS NULL -- hidden by ParkLink staff
 		GROUP BY target_id
 	`, pq.Array(spotIDs))
 	if err != nil {

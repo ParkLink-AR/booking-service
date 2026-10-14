@@ -20,6 +20,10 @@ const (
 	// ReviewsTableName is the PostgreSQL table backing the review repository.
 	ReviewsTableName = "reviews"
 
+	// ReportsTableName is the PostgreSQL table backing what users report from the app (a
+	// spot, a person or a review) for ParkLink staff to look at.
+	ReportsTableName = "reports"
+
 	// BookingMessagesTableName is the PostgreSQL table backing in-app messages
 	// between a booking's driver and its spot's owner.
 	BookingMessagesTableName = "booking_messages"

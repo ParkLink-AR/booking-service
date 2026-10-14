@@ -47,6 +47,9 @@ const (
 	RoutingKeySupportTicketClosed = "support.ticket_closed"
 	// A user opened a support ticket, or wrote on one: ParkLink staff are told (by email to
 	// the support inbox), since nobody may be looking at the admin panel at the time.
+	// ParkLink staff cancelled a booking, or refunded (part of) one, from the admin panel:
+	// the driver and the owner are told. action says which (one of the AdminAction* values).
+	RoutingKeyBookingAdminAction       = "booking.admin_action"
 	RoutingKeySupportTicketOpened      = "support.ticket_opened"
 	RoutingKeySupportTicketUserMessage = "support.ticket_user_message"
 )
@@ -342,5 +345,27 @@ func newSupportTicketStaffEvent(eventType string, ticket entity.SupportTicket, a
 		AuthorUserID:  ticket.CreatedBy,
 		AuthorRole:    authorRole,
 		Body:          body,
+	}
+}
+
+// Values of booking.admin_action's action.
+const (
+	AdminActionCancelled = "cancelled"
+	AdminActionRefunded  = "refunded"
+)
+
+// bookingAdminActionEvent is the wire shape of booking.admin_action: the booking, what staff
+// did with it, and how much went back to the driver (centavos; 0 = nothing).
+type bookingAdminActionEvent struct {
+	bookingEvent
+	Action         string `json:"action"`
+	RefundedAmount int    `json:"refunded_amount"`
+}
+
+func newBookingAdminActionEvent(b entity.Booking, spot entity.SpotDetails, action string, refunded int) bookingAdminActionEvent {
+	return bookingAdminActionEvent{
+		bookingEvent:   newBookingEvent(RoutingKeyBookingAdminAction, b, spot),
+		Action:         action,
+		RefundedAmount: refunded,
 	}
 }

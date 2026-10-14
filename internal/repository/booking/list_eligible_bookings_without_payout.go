@@ -22,7 +22,7 @@ func (repository *Repository) ListEligibleBookingsWithoutPayout(ctx context.Cont
 			lower(b.time_range), upper(b.time_range),
 			b.status, b.hold_expires_at, b.owner_response_deadline, b.amount, b.owner_amount, COALESCE(b.payment_id, ''), b.paid_at,
 			b.cancellation_reason, b.kind, b.verification_code, b.verification_attempts, b.verified_at,
-			b.created_at, b.updated_at
+			b.created_at, b.updated_at, b.refunded_amount
 		FROM `+constants.BookingsTableName+` b
 		LEFT JOIN `+constants.PayoutsTableName+` p ON p.booking_id = b.id
 		WHERE b.status = 'COMPLETED'
@@ -46,7 +46,7 @@ func (repository *Repository) ListEligibleBookingsWithoutPayout(ctx context.Cont
 			&b.Start, &b.End,
 			&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.OwnerAmount, &b.PaymentID, &b.PaidAt,
 			&b.CancellationReason, &kindLabel, &b.VerificationCode, &b.VerificationAttempts, &b.VerifiedAt,
-			&b.CreatedAt, &b.UpdatedAt,
+			&b.CreatedAt, &b.UpdatedAt, &b.RefundedAmount,
 		); err != nil {
 			return nil, errors.NewInternalError("booking.ListEligibleBookingsWithoutPayout", err)
 		}

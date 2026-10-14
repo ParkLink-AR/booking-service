@@ -126,6 +126,10 @@ func main() {
 	expirePendingApprovalsUseCase := ucbooking.NewExpirePendingApprovalsUseCase(bookingRepository, paymentClient, parkingClient, eventPublisher)
 	completeFinishedBookingsUseCase := ucbooking.NewCompleteFinishedBookingsUseCase(bookingRepository, parkingClient, eventPublisher)
 	sendBookingRemindersUseCase := ucbooking.NewSendBookingRemindersUseCase(bookingRepository, parkingClient, eventPublisher)
+	adminOpsUseCase := ucbooking.NewAdminOpsUseCase(
+		bookingRepository, paymentClient, bookingRepository, bookingRepository, bookingRepository, bookingRepository,
+		parkingClient, eventPublisher, buenosAiresLocation,
+	)
 
 	// Router
 	router := chi.NewRouter()
@@ -158,6 +162,7 @@ func main() {
 		os.Getenv("INTERNAL_SERVICE_KEY"),
 		listPendingVerificationReviewsUseCase, resolveVerificationReviewUseCase,
 		accountClosureUseCase,
+		adminOpsUseCase,
 	)
 
 	// Start consumer in background
@@ -263,6 +268,7 @@ func loadHandlers(
 	listPendingVerificationReviewsUseCase *ucbooking.ListPendingVerificationReviewsUseCase,
 	resolveVerificationReviewUseCase *ucbooking.ResolveVerificationReviewUseCase,
 	accountClosureUseCase *ucbooking.AccountClosureUseCase,
+	adminOpsUseCase *ucbooking.AdminOpsUseCase,
 ) {
 	handlers := []Handler{
 		bookingcontroller.NewHandler(
@@ -289,6 +295,7 @@ func loadHandlers(
 			listPendingVerificationReviewsUseCase, resolveVerificationReviewUseCase,
 		),
 		bookingcontroller.NewAccountClosureHandler(accountClosureUseCase, internalServiceKey),
+		bookingcontroller.NewAdminOpsHandler(adminOpsUseCase, location),
 	}
 	for _, handler := range handlers {
 		handler.RegisterRoutes(router)

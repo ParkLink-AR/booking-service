@@ -85,13 +85,18 @@ func (uc *GeneratePendingPayoutsUseCase) Execute(ctx context.Context) (int, erro
 		} else {
 			commission = b.Amount * settings.CommissionRateBP / (10000 + settings.CommissionRateBP)
 		}
+		// Part of it given back to the driver by an admin: the owner gets paid on the rest.
+		gross, commission, net := refundedPayoutAmounts(b.Amount, commission, b.RefundedAmount)
+		if net <= 0 {
+			continue
+		}
 		_, err = uc.payouts.CreatePayout(ctx, entity.Payout{
 			BookingID:        b.ID,
 			OwnerID:          spot.OwnerID,
 			PaymentID:        b.PaymentID,
-			GrossAmount:      b.Amount,
+			GrossAmount:      gross,
 			CommissionAmount: commission,
-			NetAmount:        b.Amount - commission,
+			NetAmount:        net,
 		})
 		if err != nil {
 			continue
@@ -99,4 +104,19 @@ func (uc *GeneratePendingPayoutsUseCase) Execute(ctx context.Context) (int, erro
 		created++
 	}
 	return created, nil
+}
+
+// refundedPayoutAmounts is a payout's (gross, commission, net) once refunded centavos of the
+// booking's amount went back to the driver: the owner and ParkLink each keep their share of
+// what's left, in the same proportion as before. Nothing left (net <= 0) means no payout.
+func refundedPayoutAmounts(amount, commission, refunded int) (int, int, int) {
+	if refunded <= 0 {
+		return amount, commission, amount - commission
+	}
+	remaining := amount - refunded
+	if remaining <= 0 || amount <= 0 {
+		return 0, 0, 0
+	}
+	net := (amount - commission) * remaining / amount
+	return remaining, remaining - net, net
 }

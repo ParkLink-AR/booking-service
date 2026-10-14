@@ -32,16 +32,27 @@ func NewClient(baseURL, internalKey string) *Client {
 
 type refundRequest struct {
 	PaymentID string `json:"payment_id"`
+	// Centavos to give back; omitted = the whole payment.
+	AmountCentavos *int `json:"amount_centavos,omitempty"`
 }
 
 func (client *Client) RefundPayment(ctx context.Context, paymentID string) error {
+	return client.refund(ctx, paymentID, nil)
+}
+
+// RefundPaymentAmount gives back part of a payment (an admin's partial refund), in centavos.
+func (client *Client) RefundPaymentAmount(ctx context.Context, paymentID string, amountCentavos int) error {
+	return client.refund(ctx, paymentID, &amountCentavos)
+}
+
+func (client *Client) refund(ctx context.Context, paymentID string, amountCentavos *int) error {
 	// A cash booking never had a real charge -- nothing to refund, and
 	// payment-service would just reject an unknown payment_id anyway.
 	if paymentID == constants.CashPaymentID {
 		return nil
 	}
 
-	body, err := json.Marshal(refundRequest{PaymentID: paymentID})
+	body, err := json.Marshal(refundRequest{PaymentID: paymentID, AmountCentavos: amountCentavos})
 	if err != nil {
 		return errors.NewUpstream("paymentclient.RefundPayment", err)
 	}

@@ -32,6 +32,11 @@ type Booking struct {
 	// trustworthy record of whether and when the money actually moved, independent of
 	// UpdatedAt (which every one of those transitions bumps). Nil before payment.
 	PaidAt *time.Time
+	// RefundedAmount is what an admin gave back to the driver by hand, in centavos (see
+	// usecase.AdminRefundBookingUseCase) -- the owner's payout is computed on the rest. Zero
+	// for every booking no admin refunded (an automatic full refund on cancellation isn't
+	// recorded here).
+	RefundedAmount int
 	// CancellationReason distinguishes *why* a CANCELLED booking got there --
 	// "OWNER_REJECTED" (RejectBooking), "OWNER_EXPIRED" (owner never responded in time,
 	// see ExpireStalePendingApprovals), or "DRIVER_CANCELLED" (the driver cancelled it
