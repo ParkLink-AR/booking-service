@@ -264,19 +264,25 @@ func (uc *AdminOpsUseCase) RestoreReview(ctx context.Context, reviewID string) e
 
 // Report targets and statuses.
 var (
-	reportTargetTypes   = map[string]bool{"spot": true, "user": true, "review": true}
+	reportTargetTypes   = map[string]bool{"spot": true, "user": true, "review": true, "booking": true}
 	reportFinalStatuses = map[string]bool{"RESOLVED": true, "DISMISSED": true}
 )
 
 const (
+	// How early before a booking starts either side can already report a problem with it
+	// (the spot is taken, nobody answers the gate).
+	bookingReportLead = 30 * time.Minute
+
 	maxReportReasonLength  = 100
 	maxReportDetailsLength = 1000
 )
 
-// CreateReport files a user's report about a spot, a person or a review.
+// CreateReport files a user's report about a spot, a person, a review, or something that
+// went wrong with a booking of theirs (the driver never came or stayed past the end; the
+// spot was taken).
 func (uc *AdminOpsUseCase) CreateReport(ctx context.Context, reporterID, targetType, targetID, reason, details string) (entity.Report, error) {
 	if !reportTargetTypes[targetType] {
-		return entity.Report{}, errors.NewInvalidInput("INVALID_TARGET", "target_type must be spot, user or review")
+		return entity.Report{}, errors.NewInvalidInput("INVALID_TARGET", "target_type must be spot, user, review or booking")
 	}
 	if strings.TrimSpace(targetID) == "" {
 		return entity.Report{}, errors.NewInvalidInput("INVALID_TARGET", "target_id is required")
@@ -292,9 +298,41 @@ func (uc *AdminOpsUseCase) CreateReport(ctx context.Context, reporterID, targetT
 	if len(trimmedDetails) > maxReportDetailsLength {
 		return entity.Report{}, errors.NewInvalidInput("DETAILS_TOO_LONG", "el detalle es demasiado largo")
 	}
+	if targetType == "booking" {
+		if err := uc.checkBookingReport(ctx, reporterID, targetID); err != nil {
+			return entity.Report{}, err
+		}
+	}
 	return uc.reports.CreateReport(ctx, entity.Report{
 		ReporterID: reporterID, TargetType: targetType, TargetID: targetID, Reason: trimmedReason, Details: trimmedDetails,
 	})
+}
+
+// checkBookingReport: a problem with a booking can only be reported by its driver or its
+// spot's owner, on a booking that was accepted, from shortly before it starts.
+func (uc *AdminOpsUseCase) checkBookingReport(ctx context.Context, reporterID, bookingID string) error {
+	booking, err := uc.bookings.GetAdminBooking(ctx, bookingID)
+	if err != nil {
+		return err
+	}
+	if booking.UserID != reporterID {
+		spot, err := uc.spots.GetSpotDetails(ctx, booking.ParkingSpotID)
+		if err != nil {
+			return err
+		}
+		if spot.OwnerID != reporterID {
+			return errors.NewForbidden("no sos parte de esta reserva")
+		}
+	}
+	switch booking.Status {
+	case enum.BookingStatusConfirmed, enum.BookingStatusInProgress, enum.BookingStatusCompleted:
+	default:
+		return errors.NewInvalidInput("BOOKING_NOT_REPORTABLE", "solo se puede reportar un problema con una reserva confirmada")
+	}
+	if time.Now().Before(booking.Start.Add(-bookingReportLead)) {
+		return errors.NewInvalidInput("BOOKING_NOT_STARTED", "todavía falta para que empiece la reserva")
+	}
+	return nil
 }
 
 func (uc *AdminOpsUseCase) ListReports(ctx context.Context, status string) ([]entity.Report, error) {

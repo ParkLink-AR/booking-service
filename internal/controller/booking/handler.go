@@ -12,6 +12,7 @@ import (
 	"github.com/example/bookings-service/internal/domain/entity"
 	"github.com/example/bookings-service/internal/domain/enum"
 	"github.com/example/bookings-service/internal/domain/errors"
+	"github.com/example/bookings-service/pkg/monitoring"
 )
 
 //go:generate go tool mockgen -destination=../../../pkg/mocks/list_bookings_usecase_mock.go -package=mocks -source=./handler.go
@@ -371,8 +372,10 @@ func writeDomainError(responseWriter http.ResponseWriter, err error) {
 		if strings.HasPrefix(errors.UpstreamOp(err), "paymentclient") {
 			code = "PAYMENT_SERVICE_ERROR"
 		}
+		monitoring.CaptureError(err)
 		writeErrorCode(responseWriter, http.StatusBadGateway, code, err.Error())
 	default:
+		monitoring.CaptureError(err)
 		writeErrorCode(responseWriter, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
 	}
 }

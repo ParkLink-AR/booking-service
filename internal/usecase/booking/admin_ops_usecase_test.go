@@ -183,7 +183,7 @@ func (s *adminOpsUseCaseSuite) TestRefundBooking_MoreThanWhatsLeft_Refused() {
 }
 
 func (s *adminOpsUseCaseSuite) TestCreateReport_Validates() {
-	_, err := s.useCase.CreateReport(s.context, "user-1", "booking", "x", "Spam", "")
+	_, err := s.useCase.CreateReport(s.context, "user-1", "payment", "x", "Spam", "")
 	s.Equal("INVALID_TARGET", errors.InvalidInputCode(err))
 
 	_, err = s.useCase.CreateReport(s.context, "user-1", "user", "user-1", "Spam", "")
@@ -202,6 +202,64 @@ func (s *adminOpsUseCaseSuite) TestCreateReport_Stores() {
 
 	s.Require().NoError(err)
 	s.Equal("report-1", got.ID)
+}
+
+func (s *adminOpsUseCaseSuite) startedBooking(status enum.BookingStatus) entity.AdminBooking {
+	return entity.AdminBooking{Booking: entity.Booking{
+		ID: "booking-1", ParkingSpotID: "spot-1", UserID: "driver-1", Status: status,
+		Start: time.Now().Add(-time.Hour), End: time.Now().Add(time.Hour),
+	}}
+}
+
+// The spot's owner reports the driver never came.
+func (s *adminOpsUseCaseSuite) TestCreateReport_BookingByItsOwner_Stores() {
+	s.bookings.EXPECT().GetAdminBooking(gomock.Any(), "booking-1").Return(s.startedBooking(enum.BookingStatusConfirmed), nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), "spot-1").Return(entity.SpotDetails{OwnerID: "owner-1"}, nil)
+	s.reports.EXPECT().CreateReport(gomock.Any(), entity.Report{
+		ReporterID: "owner-1", TargetType: "booking", TargetID: "booking-1", Reason: "El conductor no vino",
+	}).Return(entity.Report{ID: "report-1"}, nil)
+
+	got, err := s.useCase.CreateReport(s.context, "owner-1", "booking", "booking-1", "El conductor no vino", "")
+
+	s.Require().NoError(err)
+	s.Equal("report-1", got.ID)
+}
+
+// The driver reports the spot was taken -- no owner lookup needed.
+func (s *adminOpsUseCaseSuite) TestCreateReport_BookingByItsDriver_Stores() {
+	s.bookings.EXPECT().GetAdminBooking(gomock.Any(), "booking-1").Return(s.startedBooking(enum.BookingStatusInProgress), nil)
+	s.reports.EXPECT().CreateReport(gomock.Any(), gomock.Any()).Return(entity.Report{ID: "report-2"}, nil)
+
+	_, err := s.useCase.CreateReport(s.context, "driver-1", "booking", "booking-1", "La cochera estaba ocupada", "")
+
+	s.Require().NoError(err)
+}
+
+func (s *adminOpsUseCaseSuite) TestCreateReport_BookingBySomeoneElse_Forbidden() {
+	s.bookings.EXPECT().GetAdminBooking(gomock.Any(), "booking-1").Return(s.startedBooking(enum.BookingStatusConfirmed), nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), "spot-1").Return(entity.SpotDetails{OwnerID: "owner-1"}, nil)
+
+	_, err := s.useCase.CreateReport(s.context, "stranger", "booking", "booking-1", "Algo", "")
+
+	s.True(errors.IsForbidden(err))
+}
+
+func (s *adminOpsUseCaseSuite) TestCreateReport_BookingNotStartedYet_Rejected() {
+	booking := s.startedBooking(enum.BookingStatusConfirmed)
+	booking.Start = time.Now().Add(3 * time.Hour)
+	s.bookings.EXPECT().GetAdminBooking(gomock.Any(), "booking-1").Return(booking, nil)
+
+	_, err := s.useCase.CreateReport(s.context, "driver-1", "booking", "booking-1", "Algo", "")
+
+	s.Equal("BOOKING_NOT_STARTED", errors.InvalidInputCode(err))
+}
+
+func (s *adminOpsUseCaseSuite) TestCreateReport_CancelledBooking_Rejected() {
+	s.bookings.EXPECT().GetAdminBooking(gomock.Any(), "booking-1").Return(s.startedBooking(enum.BookingStatusCancelled), nil)
+
+	_, err := s.useCase.CreateReport(s.context, "driver-1", "booking", "booking-1", "Algo", "")
+
+	s.Equal("BOOKING_NOT_REPORTABLE", errors.InvalidInputCode(err))
 }
 
 func (s *adminOpsUseCaseSuite) TestResolveReport_OnlyFinalStatuses() {

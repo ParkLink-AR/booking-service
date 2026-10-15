@@ -25,6 +25,7 @@ import (
 	"github.com/example/bookings-service/internal/repository/storage"
 	bookingservice "github.com/example/bookings-service/internal/service/booking"
 	ucbooking "github.com/example/bookings-service/internal/usecase/booking"
+	"github.com/example/bookings-service/pkg/monitoring"
 )
 
 // holdExpiryInterval controls how often the background job expires stale holds.
@@ -38,6 +39,12 @@ type Handler interface {
 
 func main() {
 	logger, _ := zap.NewProduction()
+
+	flushMonitoring, err := monitoring.Init()
+	if err != nil {
+		logger.Warn("sentry init failed, errors won't be reported", zap.Error(err))
+	}
+	defer flushMonitoring()
 	defer logger.Sync()
 
 	// Infrastructure
@@ -137,6 +144,7 @@ func main() {
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
+	router.Use(monitoring.Middleware)
 	router.Use(trustedcaller.Middleware(os.Getenv("GATEWAY_INTERNAL_SECRET"), os.Getenv("INTERNAL_SERVICE_KEY")))
 
 	loadHandlers(
