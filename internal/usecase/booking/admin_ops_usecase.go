@@ -23,6 +23,8 @@ type AdminBookingStore interface {
 	GetAdminBooking(ctx context.Context, bookingID string) (entity.AdminBooking, error)
 	AdminCancelBooking(ctx context.Context, bookingID string, refundedAmount int, note string) (entity.AdminBooking, error)
 	RecordAdminRefund(ctx context.Context, bookingID string, amount int, note string) (entity.AdminBooking, error)
+	// ReleaseDebts puts back to pending the balances a booking's payment had settled or reserved.
+	ReleaseDebts(ctx context.Context, bookingID string) error
 	GetPayoutByBooking(ctx context.Context, bookingID string) (*entity.Payout, error)
 	AdjustPayout(ctx context.Context, payoutID string, gross, commission, net int) error
 }
@@ -133,28 +135,37 @@ func (uc *AdminOpsUseCase) CancelBooking(ctx context.Context, bookingID string, 
 	if err != nil {
 		return entity.AdminBooking{}, err
 	}
+	// What the driver paid includes the pending balances the booking took on: giving back all of
+	// it returns those too (they owe them again), anything less only touches the booking's share.
+	paid := booking.Amount + booking.DebtAmount
 	refund := 0
 	if booking.PaidAt != nil {
-		refund = booking.Amount
+		refund = paid
 		if refundAmount != nil {
 			refund = *refundAmount
 		}
 	}
-	if refund < 0 || refund > booking.Amount {
+	if refund < 0 || refund > paid {
 		return entity.AdminBooking{}, errors.NewInvalidInput("INVALID_REFUND", "el reembolso tiene que estar entre 0 y lo que se pagó")
 	}
 	if refund > 0 && booking.PaidAt == nil {
 		return entity.AdminBooking{}, errors.NewInvalidInput("NOT_PAID", "la reserva no se pagó: no hay nada para devolver")
 	}
 
-	cancelled, err := uc.bookings.AdminCancelBooking(ctx, bookingID, refund, cleaned)
+	// The booking's own record never holds more than its own price as refunded.
+	cancelled, err := uc.bookings.AdminCancelBooking(ctx, bookingID, min(refund, booking.Amount), cleaned)
 	if err != nil {
 		return entity.AdminBooking{}, err
+	}
+	if booking.DebtAmount > 0 && (booking.PaidAt == nil || refund >= paid) {
+		if err := uc.bookings.ReleaseDebts(ctx, bookingID); err != nil {
+			return cancelled, err
+		}
 	}
 	if refund > 0 {
 		// The booking stays cancelled even if Mercado Pago fails: payment-service keeps the
 		// refund on record and the "Reembolsos pendientes" screen follows it up.
-		if err := uc.refund(ctx, cancelled.PaymentID, refund, cancelled.Amount); err != nil {
+		if err := uc.refund(ctx, cancelled.PaymentID, refund, paid); err != nil {
 			return cancelled, err
 		}
 	}
@@ -202,7 +213,9 @@ func (uc *AdminOpsUseCase) RefundBooking(ctx context.Context, bookingID string, 
 		}
 	}
 
-	if err := uc.refund(ctx, booking.PaymentID, amount, booking.Amount); err != nil {
+	// Never the whole payment while it includes pending balances: only the booking's own share can
+	// be given back this way.
+	if err := uc.refund(ctx, booking.PaymentID, amount, booking.Amount+booking.DebtAmount); err != nil {
 		return entity.AdminBooking{}, false, err
 	}
 	refunded, err := uc.bookings.RecordAdminRefund(ctx, bookingID, amount, cleaned)

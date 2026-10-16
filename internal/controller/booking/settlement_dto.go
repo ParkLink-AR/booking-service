@@ -16,6 +16,8 @@ type settlementPayoutResponse struct {
 	GrossAmount      int    `json:"gross_amount"`
 	CommissionAmount int    `json:"commission_amount"`
 	NetAmount        int    `json:"net_amount"`
+	// Kind is BOOKING, or OVERSTAY for what ParkLink pays the owner for the driver staying past the end.
+	Kind string `json:"kind"`
 }
 
 // settlementResponse is the wire shape of a Settlement, for both ParkLink staff's admin panel
@@ -64,6 +66,7 @@ func settlementResponseFromEntity(settlement entity.Settlement, payouts []entity
 				GrossAmount:      p.GrossAmount,
 				CommissionAmount: p.CommissionAmount,
 				NetAmount:        p.NetAmount,
+				Kind:             p.Kind,
 			}
 		}
 	}

@@ -82,6 +82,10 @@ func (repository *Repository) CancelBookingWithReason(ctx context.Context, booki
 	b.Status, _ = parseBookingStatus(statusLabel)
 	b.Kind, _ = parseBookingKind(kindLabel)
 	b.CancellationReason = &reason
+	// Closing an account refunds the driver in full, debts included: they owe those again.
+	if err := repository.ReleaseDebts(ctx, bookingID); err != nil {
+		return entity.Booking{}, err
+	}
 	return b, nil
 }
 
@@ -96,7 +100,7 @@ func (repository *Repository) ExpireHold(ctx context.Context, bookingID string) 
 	if err != nil {
 		return errors.NewInternalError("booking.ExpireHold", err)
 	}
-	return nil
+	return repository.ReleaseDebts(ctx, bookingID)
 }
 
 // GetOwnerPendingPayouts is what ParkLink still owes this owner: payouts not paid yet
@@ -118,7 +122,7 @@ func (repository *Repository) GetOwnerPendingPayouts(ctx context.Context, ownerI
 		  AND b.status = 'COMPLETED'
 		  AND COALESCE(b.payment_id, '') <> ''
 		  AND COALESCE(b.verification_review, '') <> 'REFUNDED'
-		  AND NOT EXISTS (SELECT 1 FROM `+constants.PayoutsTableName+` p WHERE p.booking_id = b.id)
+		  AND NOT EXISTS (SELECT 1 FROM `+constants.PayoutsTableName+` p WHERE p.booking_id = b.id AND p.kind = 'BOOKING')
 	`, pq.Array(spotIDs)).Scan(&bookingCount, &bookingAmount); err != nil {
 		return 0, 0, errors.NewInternalError("booking.GetOwnerPendingPayouts", err)
 	}

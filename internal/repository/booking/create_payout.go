@@ -17,14 +17,14 @@ func (repository *Repository) CreatePayout(ctx context.Context, payout entity.Pa
 			(booking_id, owner_id, payment_id, gross_amount, commission_amount, net_amount)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING
-			id, booking_id, owner_id, payment_id, gross_amount, commission_amount, net_amount,
+			id, booking_id, owner_id, payment_id, gross_amount, commission_amount, net_amount, kind,
 			status, paid_at, paid_by_admin_id, proof_url, settlement_id, created_at
 	`, payout.BookingID, payout.OwnerID, payout.PaymentID, payout.GrossAmount, payout.CommissionAmount, payout.NetAmount)
 
 	var p entity.Payout
 	var statusLabel string
 	if err := row.Scan(
-		&p.ID, &p.BookingID, &p.OwnerID, &p.PaymentID, &p.GrossAmount, &p.CommissionAmount, &p.NetAmount,
+		&p.ID, &p.BookingID, &p.OwnerID, &p.PaymentID, &p.GrossAmount, &p.CommissionAmount, &p.NetAmount, &p.Kind,
 		&statusLabel, &p.PaidAt, &p.PaidByAdminID, &p.ProofURL, &p.SettlementID, &p.CreatedAt,
 	); err != nil {
 		return entity.Payout{}, errors.NewInternalError("booking.CreatePayout", err)

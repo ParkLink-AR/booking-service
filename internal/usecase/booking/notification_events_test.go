@@ -75,14 +75,21 @@ func (s *notificationEventsSuite) TestReminders_AnnounceEachDueReminderOnce() {
 	claimer.EXPECT().ClaimStartReminders(gomock.Any(), booking.StartReminderLead, booking.StartReminderMinLead).
 		Return([]entity.Booking{s.booking("b"), s.booking("c")}, nil)
 	claimer.EXPECT().ClaimEndReminders(gomock.Any(), booking.EndReminderLead).Return(nil, nil)
+	claimer.EXPECT().ClaimHourlyEndReminders(gomock.Any(), booking.HourlyEndReminderLead).Return([]entity.Booking{s.booking("h")}, nil)
+	claimer.EXPECT().ClaimEndNotices(gomock.Any()).Return([]entity.Booking{s.booking("i")}, nil)
 	useCase := booking.NewSendBookingRemindersUseCase(claimer, s.spots, s.events)
 
 	sent, err := useCase.Execute(s.context)
 
 	s.Require().NoError(err)
-	s.Equal(3, sent)
-	s.Equal([]string{"booking.approval_reminder", "booking.starting_soon", "booking.starting_soon"},
-		[]string{s.published[0].routingKey, s.published[1].routingKey, s.published[2].routingKey})
+	s.Equal(5, sent)
+	s.Equal([]string{
+		"booking.approval_reminder", "booking.starting_soon", "booking.starting_soon",
+		"booking.hourly_ending_soon", "booking.ended",
+	}, []string{
+		s.published[0].routingKey, s.published[1].routingKey, s.published[2].routingKey,
+		s.published[3].routingKey, s.published[4].routingKey,
+	})
 	s.Equal("Cochera Palermo", s.published[1].body["parking_spot_title"])
 	s.Equal(notifOwnerID, s.published[1].body["owner_user_id"])
 }
@@ -92,6 +99,8 @@ func (s *notificationEventsSuite) TestReminders_OneKindFailingDoesNotStopTheOthe
 	claimer.EXPECT().ClaimApprovalReminders(gomock.Any(), gomock.Any()).Return(nil, context.DeadlineExceeded)
 	claimer.EXPECT().ClaimStartReminders(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
 	claimer.EXPECT().ClaimEndReminders(gomock.Any(), gomock.Any()).Return([]entity.Booking{s.booking("d")}, nil)
+	claimer.EXPECT().ClaimHourlyEndReminders(gomock.Any(), gomock.Any()).Return(nil, nil)
+	claimer.EXPECT().ClaimEndNotices(gomock.Any()).Return(nil, nil)
 	useCase := booking.NewSendBookingRemindersUseCase(claimer, s.spots, s.events)
 
 	sent, err := useCase.Execute(s.context)

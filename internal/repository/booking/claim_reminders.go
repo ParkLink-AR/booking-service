@@ -61,6 +61,59 @@ func (repository *Repository) ClaimEndReminders(ctx context.Context, within time
 		RETURNING `+reminderColumns, within)
 }
 
+// ClaimHourlyEndReminders marks and returns every hourly booking under way that ends less than
+// `within` from now -- the driver gets one reminder, in time to extend it or head out. One that
+// a paid extension already carries on has nothing to remind about. It shares end_reminder_sent_at
+// with the stays' reminder: a booking is one or the other.
+func (repository *Repository) ClaimHourlyEndReminders(ctx context.Context, within time.Duration) ([]entity.Booking, error) {
+	return repository.claimReminders(ctx, "booking.ClaimHourlyEndReminders", `
+		UPDATE `+constants.BookingsTableName+`
+		SET    end_reminder_sent_at = now()
+		WHERE  status IN ('CONFIRMED', 'IN_PROGRESS')
+		  AND  kind = 'HOURLY'
+		  AND  end_reminder_sent_at IS NULL
+		  AND  lower(time_range) <= now()
+		  AND  upper(time_range) > now()
+		  AND  upper(time_range) <= now() + make_interval(secs => $1)
+		  AND  NOT EXISTS (
+		         SELECT 1 FROM `+constants.BookingsTableName+` child
+		         WHERE child.parent_booking_id = `+constants.BookingsTableName+`.id
+		           AND child.status IN ('CONFIRMED', 'IN_PROGRESS')
+		       )
+		RETURNING `+reminderColumns, within)
+}
+
+// ClaimEndNotices marks and returns every verified hourly booking whose end has passed and that
+// still waits for its exit code (see BookingExitUseCase): the driver gets one notice that it is
+// over, and what to do. One a paid extension carries on, or that was already closed, doesn't
+// get it; neither does a booking whose arrival was never verified, which completes by itself
+// (and so gets the review prompt instead).
+func (repository *Repository) ClaimEndNotices(ctx context.Context) ([]entity.Booking, error) {
+	rows, err := repository.database.QueryContext(ctx, `
+		UPDATE `+constants.BookingsTableName+`
+		SET    end_notice_sent_at = now()
+		WHERE  status IN ('CONFIRMED', 'IN_PROGRESS')
+		  AND  kind = 'HOURLY'
+		  AND  verified_at IS NOT NULL
+		  AND  end_notice_sent_at IS NULL
+		  AND  upper(time_range) <= now()
+		  AND  NOT EXISTS (
+		         SELECT 1 FROM `+constants.BookingExitsTableName+` booking_exit
+		         WHERE booking_exit.booking_id = `+constants.BookingsTableName+`.id
+		           AND booking_exit.exited_at IS NOT NULL
+		       )
+		  AND  NOT EXISTS (
+		         SELECT 1 FROM `+constants.BookingsTableName+` child
+		         WHERE child.parent_booking_id = `+constants.BookingsTableName+`.id
+		           AND child.status IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
+		       )
+		RETURNING `+reminderColumns)
+	if err != nil {
+		return nil, errors.NewInternalError("booking.ClaimEndNotices", err)
+	}
+	return scanReminders(rows, "booking.ClaimEndNotices")
+}
+
 // reminderColumns is what a reminder needs to know about its booking.
 const reminderColumns = `
 	id, parking_spot_id, user_id, lower(time_range), upper(time_range),

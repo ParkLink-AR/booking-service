@@ -22,7 +22,13 @@ func (repository *Repository) ConfirmBooking(
 	ownerResponseDeadline *time.Time,
 	verificationCode *string,
 ) (entity.Booking, error) {
-	row := repository.database.QueryRowContext(ctx, `
+	transaction, err := repository.database.BeginTx(ctx, nil)
+	if err != nil {
+		return entity.Booking{}, errors.NewInternalError("booking.ConfirmBooking", err)
+	}
+	defer func() { _ = transaction.Rollback() }()
+
+	row := transaction.QueryRowContext(ctx, `
 		UPDATE `+constants.BookingsTableName+`
 		SET
 			status                  = $3::booking_status,
@@ -50,6 +56,17 @@ func (repository *Repository) ConfirmBooking(
 		&kindLabel, &b.VerificationCode, &b.VerificationAttempts, &b.VerifiedAt, &b.CreatedAt, &b.UpdatedAt,
 	); err != nil {
 		return entity.Booking{}, errors.NewNotFound("booking", bookingID)
+	}
+	// The payment included the pending balances this booking took on: they're settled.
+	if _, err := transaction.ExecContext(ctx, `
+		UPDATE `+constants.BookingDebtsTableName+`
+		SET    status = 'PAID', paid_at = now()
+		WHERE  charged_booking_id = $1 AND status = 'RESERVED'
+	`, bookingID); err != nil {
+		return entity.Booking{}, errors.NewInternalError("booking.ConfirmBooking", err)
+	}
+	if err := transaction.Commit(); err != nil {
+		return entity.Booking{}, errors.NewInternalError("booking.ConfirmBooking", err)
 	}
 	b.Status, _ = parseBookingStatus(statusLabel)
 	b.Kind, _ = parseBookingKind(kindLabel)

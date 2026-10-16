@@ -56,6 +56,21 @@ func (mr *MockReminderClaimerMockRecorder) ClaimApprovalReminders(ctx, within an
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClaimApprovalReminders", reflect.TypeOf((*MockReminderClaimer)(nil).ClaimApprovalReminders), ctx, within)
 }
 
+// ClaimEndNotices mocks base method.
+func (m *MockReminderClaimer) ClaimEndNotices(ctx context.Context) ([]entity.Booking, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ClaimEndNotices", ctx)
+	ret0, _ := ret[0].([]entity.Booking)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ClaimEndNotices indicates an expected call of ClaimEndNotices.
+func (mr *MockReminderClaimerMockRecorder) ClaimEndNotices(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClaimEndNotices", reflect.TypeOf((*MockReminderClaimer)(nil).ClaimEndNotices), ctx)
+}
+
 // ClaimEndReminders mocks base method.
 func (m *MockReminderClaimer) ClaimEndReminders(ctx context.Context, within time.Duration) ([]entity.Booking, error) {
 	m.ctrl.T.Helper()
@@ -69,6 +84,21 @@ func (m *MockReminderClaimer) ClaimEndReminders(ctx context.Context, within time
 func (mr *MockReminderClaimerMockRecorder) ClaimEndReminders(ctx, within any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClaimEndReminders", reflect.TypeOf((*MockReminderClaimer)(nil).ClaimEndReminders), ctx, within)
+}
+
+// ClaimHourlyEndReminders mocks base method.
+func (m *MockReminderClaimer) ClaimHourlyEndReminders(ctx context.Context, within time.Duration) ([]entity.Booking, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ClaimHourlyEndReminders", ctx, within)
+	ret0, _ := ret[0].([]entity.Booking)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ClaimHourlyEndReminders indicates an expected call of ClaimHourlyEndReminders.
+func (mr *MockReminderClaimerMockRecorder) ClaimHourlyEndReminders(ctx, within any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClaimHourlyEndReminders", reflect.TypeOf((*MockReminderClaimer)(nil).ClaimHourlyEndReminders), ctx, within)
 }
 
 // ClaimStartReminders mocks base method.

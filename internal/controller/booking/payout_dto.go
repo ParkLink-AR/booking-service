@@ -8,17 +8,19 @@ import (
 
 // payoutResponse is the wire shape of a Payout row for ParkLink staff's admin panel.
 type payoutResponse struct {
-	ID               string  `json:"id"`
-	BookingID        string  `json:"booking_id"`
-	OwnerID          string  `json:"owner_id"`
-	PaymentID        string  `json:"payment_id"`
-	GrossAmount      int     `json:"gross_amount"`
-	CommissionAmount int     `json:"commission_amount"`
-	NetAmount        int     `json:"net_amount"`
-	Status           string  `json:"status"`
-	PaidAt           *string `json:"paid_at,omitempty"`
-	PaidByAdminID    *string `json:"paid_by_admin_id,omitempty"`
-	ProofURL         *string `json:"proof_url,omitempty"`
+	ID               string `json:"id"`
+	BookingID        string `json:"booking_id"`
+	OwnerID          string `json:"owner_id"`
+	PaymentID        string `json:"payment_id"`
+	GrossAmount      int    `json:"gross_amount"`
+	CommissionAmount int    `json:"commission_amount"`
+	NetAmount        int    `json:"net_amount"`
+	// Kind is BOOKING, or OVERSTAY for what ParkLink pays the owner for time past the booking's end.
+	Kind          string  `json:"kind"`
+	Status        string  `json:"status"`
+	PaidAt        *string `json:"paid_at,omitempty"`
+	PaidByAdminID *string `json:"paid_by_admin_id,omitempty"`
+	ProofURL      *string `json:"proof_url,omitempty"`
 	// SettlementID is set once a Settlement draft has swept this payout up -- see
 	// entity.Payout.SettlementID. Nil while the payout is unattached.
 	SettlementID *string `json:"settlement_id,omitempty"`
@@ -34,6 +36,7 @@ func payoutResponseFromEntity(payout entity.Payout, location *time.Location) pay
 		GrossAmount:      payout.GrossAmount,
 		CommissionAmount: payout.CommissionAmount,
 		NetAmount:        payout.NetAmount,
+		Kind:             payout.Kind,
 		Status:           payout.Status.String(),
 		PaidByAdminID:    payout.PaidByAdminID,
 		ProofURL:         payout.ProofURL,

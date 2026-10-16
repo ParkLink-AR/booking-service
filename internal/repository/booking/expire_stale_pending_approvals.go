@@ -51,5 +51,14 @@ func (repository *Repository) ExpireStalePendingApprovals(ctx context.Context) (
 	if err := rows.Err(); err != nil {
 		return nil, errors.NewInternalError("booking.ExpireStalePendingApprovals", err)
 	}
+	rows.Close()
+	// They're refunded in full, debts included: the drivers owe those again.
+	ids := make([]string, 0, len(expired))
+	for _, b := range expired {
+		ids = append(ids, b.ID)
+	}
+	if err := repository.releaseDebtsOf(ctx, "booking.ExpireStalePendingApprovals", ids); err != nil {
+		return nil, err
+	}
 	return expired, nil
 }

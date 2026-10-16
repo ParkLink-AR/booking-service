@@ -28,7 +28,7 @@ func (repository *Repository) CreateSettlementDraft(ctx context.Context, ownerID
 	defer func() { _ = tx.Rollback() }()
 
 	rows, err := tx.QueryContext(ctx, `
-		SELECT id, booking_id, owner_id, payment_id, gross_amount, commission_amount, net_amount,
+		SELECT id, booking_id, owner_id, payment_id, gross_amount, commission_amount, net_amount, kind,
 			status, paid_at, paid_by_admin_id, proof_url, settlement_id, created_at
 		FROM `+constants.PayoutsTableName+`
 		WHERE owner_id = $1 AND status = 'PENDING' AND settlement_id IS NULL
@@ -44,7 +44,7 @@ func (repository *Repository) CreateSettlementDraft(ctx context.Context, ownerID
 		var p entity.Payout
 		var statusLabel string
 		if err := rows.Scan(
-			&p.ID, &p.BookingID, &p.OwnerID, &p.PaymentID, &p.GrossAmount, &p.CommissionAmount, &p.NetAmount,
+			&p.ID, &p.BookingID, &p.OwnerID, &p.PaymentID, &p.GrossAmount, &p.CommissionAmount, &p.NetAmount, &p.Kind,
 			&statusLabel, &p.PaidAt, &p.PaidByAdminID, &p.ProofURL, &p.SettlementID, &p.CreatedAt,
 		); err != nil {
 			rows.Close()

@@ -12,8 +12,9 @@ import (
 )
 
 // internalBookingResponse is what payment-service needs to charge for a booking: whose it
-// is, whether it's still awaiting payment, and the server-side price -- so the checkout
-// amount never comes from the client. The spot, dates and kind (and why it was cancelled)
+// is, whether it's still awaiting payment, and the server-side price -- Amount plus the
+// DebtAmount of the driver's pending balances it took on, which its payment also covers -- so
+// the checkout amount never comes from the client. The spot, dates and kind (and why it was cancelled)
 // are for the admin panel's failed refunds, which payment-service lists with their booking.
 type internalBookingResponse struct {
 	ID                 string  `json:"id"`
@@ -24,6 +25,7 @@ type internalBookingResponse struct {
 	Start              string  `json:"start"`
 	End                string  `json:"end"`
 	Amount             int     `json:"amount"`
+	DebtAmount         int     `json:"debt_amount"`
 	CancellationReason *string `json:"cancellation_reason,omitempty"`
 	HoldExpiresAt      *string `json:"hold_expires_at,omitempty"`
 }
@@ -60,6 +62,7 @@ func (handler *Handler) GetInternalBookingEndpoint(responseWriter http.ResponseW
 		Start:              booking.Start.UTC().Format(time.RFC3339),
 		End:                booking.End.UTC().Format(time.RFC3339),
 		Amount:             booking.Amount,
+		DebtAmount:         booking.DebtAmount,
 		CancellationReason: booking.CancellationReason,
 	}
 	if booking.HoldExpiresAt != nil {

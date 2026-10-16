@@ -103,6 +103,52 @@ func (s *adminOpsUseCaseSuite) TestCancelBooking_PartialRefund() {
 	s.Require().NoError(err)
 }
 
+// What the driver paid includes the pending balances the booking took on: cancelling with a full
+// refund gives all of it back and the driver owes those balances again.
+func (s *adminOpsUseCaseSuite) TestCancelBooking_WithDebt_RefundsEverythingAndGivesTheDebtBack() {
+	booking := s.paidBooking(enum.BookingStatusConfirmed, 0)
+	booking.DebtAmount = 6000
+	s.bookings.EXPECT().GetAdminBooking(gomock.Any(), s.bookingID).Return(booking, nil)
+	s.bookings.EXPECT().AdminCancelBooking(gomock.Any(), s.bookingID, 1000000, "Cochera inundada").Return(booking, nil)
+	s.bookings.EXPECT().ReleaseDebts(gomock.Any(), s.bookingID).Return(nil)
+	s.refunder.EXPECT().RefundPayment(gomock.Any(), "mp-1").Return(nil)
+	s.expectAnnounced("cancelled", 1006000)
+
+	_, err := s.useCase.CancelBooking(s.context, s.bookingID, nil, "Cochera inundada")
+
+	s.Require().NoError(err)
+}
+
+// Giving back no more than the booking's own price leaves the debt part of the payment paid.
+func (s *adminOpsUseCaseSuite) TestCancelBooking_WithDebt_RefundOfTheBookingAlone_KeepsTheDebtPaid() {
+	booking := s.paidBooking(enum.BookingStatusConfirmed, 0)
+	booking.DebtAmount = 6000
+	ownPrice := 1000000
+	s.bookings.EXPECT().GetAdminBooking(gomock.Any(), s.bookingID).Return(booking, nil)
+	s.bookings.EXPECT().AdminCancelBooking(gomock.Any(), s.bookingID, ownPrice, "Acuerdo").Return(booking, nil)
+	s.refunder.EXPECT().RefundPaymentAmount(gomock.Any(), "mp-1", ownPrice).Return(nil)
+	s.expectAnnounced("cancelled", ownPrice)
+
+	_, err := s.useCase.CancelBooking(s.context, s.bookingID, &ownPrice, "Acuerdo")
+
+	s.Require().NoError(err)
+}
+
+// A booking nobody paid yet has nothing to refund, but the balances it reserved must go back.
+func (s *adminOpsUseCaseSuite) TestCancelBooking_UnpaidWithDebt_GivesTheDebtBack() {
+	booking := s.paidBooking(enum.BookingStatusPendingPayment, 0)
+	booking.PaidAt = nil
+	booking.DebtAmount = 6000
+	s.bookings.EXPECT().GetAdminBooking(gomock.Any(), s.bookingID).Return(booking, nil)
+	s.bookings.EXPECT().AdminCancelBooking(gomock.Any(), s.bookingID, 0, "Duplicada").Return(booking, nil)
+	s.bookings.EXPECT().ReleaseDebts(gomock.Any(), s.bookingID).Return(nil)
+	s.expectAnnounced("cancelled", 0)
+
+	_, err := s.useCase.CancelBooking(s.context, s.bookingID, nil, "Duplicada")
+
+	s.Require().NoError(err)
+}
+
 func (s *adminOpsUseCaseSuite) TestCancelBooking_NeedsAReason() {
 	_, err := s.useCase.CancelBooking(s.context, s.bookingID, nil, "   ")
 

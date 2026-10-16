@@ -19,6 +19,11 @@ type Booking struct {
 	// to approve/reject before the sweep auto-cancels and refunds it.
 	OwnerResponseDeadline *time.Time
 	Amount                int
+	// DebtAmount is what this booking charges on top of Amount: the driver's pending balances for
+	// staying past earlier bookings' ends (see BookingDebt), attached when it was created. The
+	// payment is for Amount + DebtAmount; everything else (payouts, the cancellation policy) works
+	// on Amount alone.
+	DebtAmount int
 	// OwnerAmount is the owner's own price at the moment this booking was priced (see
 	// Service.priceHourly/priceStay) -- Amount minus whatever platform commission was
 	// added on top for the driver, fixed at creation time so a later admin change to the

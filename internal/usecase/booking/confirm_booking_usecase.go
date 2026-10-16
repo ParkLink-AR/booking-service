@@ -120,7 +120,8 @@ func payableError(booking entity.Booking, amount int) error {
 		return errors.NewInvalidInput(ConfirmErrorHoldExpired, "la reserva venció antes de que se acreditara el pago")
 	case booking.Status != enum.BookingStatusPendingPayment:
 		return errors.NewInvalidInput(ConfirmErrorNotPayable, "la reserva no está esperando un pago")
-	case amount != booking.Amount:
+	case amount != booking.Amount+booking.DebtAmount:
+		// The payment is the booking's price plus the pending balances it took on.
 		return errors.NewInvalidInput(ConfirmErrorAmountMismatch, "el monto pagado no coincide con el de la reserva")
 	}
 	return nil

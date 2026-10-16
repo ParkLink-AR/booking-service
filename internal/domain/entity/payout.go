@@ -6,6 +6,12 @@ import (
 	"github.com/example/bookings-service/internal/domain/enum"
 )
 
+// The kinds of payout a booking can have: one of each.
+const (
+	PayoutKindBooking  = "BOOKING"
+	PayoutKindOverstay = "OVERSTAY"
+)
+
 // Payout represents the money ParkLink owes a parking spot's owner for a single completed,
 // paid booking, net of platform commission. There is exactly one payout per booking (see the
 // UNIQUE constraint on booking_id in migrations/014_create_payouts.sql) -- created once the
@@ -31,7 +37,10 @@ type Payout struct {
 	CommissionAmount int
 	// NetAmount is what actually gets transferred to the owner: GrossAmount - CommissionAmount.
 	NetAmount int
-	Status    enum.PayoutStatus
+	// Kind is PayoutKindBooking, the owner's share of the booking, or PayoutKindOverstay, what
+	// ParkLink pays them for the driver staying past its end (the driver's debt covers it).
+	Kind   string
+	Status enum.PayoutStatus
 	// SettlementID is set once a Settlement draft has swept this payout up (see
 	// usecase.DraftSettlementUseCase) -- nil while the payout is unattached, which is exactly
 	// the set GetOwnerPendingBalances/a future draft consider available. A payout can have a

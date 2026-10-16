@@ -85,11 +85,33 @@ func (repository *Repository) CreateBooking(ctx context.Context, booking entity.
 		return entity.Booking{}, errors.NewInternalError("booking.CreateBooking", err)
 	}
 
+	// The driver's pending balances ride on this booking: its payment will include them (and they
+	// go back to PENDING if its hold runs out). Taken in the same transaction, so two bookings
+	// created at once can't both charge the same debt.
+	var debt int
+	if err := tx.QueryRowContext(ctx, `
+		WITH taken AS (
+			UPDATE `+constants.BookingDebtsTableName+`
+			SET    status = 'RESERVED', charged_booking_id = $1
+			WHERE  user_id = $2 AND status = 'PENDING'
+			RETURNING amount
+		)
+		SELECT COALESCE(SUM(amount), 0) FROM taken
+	`, id, booking.UserID).Scan(&debt); err != nil {
+		return entity.Booking{}, errors.NewInternalError("booking.CreateBooking", err)
+	}
+	if debt > 0 {
+		if _, err := tx.ExecContext(ctx, `UPDATE `+constants.BookingsTableName+` SET debt_amount = $2 WHERE id = $1`, id, debt); err != nil {
+			return entity.Booking{}, errors.NewInternalError("booking.CreateBooking", err)
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return entity.Booking{}, errors.NewInternalError("booking.CreateBooking", err)
 	}
 
 	booking.ID = id
+	booking.DebtAmount = debt
 	booking.Capacity = capacity
 	booking.CreatedAt = createdAt
 	booking.UpdatedAt = updatedAt

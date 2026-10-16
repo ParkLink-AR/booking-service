@@ -47,6 +47,10 @@ func (repository *Repository) OwnerCancelBooking(ctx context.Context, bookingID,
 		return entity.Booking{}, errors.NewNotFound("booking", bookingID)
 	}
 	booking.CancellationNote = &note
+	// The driver gets everything back, debts included: they owe those again.
+	if err := repository.ReleaseDebts(ctx, bookingID); err != nil {
+		return entity.Booking{}, err
+	}
 	return booking, nil
 }
 
@@ -54,13 +58,25 @@ func (repository *Repository) OwnerCancelBooking(ctx context.Context, bookingID,
 // one still awaiting payment simply expires; a paid one is CANCELLED with reason. Returns
 // the paid ones, which the caller refunds.
 func (repository *Repository) CancelExtensions(ctx context.Context, parentID, reason string) ([]entity.Booking, error) {
-	if _, err := repository.database.ExecContext(ctx, `
+	expired, err := repository.database.QueryContext(ctx, `
 		UPDATE `+constants.BookingsTableName+`
 		SET status = 'EXPIRED'::booking_status, updated_at = now()
 		WHERE parent_booking_id = $1 AND status = 'PENDING_PAYMENT'
-	`, parentID); err != nil {
+		RETURNING id
+	`, parentID)
+	if err != nil {
 		return nil, errors.NewInternalError("booking.CancelExtensions", err)
 	}
+	var released []string
+	for expired.Next() {
+		var id string
+		if err := expired.Scan(&id); err != nil {
+			expired.Close()
+			return nil, errors.NewInternalError("booking.CancelExtensions", err)
+		}
+		released = append(released, id)
+	}
+	expired.Close()
 	rows, err := repository.database.QueryContext(ctx, `
 		UPDATE `+constants.BookingsTableName+`
 		SET status = 'CANCELLED'::booking_status, cancellation_reason = $2, updated_at = now()
@@ -80,6 +96,14 @@ func (repository *Repository) CancelExtensions(ctx context.Context, parentID, re
 	}
 	if err := rows.Err(); err != nil {
 		return nil, errors.NewInternalError("booking.CancelExtensions", err)
+	}
+	rows.Close()
+	// Both kinds give back their whole payment, debts included: the driver owes those again.
+	for _, extension := range cancelled {
+		released = append(released, extension.ID)
+	}
+	if err := repository.releaseDebtsOf(ctx, "booking.CancelExtensions", released); err != nil {
+		return nil, err
 	}
 	return cancelled, nil
 }

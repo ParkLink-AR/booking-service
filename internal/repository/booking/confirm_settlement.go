@@ -74,7 +74,7 @@ func (repository *Repository) ConfirmSettlement(
 		SET status = 'PAID', paid_at = $2, paid_by_admin_id = $3, proof_url = $4
 		WHERE settlement_id = $1
 		RETURNING
-			id, booking_id, owner_id, payment_id, gross_amount, commission_amount, net_amount,
+			id, booking_id, owner_id, payment_id, gross_amount, commission_amount, net_amount, kind,
 			status, paid_at, paid_by_admin_id, proof_url, settlement_id, created_at
 	`, settlementID, settlement.PaidAt, adminUserID, proofURL)
 	if err != nil {
@@ -86,7 +86,7 @@ func (repository *Repository) ConfirmSettlement(
 		var p entity.Payout
 		var payoutStatusLabel string
 		if err := rows.Scan(
-			&p.ID, &p.BookingID, &p.OwnerID, &p.PaymentID, &p.GrossAmount, &p.CommissionAmount, &p.NetAmount,
+			&p.ID, &p.BookingID, &p.OwnerID, &p.PaymentID, &p.GrossAmount, &p.CommissionAmount, &p.NetAmount, &p.Kind,
 			&payoutStatusLabel, &p.PaidAt, &p.PaidByAdminID, &p.ProofURL, &p.SettlementID, &p.CreatedAt,
 		); err != nil {
 			rows.Close()

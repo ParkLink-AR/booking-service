@@ -191,6 +191,35 @@ func (s *confirmBookingUseCaseSuite) TestExecute_WrongAmount_RejectedAsAmountMis
 	s.assertCode(err, booking.ConfirmErrorAmountMismatch)
 }
 
+// The payment of a booking that took on the driver's pending balances covers both.
+func (s *confirmBookingUseCaseSuite) TestExecute_BookingWithDebt_ExpectsThePriceAndTheDebt() {
+	withDebt := s.pendingBooking()
+	withDebt.DebtAmount = 6000
+	confirmed := withDebt
+	confirmed.Status = enum.BookingStatusPendingOwnerApproval
+	s.confirmer.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(withDebt, nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), s.spotID).Return(entity.SpotDetails{OwnerID: s.ownerID, Title: "Cochera"}, nil)
+	s.confirmer.EXPECT().ConfirmBooking(gomock.Any(), s.bookingID, s.paymentID, enum.BookingStatusPendingOwnerApproval, gomock.Any(), gomock.Nil()).Return(confirmed, nil)
+	var gotKey string
+	var gotPayload map[string]any
+	s.captureEvent(&gotKey, &gotPayload)
+
+	_, err := s.useCase.Execute(s.context, s.bookingID, s.paymentID, s.amount+6000)
+
+	s.Require().NoError(err)
+	s.Equal("booking.pending_approval", gotKey)
+}
+
+func (s *confirmBookingUseCaseSuite) TestExecute_BookingWithDebt_PayingOnlyThePriceIsAMismatch() {
+	withDebt := s.pendingBooking()
+	withDebt.DebtAmount = 6000
+	s.confirmer.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(withDebt, nil)
+
+	_, err := s.useCase.Execute(s.context, s.bookingID, s.paymentID, s.amount)
+
+	s.assertCode(err, booking.ConfirmErrorAmountMismatch)
+}
+
 func (s *confirmBookingUseCaseSuite) TestExecute_PaidWithAnotherPayment_RejectedAsNotPayable() {
 	paidAt := time.Now()
 	other := s.pendingBooking()
