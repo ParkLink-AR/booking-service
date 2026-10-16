@@ -7,8 +7,9 @@ const (
 
 	// GracePeriodMinutes is the buffer a booking keeps the spot occupied after its end (and,
 	// symmetrically, that a new booking must leave before the next one starts), in case the
-	// driver hasn't left yet. It only affects whether *other* drivers can book -- it is never
-	// billed to the driver nor shown to anyone. See entity.OccupancyWindow.
+	// driver hasn't left yet. It keeps *other* drivers from booking the slot, and it is also how
+	// long the driver may stay past their end for free: past it, all the extra time is charged
+	// (see entity.ComputeOverstay). See entity.OccupancyWindow.
 	GracePeriodMinutes = 15
 
 	// BuenosAiresTimezone is the IANA timezone every booking timestamp is rendered in.
@@ -16,6 +17,14 @@ const (
 
 	// BookingsTableName is the PostgreSQL table backing the booking repository.
 	BookingsTableName = "bookings"
+
+	// BookingDebtsTableName is the PostgreSQL table of what drivers owe for staying past the end
+	// of a booking, charged on their next reservation.
+	BookingDebtsTableName = "booking_debts"
+
+	// BookingExitsTableName is the PostgreSQL table holding each verified hourly booking's exit
+	// code and, once closed, when the vehicle left and what staying past the end cost.
+	BookingExitsTableName = "booking_exits"
 
 	// ReviewsTableName is the PostgreSQL table backing the review repository.
 	ReviewsTableName = "reviews"

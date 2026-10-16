@@ -9,7 +9,8 @@ import (
 )
 
 // ExpireCompletedBookings transitions every CONFIRMED or IN_PROGRESS booking whose time
-// window has already ended to COMPLETED. This is what makes a stay "over" -- it's the
+// window has already ended to COMPLETED -- except a verified hourly one, which waits for its
+// exit code (see BookingExitUseCase) so how long the vehicle stayed is on record. This is what makes a stay "over" -- it's the
 // trigger the review prompts key off of. A paid booking that completes without the
 // driver's in-person code ever having been verified (still CONFIRMED, verified_at NULL)
 // is also flagged verification_review = 'PENDING', which holds back the owner's payout
@@ -27,6 +28,23 @@ func (repository *Repository) ExpireCompletedBookings(ctx context.Context) ([]en
 		       updated_at          = now()
 		WHERE  status IN ('CONFIRMED', 'IN_PROGRESS')
 		  AND  upper(time_range) < now()
+		  AND  NOT (
+		         -- Verified in person at arrival, so it ends the same way: it stays in progress
+		         -- until the owner enters the exit code (or support closes it), unless a paid
+		         -- extension carries the stay on -- the departure is recorded there.
+		         kind = 'HOURLY'
+		         AND verified_at IS NOT NULL
+		         AND NOT EXISTS (
+		               SELECT 1 FROM `+constants.BookingExitsTableName+` booking_exit
+		               WHERE booking_exit.booking_id = `+constants.BookingsTableName+`.id
+		                 AND booking_exit.exited_at IS NOT NULL
+		             )
+		         AND NOT EXISTS (
+		               SELECT 1 FROM `+constants.BookingsTableName+` child
+		               WHERE child.parent_booking_id = `+constants.BookingsTableName+`.id
+		                 AND child.status IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
+		             )
+		       )
 		RETURNING
 			id, parking_spot_id, user_id,
 			lower(time_range), upper(time_range),

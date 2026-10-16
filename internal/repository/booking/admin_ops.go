@@ -19,7 +19,7 @@ const adminBookingColumns = `
 	status, hold_expires_at, owner_response_deadline, amount, owner_amount, COALESCE(payment_id, ''), paid_at,
 	cancellation_reason, kind, verification_code, verification_attempts, verified_at, created_at, updated_at,
 	vehicle_plate, vehicle_brand, vehicle_model, vehicle_country, vehicle_type,
-	refunded_amount, admin_note, verification_review, cancellation_note, parent_booking_id`
+	refunded_amount, admin_note, verification_review, cancellation_note, parent_booking_id, debt_amount`
 
 func scanAdminBooking(row rowScanner) (entity.AdminBooking, error) {
 	var b entity.AdminBooking
@@ -30,7 +30,7 @@ func scanAdminBooking(row rowScanner) (entity.AdminBooking, error) {
 		&statusLabel, &b.HoldExpiresAt, &b.OwnerResponseDeadline, &b.Amount, &b.OwnerAmount, &b.PaymentID, &b.PaidAt,
 		&b.CancellationReason, &kindLabel, &b.VerificationCode, &b.VerificationAttempts, &b.VerifiedAt, &b.CreatedAt, &b.UpdatedAt,
 		&b.VehiclePlate, &b.VehicleBrand, &b.VehicleModel, &b.VehicleCountry, &b.VehicleType,
-		&b.RefundedAmount, &b.AdminNote, &b.VerificationReview, &b.CancellationNote, &b.ParentBookingID,
+		&b.RefundedAmount, &b.AdminNote, &b.VerificationReview, &b.CancellationNote, &b.ParentBookingID, &b.DebtAmount,
 	); err != nil {
 		return entity.AdminBooking{}, err
 	}
@@ -164,7 +164,7 @@ func (repository *Repository) GetPayoutByBooking(ctx context.Context, bookingID 
 	var statusLabel string
 	err := repository.database.QueryRowContext(ctx, `
 		SELECT id, booking_id, owner_id, gross_amount, commission_amount, net_amount, status, settlement_id
-		FROM `+constants.PayoutsTableName+` WHERE booking_id = $1
+		FROM `+constants.PayoutsTableName+` WHERE booking_id = $1 AND kind = 'BOOKING'
 	`, bookingID).Scan(&payout.ID, &payout.BookingID, &payout.OwnerID, &payout.GrossAmount,
 		&payout.CommissionAmount, &payout.NetAmount, &statusLabel, &payout.SettlementID)
 	if err == sql.ErrNoRows {

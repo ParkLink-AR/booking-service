@@ -19,6 +19,8 @@ const (
 	StartReminderMinLead = 5 * time.Minute
 	// Before a stay ends.
 	EndReminderLead = time.Hour
+	// Before an hourly booking ends: in time to extend it or head out.
+	HourlyEndReminderLead = 15 * time.Minute
 )
 
 // ReminderClaimer picks up (and marks as sent, in the same step) the bookings each
@@ -27,12 +29,16 @@ type ReminderClaimer interface {
 	ClaimApprovalReminders(ctx context.Context, within time.Duration) ([]entity.Booking, error)
 	ClaimStartReminders(ctx context.Context, maxLead, minLead time.Duration) ([]entity.Booking, error)
 	ClaimEndReminders(ctx context.Context, within time.Duration) ([]entity.Booking, error)
+	ClaimHourlyEndReminders(ctx context.Context, within time.Duration) ([]entity.Booking, error)
+	ClaimEndNotices(ctx context.Context) ([]entity.Booking, error)
 }
 
 // SendBookingRemindersUseCase sends the reminders that keep a booking from slipping: to the
 // owner before a request expires unanswered (booking.approval_reminder), to both sides
 // before a booking starts (booking.starting_soon), and to the driver before a stay ends
-// (booking.ending_soon). Each goes out once per booking. Meant to run on a ticker (see
+// (booking.ending_soon) or an hourly booking does (booking.hourly_ending_soon), and once more
+// when a verified hourly one is over and waits for its exit code (booking.ended). Each goes out
+// once per booking. Meant to run on a ticker (see
 // cmd.runRemindersJob).
 type SendBookingRemindersUseCase struct {
 	claimer ReminderClaimer
@@ -57,6 +63,10 @@ func (uc *SendBookingRemindersUseCase) Execute(ctx context.Context) (int, error)
 			return uc.claimer.ClaimStartReminders(ctx, lead, StartReminderMinLead)
 		}},
 		{RoutingKeyBookingEndingSoon, EndReminderLead, uc.claimer.ClaimEndReminders},
+		{RoutingKeyBookingHourlyEndingSoon, HourlyEndReminderLead, uc.claimer.ClaimHourlyEndReminders},
+		{RoutingKeyBookingEnded, 0, func(ctx context.Context, _ time.Duration) ([]entity.Booking, error) {
+			return uc.claimer.ClaimEndNotices(ctx)
+		}},
 	}
 	sent := 0
 	var firstErr error

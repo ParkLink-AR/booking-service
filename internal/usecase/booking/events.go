@@ -41,6 +41,14 @@ const (
 	RoutingKeyBookingApprovalReminder = "booking.approval_reminder"
 	RoutingKeyBookingStartingSoon     = "booking.starting_soon"
 	RoutingKeyBookingEndingSoon       = "booking.ending_soon"
+	// Before an hourly booking ends, and once it is over while its exit code is still to be
+	// entered (see BookingExitUseCase): the driver is told to extend it or head out, then to give
+	// the owner the exit code.
+	RoutingKeyBookingHourlyEndingSoon = "booking.hourly_ending_soon"
+	RoutingKeyBookingEnded            = "booking.ended"
+	// A booking's exit was recorded after the grace period: the extra time is charged (see
+	// entity.ComputeOverstay).
+	RoutingKeyBookingOverstayCharged = "booking.overstay_charged"
 	// Someone reviewed the other side of a booking (the owner, or the driver).
 	RoutingKeyReviewReceived = "review.received"
 	// Staff resolved or closed a support ticket.
@@ -162,6 +170,25 @@ func newBookingExtendedEvent(extension entity.Booking, spot entity.SpotDetails) 
 		event.ParentBookingID = *extension.ParentBookingID
 	}
 	return event
+}
+
+// bookingOverstayEvent is the wire shape of booking.overstay_charged: the booking plus how long
+// the driver stayed past its end and what that comes to for each side (centavos). The driver owes
+// DriverAmount on their next reservation; ParkLink pays the owner OwnerAmount.
+type bookingOverstayEvent struct {
+	bookingEvent
+	OverstayMinutes int `json:"overstay_minutes"`
+	DriverAmount    int `json:"driver_amount"`
+	OwnerAmount     int `json:"owner_amount"`
+}
+
+func newBookingOverstayEvent(b entity.Booking, spot entity.SpotDetails, overstay entity.Overstay) bookingOverstayEvent {
+	return bookingOverstayEvent{
+		bookingEvent:    newBookingEvent(RoutingKeyBookingOverstayCharged, b, spot),
+		OverstayMinutes: overstay.ChargedMinutes,
+		DriverAmount:    overstay.Amount,
+		OwnerAmount:     overstay.OwnerAmount,
+	}
 }
 
 // bookingVerificationReviewedEvent is the wire shape of booking.verification_reviewed: the

@@ -40,5 +40,9 @@ func (repository *Repository) RejectBooking(ctx context.Context, bookingID strin
 	}
 	b.Status, _ = parseBookingStatus(statusLabel)
 	b.Kind, _ = parseBookingKind(kindLabel)
+	// The driver is refunded in full, debts included: they owe those again.
+	if err := repository.ReleaseDebts(ctx, bookingID); err != nil {
+		return entity.Booking{}, err
+	}
 	return b, nil
 }

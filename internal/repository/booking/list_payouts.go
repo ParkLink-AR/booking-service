@@ -14,7 +14,7 @@ import (
 // id -- powers GET /admin/payouts.
 func (repository *Repository) ListPayouts(ctx context.Context, status *enum.PayoutStatus, ownerID *string) ([]entity.Payout, error) {
 	query := `
-		SELECT id, booking_id, owner_id, payment_id, gross_amount, commission_amount, net_amount,
+		SELECT id, booking_id, owner_id, payment_id, gross_amount, commission_amount, net_amount, kind,
 			status, paid_at, paid_by_admin_id, proof_url, settlement_id, created_at
 		FROM ` + constants.PayoutsTableName + `
 	`
@@ -48,7 +48,7 @@ func (repository *Repository) ListPayouts(ctx context.Context, status *enum.Payo
 		var p entity.Payout
 		var statusLabel string
 		if err := rows.Scan(
-			&p.ID, &p.BookingID, &p.OwnerID, &p.PaymentID, &p.GrossAmount, &p.CommissionAmount, &p.NetAmount,
+			&p.ID, &p.BookingID, &p.OwnerID, &p.PaymentID, &p.GrossAmount, &p.CommissionAmount, &p.NetAmount, &p.Kind,
 			&statusLabel, &p.PaidAt, &p.PaidByAdminID, &p.ProofURL, &p.SettlementID, &p.CreatedAt,
 		); err != nil {
 			return nil, errors.NewInternalError("booking.ListPayouts", err)

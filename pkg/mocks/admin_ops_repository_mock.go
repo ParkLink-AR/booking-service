@@ -131,6 +131,20 @@ func (mr *MockAdminBookingStoreMockRecorder) RecordAdminRefund(ctx, bookingID, a
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordAdminRefund", reflect.TypeOf((*MockAdminBookingStore)(nil).RecordAdminRefund), ctx, bookingID, amount, note)
 }
 
+// ReleaseDebts mocks base method.
+func (m *MockAdminBookingStore) ReleaseDebts(ctx context.Context, bookingID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReleaseDebts", ctx, bookingID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ReleaseDebts indicates an expected call of ReleaseDebts.
+func (mr *MockAdminBookingStoreMockRecorder) ReleaseDebts(ctx, bookingID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleaseDebts", reflect.TypeOf((*MockAdminBookingStore)(nil).ReleaseDebts), ctx, bookingID)
+}
+
 // MockPaymentAmountRefunder is a mock of PaymentAmountRefunder interface.
 type MockPaymentAmountRefunder struct {
 	ctrl     *gomock.Controller

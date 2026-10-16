@@ -2,6 +2,7 @@ package booking_test
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"time"
 
 	"github.com/goccy/go-json"
@@ -64,4 +65,28 @@ func (s *handlerSuite) TestGetBookingEndpoint_NotFound() {
 	recorder := s.doGet("/bookings/" + validBookingID)
 
 	s.Equal(http.StatusNotFound, recorder.Code)
+}
+
+func (s *handlerSuite) getBookingAs(userID string) map[string]any {
+	request := httptest.NewRequest(http.MethodGet, "/bookings/"+validBookingID, nil)
+	request.Header.Set("X-User-Id", userID)
+	recorder := httptest.NewRecorder()
+	s.router.ServeHTTP(recorder, request)
+	s.Require().Equal(http.StatusOK, recorder.Code)
+	var response map[string]any
+	s.Require().NoError(json.NewDecoder(recorder.Body).Decode(&response))
+	return response
+}
+
+// The pending balances a booking took on are the driver's own business: the spot's owner never
+// sees them.
+func (s *handlerSuite) TestGetBookingEndpoint_DebtAmountIsOnlyForTheDriver() {
+	booking := entity.Booking{ID: validBookingID, UserID: "driver-1", Status: enum.BookingStatusPendingPayment, Amount: 240000, DebtAmount: 6000}
+	s.getBookingUseCase.EXPECT().Execute(gomock.Any(), validBookingID, gomock.Any()).Return(booking, nil).Times(2)
+
+	asDriver := s.getBookingAs("driver-1")
+	asOwner := s.getBookingAs("owner-1")
+
+	s.Equal(float64(6000), asDriver["debt_amount"])
+	s.NotContains(asOwner, "debt_amount")
 }

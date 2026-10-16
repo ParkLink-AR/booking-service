@@ -340,6 +340,43 @@ func runMigrations(database *sql.DB) error {
 		ALTER TABLE reports DROP CONSTRAINT IF EXISTS reports_target_type_check;
 		ALTER TABLE reports ADD CONSTRAINT reports_target_type_check
 			CHECK (target_type IN ('spot', 'user', 'review', 'booking'));
+
+		-- migrations/027: the driver's exit code and what staying past the end cost (see
+		-- usecase.BookingExitUseCase), plus the "your booking ended" notice mark.
+		CREATE TABLE IF NOT EXISTS booking_exits (
+			booking_id            UUID        PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
+			exit_code             VARCHAR(4)  NOT NULL,
+			exit_attempts         INT         NOT NULL DEFAULT 0,
+			exited_at             TIMESTAMPTZ,
+			closed_by             TEXT        CHECK (closed_by IN ('OWNER_CODE', 'SUPPORT')),
+			overstay_minutes      INT         NOT NULL DEFAULT 0,
+			charged_minutes       INT         NOT NULL DEFAULT 0,
+			overstay_amount       INT         NOT NULL DEFAULT 0,
+			overstay_owner_amount INT         NOT NULL DEFAULT 0,
+			created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+		);
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS end_notice_sent_at TIMESTAMPTZ;
+
+		-- migrations/028: what staying past the end costs becomes a debt that rides on the driver's
+		-- next reservation (see usecase.BookingDebtUseCase), and ParkLink pays the owner for it.
+		CREATE TABLE IF NOT EXISTS booking_debts (
+			id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id            UUID        NOT NULL,
+			source_booking_id  UUID        NOT NULL UNIQUE REFERENCES bookings(id),
+			charged_booking_id UUID        REFERENCES bookings(id),
+			minutes            INT         NOT NULL,
+			amount             INT         NOT NULL CHECK (amount > 0),
+			status             TEXT        NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'RESERVED', 'PAID')),
+			created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+			paid_at            TIMESTAMPTZ
+		);
+		CREATE INDEX IF NOT EXISTS idx_booking_debts_user ON booking_debts (user_id, status);
+		CREATE INDEX IF NOT EXISTS idx_booking_debts_charged ON booking_debts (charged_booking_id);
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS debt_amount INT NOT NULL DEFAULT 0;
+		ALTER TABLE payouts ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'BOOKING' CHECK (kind IN ('BOOKING', 'OVERSTAY'));
+		ALTER TABLE payouts DROP CONSTRAINT IF EXISTS payouts_booking_id_key;
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_payouts_booking_kind ON payouts (booking_id, kind);
 	`)
 	return err
 }

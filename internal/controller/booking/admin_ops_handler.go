@@ -71,6 +71,7 @@ type adminBookingResponse struct {
 	Status             string  `json:"status"`
 	Kind               string  `json:"kind"`
 	Amount             int     `json:"amount"`
+	DebtAmount         int     `json:"debt_amount,omitempty"`
 	OwnerAmount        *int    `json:"owner_amount,omitempty"`
 	RefundedAmount     int     `json:"refunded_amount"`
 	PaymentID          string  `json:"payment_id,omitempty"`
@@ -110,6 +111,7 @@ func (handler *AdminOpsHandler) bookingResponse(booking entity.AdminBooking) adm
 		Kind:               booking.Kind.String(),
 		Amount:             booking.Amount,
 		OwnerAmount:        booking.OwnerAmount,
+		DebtAmount:         booking.DebtAmount,
 		RefundedAmount:     booking.RefundedAmount,
 		PaymentID:          booking.PaymentID,
 		PaidAt:             handler.formatTime(booking.PaidAt),
