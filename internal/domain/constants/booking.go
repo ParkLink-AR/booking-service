@@ -3,7 +3,7 @@ package constants
 const (
 	// DefaultHoldMinutes is the fallback for BOOKING_HOLD_MINUTES: how long a newly created
 	// PENDING_PAYMENT booking holds the time slot before its hold is considered expired.
-	DefaultHoldMinutes = 5
+	DefaultHoldMinutes = 10
 
 	// GracePeriodMinutes is the buffer a booking keeps the spot occupied after its end (and,
 	// symmetrically, that a new booking must leave before the next one starts), in case the
@@ -11,6 +11,10 @@ const (
 	// long the driver may stay past their end for free: past it, all the extra time is charged
 	// (see entity.ComputeOverstay). See entity.OccupancyWindow.
 	GracePeriodMinutes = 15
+
+	// ExitTrackedKindsSQL is enum.BookingKind.TracksExit as a SQL list, for the queries that
+	// pick the bookings ended by the exit code (completion, payouts, end reminders and notices).
+	ExitTrackedKindsSQL = "('HOURLY', 'HALF_DAY')"
 
 	// BuenosAiresTimezone is the IANA timezone every booking timestamp is rendered in.
 	BuenosAiresTimezone = "America/Argentina/Buenos_Aires"

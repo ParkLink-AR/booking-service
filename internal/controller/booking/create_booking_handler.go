@@ -62,7 +62,7 @@ func (handler *Handler) CreateBookingEndpoint(responseWriter http.ResponseWriter
 	}
 	kind, ok := enum.ParseBookingKind(kindLabel)
 	if !ok {
-		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_KIND", "kind must be HOURLY or STAY")
+		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_KIND", "kind must be HOURLY, STAY or HALF_DAY")
 		return
 	}
 

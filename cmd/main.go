@@ -116,6 +116,9 @@ func main() {
 	listAdminPayoutsUseCase := ucbooking.NewListAdminPayoutsUseCase(bookingRepository, storageClient)
 	getAdminPayoutUseCase := ucbooking.NewGetAdminPayoutUseCase(bookingRepository, storageClient)
 	listOwnerBookingsUseCase := ucbooking.NewListOwnerBookingsUseCase(parkingClient, bookingRepository)
+	ownerEarningsUseCase := ucbooking.NewGetOwnerEarningsUseCase(
+		parkingClient, bookingRepository, bookingRepository, bookingRepository, buenosAiresLocation, time.Now,
+	)
 	getCommissionUseCase := ucbooking.NewGetCommissionUseCase(bookingRepository)
 	setCommissionUseCase := ucbooking.NewSetCommissionUseCase(bookingRepository)
 	getOwnerPendingBalancesUseCase := ucbooking.NewGetOwnerPendingBalancesUseCase(bookingRepository)
@@ -177,6 +180,7 @@ func main() {
 		bookingChangesUseCase,
 		bookingExitUseCase,
 		bookingDebtUseCase,
+		ownerEarningsUseCase,
 	)
 
 	// Start consumer in background
@@ -286,6 +290,7 @@ func loadHandlers(
 	bookingChangesUseCase *ucbooking.BookingChangesUseCase,
 	bookingExitUseCase *ucbooking.BookingExitUseCase,
 	bookingDebtUseCase *ucbooking.BookingDebtUseCase,
+	ownerEarningsUseCase *ucbooking.GetOwnerEarningsUseCase,
 ) {
 	handlers := []Handler{
 		bookingcontroller.NewHandler(
@@ -316,6 +321,7 @@ func loadHandlers(
 		bookingcontroller.NewBookingChangesHandler(bookingChangesUseCase, location),
 		bookingcontroller.NewBookingExitHandler(bookingExitUseCase, location),
 		bookingcontroller.NewBookingDebtHandler(bookingDebtUseCase, location, internalServiceKey),
+		bookingcontroller.NewOwnerEarningsHandler(ownerEarningsUseCase),
 	}
 	for _, handler := range handlers {
 		handler.RegisterRoutes(router)

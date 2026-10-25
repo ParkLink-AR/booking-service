@@ -61,7 +61,7 @@ func (repository *Repository) ClaimEndReminders(ctx context.Context, within time
 		RETURNING `+reminderColumns, within)
 }
 
-// ClaimHourlyEndReminders marks and returns every hourly booking under way that ends less than
+// ClaimHourlyEndReminders marks and returns every hourly booking (or half-day) under way that ends less than
 // `within` from now -- the driver gets one reminder, in time to extend it or head out. One that
 // a paid extension already carries on has nothing to remind about. It shares end_reminder_sent_at
 // with the stays' reminder: a booking is one or the other.
@@ -70,7 +70,7 @@ func (repository *Repository) ClaimHourlyEndReminders(ctx context.Context, withi
 		UPDATE `+constants.BookingsTableName+`
 		SET    end_reminder_sent_at = now()
 		WHERE  status IN ('CONFIRMED', 'IN_PROGRESS')
-		  AND  kind = 'HOURLY'
+		  AND  kind IN `+constants.ExitTrackedKindsSQL+`
 		  AND  end_reminder_sent_at IS NULL
 		  AND  lower(time_range) <= now()
 		  AND  upper(time_range) > now()
@@ -83,7 +83,7 @@ func (repository *Repository) ClaimHourlyEndReminders(ctx context.Context, withi
 		RETURNING `+reminderColumns, within)
 }
 
-// ClaimEndNotices marks and returns every verified hourly booking whose end has passed and that
+// ClaimEndNotices marks and returns every verified hourly booking (or half-day) whose end has passed and that
 // still waits for its exit code (see BookingExitUseCase): the driver gets one notice that it is
 // over, and what to do. One a paid extension carries on, or that was already closed, doesn't
 // get it; neither does a booking whose arrival was never verified, which completes by itself
@@ -93,7 +93,7 @@ func (repository *Repository) ClaimEndNotices(ctx context.Context) ([]entity.Boo
 		UPDATE `+constants.BookingsTableName+`
 		SET    end_notice_sent_at = now()
 		WHERE  status IN ('CONFIRMED', 'IN_PROGRESS')
-		  AND  kind = 'HOURLY'
+		  AND  kind IN `+constants.ExitTrackedKindsSQL+`
 		  AND  verified_at IS NOT NULL
 		  AND  end_notice_sent_at IS NULL
 		  AND  upper(time_range) <= now()

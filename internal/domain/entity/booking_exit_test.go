@@ -92,6 +92,8 @@ var awaitingExitCases = []struct {
 	{"never verified", enum.BookingKindHourly, enum.BookingStatusConfirmed, false, false},
 	{"already completed", enum.BookingKindHourly, enum.BookingStatusCompleted, true, false},
 	{"a stay is not waited for", enum.BookingKindStay, enum.BookingStatusInProgress, true, false},
+	{"a verified half-day is waited for, like an hourly booking", enum.BookingKindHalfDay, enum.BookingStatusInProgress, true, true},
+	{"a half-day never verified completes on its own", enum.BookingKindHalfDay, enum.BookingStatusConfirmed, false, false},
 	{"cancelled", enum.BookingKindHourly, enum.BookingStatusCancelled, true, false},
 }
 

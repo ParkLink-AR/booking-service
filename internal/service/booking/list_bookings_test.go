@@ -39,6 +39,12 @@ type serviceSuite struct {
 	vehicleRules entity.SpotVehicleRules
 	// blockedDates is what GetBlockedDates reports: the days the owner closed (none by default).
 	blockedDates []entity.DateRange
+	// spotRules is what GetSpotBookingRules reports (with blockedDates as its closed days): an
+	// active spot taking hourly bookings on Tuesdays 08-20 with one place, unless a test sets it.
+	spotRules    entity.SpotBookingRules
+	spotRulesErr error
+	// clock is the service's "now": the day before the 2026-08-18 these tests book on, at noon.
+	clock time.Time
 }
 
 func (s *serviceSuite) SetupTest() {
@@ -51,7 +57,9 @@ func (s *serviceSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.location = location
 
-	s.service = booking.NewService(s.bookingRepository, s.parkingClient, s.commissionRates, location, testHoldDuration)
+	s.clock = time.Date(2026, 8, 17, 12, 0, 0, 0, location)
+	s.service = booking.NewService(s.bookingRepository, s.parkingClient, s.commissionRates, location, testHoldDuration).
+		WithClock(func() time.Time { return s.clock })
 	s.context = context.Background()
 	s.parkingSpotID = "8f14e45f-ceea-4b0e-b6b4-5a1b6c9a2d0f"
 	s.spotOwnerID = "99999999-9999-9999-9999-999999999999"
@@ -63,6 +71,15 @@ func (s *serviceSuite) SetupTest() {
 		DoAndReturn(func(_ context.Context, _ string) (entity.SpotVehicleRules, error) { return s.vehicleRules, nil }).
 		AnyTimes()
 	s.blockedDates = nil
+	s.spotRules = entity.SpotBookingRules{Active: true, HourlyEnabled: true, Schedule: tuesdaySchedule, Capacity: 1}
+	s.spotRulesErr = nil
+	s.parkingClient.EXPECT().GetSpotBookingRules(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ string) (entity.SpotBookingRules, error) {
+			rules := s.spotRules
+			rules.BlockedDates = s.blockedDates
+			return rules, s.spotRulesErr
+		}).
+		AnyTimes()
 	s.parkingClient.EXPECT().GetBlockedDates(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, _ string) ([]entity.DateRange, error) { return s.blockedDates, nil }).
 		AnyTimes()
@@ -82,7 +99,7 @@ func (s *serviceSuite) localDate(day int) time.Time {
 // that's already today or earlier gets clamped to "now" by CreateBooking (see
 // TestCreateBooking_Stay_StartingTodayClampsToNow), which would break these otherwise.
 func (s *serviceSuite) futureDate(daysFromNow int) time.Time {
-	now := time.Now().In(s.location).AddDate(0, 0, daysFromNow)
+	now := s.clock.In(s.location).AddDate(0, 0, daysFromNow)
 	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, s.location)
 }
 

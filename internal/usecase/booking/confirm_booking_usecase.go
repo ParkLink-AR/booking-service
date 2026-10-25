@@ -80,7 +80,7 @@ func (uc *ConfirmBookingUseCase) Execute(ctx context.Context, bookingID, payment
 	}
 
 	// An extension continues a stay the owner already accepted: it's confirmed outright.
-	status, deadline := enum.BookingStatusPendingOwnerApproval, time.Now().Add(ownerApprovalWindow())
+	status, deadline := enum.BookingStatusPendingOwnerApproval, OwnerResponseDeadline(time.Now(), booking.Start)
 	deadlinePointer := &deadline
 	if booking.ParentBookingID != nil {
 		status, deadlinePointer = enum.BookingStatusConfirmed, nil
@@ -129,6 +129,26 @@ func payableError(booking entity.Booking, amount int) error {
 
 // ownerApprovalWindow reads OWNER_APPROVAL_HOURS, falling back to 24h when unset or not a
 // valid positive integer.
+// minOwnerResponseWindow is the least an owner gets to answer a request, even one for a booking
+// that starts right away -- the app lets drivers book at the last minute.
+const minOwnerResponseWindow = 15 * time.Minute
+
+// OwnerResponseDeadline is how long the owner has to accept or reject a booking paid at now that
+// starts at start: the approval window, but never past the start -- a request still waiting
+// then is cancelled and refunded, instead of the owner accepting a booking already under way
+// or over -- and never less than minOwnerResponseWindow.
+func OwnerResponseDeadline(now, start time.Time) time.Time {
+	deadline := now.Add(ownerApprovalWindow())
+	latest := start
+	if floor := now.Add(minOwnerResponseWindow); latest.Before(floor) {
+		latest = floor
+	}
+	if deadline.After(latest) {
+		deadline = latest
+	}
+	return deadline
+}
+
 func ownerApprovalWindow() time.Duration {
 	hours := 24
 	if raw := os.Getenv("OWNER_APPROVAL_HOURS"); raw != "" {

@@ -32,7 +32,7 @@ func (repository *Repository) ExpireCompletedBookings(ctx context.Context) ([]en
 		         -- Verified in person at arrival, so it ends the same way: it stays in progress
 		         -- until the owner enters the exit code (or support closes it), unless a paid
 		         -- extension carries the stay on -- the departure is recorded there.
-		         kind = 'HOURLY'
+		         kind IN `+constants.ExitTrackedKindsSQL+`
 		         AND verified_at IS NOT NULL
 		         AND NOT EXISTS (
 		               SELECT 1 FROM `+constants.BookingExitsTableName+` booking_exit

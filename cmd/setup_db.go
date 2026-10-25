@@ -60,7 +60,7 @@ func runMigrations(database *sql.DB) error {
 			amount                   INT           NOT NULL,
 			payment_id               TEXT,
 			capacity                 INT           NOT NULL DEFAULT 1,
-			kind                     TEXT          NOT NULL DEFAULT 'HOURLY' CHECK (kind IN ('HOURLY', 'STAY')),
+			kind                     TEXT          NOT NULL DEFAULT 'HOURLY' CHECK (kind IN ('HOURLY', 'STAY', 'HALF_DAY')),
 			created_at               TIMESTAMPTZ   NOT NULL DEFAULT now(),
 			updated_at               TIMESTAMPTZ   NOT NULL DEFAULT now()
 		);
@@ -377,6 +377,11 @@ func runMigrations(database *sql.DB) error {
 		ALTER TABLE payouts ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'BOOKING' CHECK (kind IN ('BOOKING', 'OVERSTAY'));
 		ALTER TABLE payouts DROP CONSTRAINT IF EXISTS payouts_booking_id_key;
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_payouts_booking_kind ON payouts (booking_id, kind);
+
+		-- migrations/029: "media estadía" -- HALF_DAY joins the kinds a booking can be. The
+		-- column's inline CHECK from migrations/007 is replaced; existing rows still pass.
+		ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_kind_check;
+		ALTER TABLE bookings ADD CONSTRAINT bookings_kind_check CHECK (kind IN ('HOURLY', 'STAY', 'HALF_DAY'));
 	`)
 	return err
 }

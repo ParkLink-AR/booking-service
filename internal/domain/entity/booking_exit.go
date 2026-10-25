@@ -44,11 +44,12 @@ type Overstay struct {
 	OwnerAmount int
 }
 
-// AwaitingExit reports whether b is a verified hourly booking still waiting for its exit: the
-// driver's arrival was confirmed in person, so leaving is confirmed the same way. A booking
-// whose arrival was never verified completes at its end as always.
+// AwaitingExit reports whether b is a verified hourly booking (or half-day, see
+// BookingKind.TracksExit) still waiting for its exit: the driver's arrival was confirmed in
+// person, so leaving is confirmed the same way. A booking whose arrival was never verified
+// completes at its end as always.
 func (b Booking) AwaitingExit() bool {
-	if b.Kind != enum.BookingKindHourly || b.VerifiedAt == nil {
+	if !b.Kind.TracksExit() || b.VerifiedAt == nil {
 		return false
 	}
 	return b.Status == enum.BookingStatusConfirmed || b.Status == enum.BookingStatusInProgress

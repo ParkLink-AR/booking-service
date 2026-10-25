@@ -27,9 +27,6 @@ func (s *serviceSuite) TestCreateBooking_Success() {
 		Amount:              5000,
 	}
 
-	s.parkingClient.EXPECT().
-		IsSpotActive(gomock.Any(), s.parkingSpotID).
-		Return(true, nil)
 	// $100/hour x 1 hour = 10000 centavos, +5% commission = 10500 -- the client's
 	// (deliberately wrong) Amount: 5000 is never trusted for an HOURLY booking either,
 	// same as a STAY's.
@@ -84,7 +81,6 @@ func (s *serviceSuite) TestCreateBooking_WithVehicle_CopiesSnapshotOntoBooking()
 		VehicleCountry:      "AR",
 	}
 
-	s.parkingClient.EXPECT().IsSpotActive(gomock.Any(), s.parkingSpotID).Return(true, nil)
 	s.parkingClient.EXPECT().GetHourlyPrice(gomock.Any(), s.parkingSpotID, "").Return(100.0, nil)
 	s.commissionRates.EXPECT().GetCommissionRate(gomock.Any()).Return(entity.PlatformSettings{CommissionRateBP: 500}, nil)
 	s.bookingRepository.EXPECT().
@@ -133,9 +129,6 @@ func (s *serviceSuite) TestCreateBooking_OutsidePublishedHours() {
 		End:                 end,
 	}
 
-	s.parkingClient.EXPECT().
-		IsSpotActive(gomock.Any(), s.parkingSpotID).
-		Return(true, nil)
 	got, err := s.service.CreateBooking(s.context, input)
 
 	s.Equal(entity.Booking{}, got)
@@ -153,9 +146,7 @@ func (s *serviceSuite) TestCreateBooking_Hourly_RejectsWhenSpotNotActive() {
 		End:                 end,
 	}
 
-	s.parkingClient.EXPECT().
-		IsSpotActive(gomock.Any(), s.parkingSpotID).
-		Return(false, nil)
+	s.spotRules.Active = false
 
 	got, err := s.service.CreateBooking(s.context, input)
 
@@ -174,9 +165,7 @@ func (s *serviceSuite) TestCreateBooking_Hourly_PropagatesSpotActiveCheckError()
 		End:                 end,
 	}
 
-	s.parkingClient.EXPECT().
-		IsSpotActive(gomock.Any(), s.parkingSpotID).
-		Return(false, errors.NewUpstream("parkingclient.getSpot", errors.NewNotFound("parking_spot", s.parkingSpotID)))
+	s.spotRulesErr = errors.NewUpstream("parkingclient.getSpot", errors.NewNotFound("parking_spot", s.parkingSpotID))
 
 	got, err := s.service.CreateBooking(s.context, input)
 
@@ -198,9 +187,6 @@ func (s *serviceSuite) TestCreateBooking_Hourly_IgnoresClientAmountPricesFromOwn
 		Amount:              1, // deliberately wrong -- must be ignored
 	}
 
-	s.parkingClient.EXPECT().
-		IsSpotActive(gomock.Any(), s.parkingSpotID).
-		Return(true, nil)
 	// $200/hour x 3 hours = 60000 centavos, +10% commission = 66000.
 	s.parkingClient.EXPECT().
 		GetHourlyPrice(gomock.Any(), s.parkingSpotID, "").
@@ -241,9 +227,6 @@ func (s *serviceSuite) TestCreateBooking_Hourly_PropagatesHourlyPriceLookupError
 	}
 
 	s.parkingClient.EXPECT().
-		IsSpotActive(gomock.Any(), s.parkingSpotID).
-		Return(true, nil)
-	s.parkingClient.EXPECT().
 		GetHourlyPrice(gomock.Any(), s.parkingSpotID, "").
 		Return(0.0, errors.NewInvalidInput("HOURLY_NOT_AVAILABLE", "this parking spot does not accept hourly bookings"))
 
@@ -255,13 +238,11 @@ func (s *serviceSuite) TestCreateBooking_Hourly_PropagatesHourlyPriceLookupError
 }
 
 func (s *serviceSuite) TestCreateBooking_NoScheduleProvidedIsOutsidePublishedHours() {
+	s.spotRules.Schedule = nil
 	start := s.localDate(18).Add(10 * time.Hour)
 	end := s.localDate(18).Add(11 * time.Hour)
 	input := entity.CreateBookingInput{ParkingSpotID: s.parkingSpotID, Start: start, End: end}
 
-	s.parkingClient.EXPECT().
-		IsSpotActive(gomock.Any(), s.parkingSpotID).
-		Return(true, nil)
 	got, err := s.service.CreateBooking(s.context, input)
 
 	s.Equal(entity.Booking{}, got)
@@ -280,9 +261,6 @@ func (s *serviceSuite) TestCreateBooking_OverlapWithActiveBookingIsConflict() {
 	}
 
 	s.parkingClient.EXPECT().
-		IsSpotActive(gomock.Any(), s.parkingSpotID).
-		Return(true, nil)
-	s.parkingClient.EXPECT().
 		GetHourlyPrice(gomock.Any(), s.parkingSpotID, "").
 		Return(100.0, nil)
 	s.commissionRates.EXPECT().
@@ -299,6 +277,8 @@ func (s *serviceSuite) TestCreateBooking_OverlapWithActiveBookingIsConflict() {
 }
 
 func (s *serviceSuite) TestCreateBooking_CapacityAllowsConcurrentUpToLimit() {
+	// The spot rents two identical places -- its own capacity, from parking-service.
+	s.spotRules.Capacity = 2
 	start := s.localDate(18).Add(10 * time.Hour)
 	end := s.localDate(18).Add(11 * time.Hour)
 	input := entity.CreateBookingInput{
@@ -311,9 +291,6 @@ func (s *serviceSuite) TestCreateBooking_CapacityAllowsConcurrentUpToLimit() {
 		Capacity:            2,
 	}
 
-	s.parkingClient.EXPECT().
-		IsSpotActive(gomock.Any(), s.parkingSpotID).
-		Return(true, nil)
 	s.parkingClient.EXPECT().
 		GetHourlyPrice(gomock.Any(), s.parkingSpotID, "").
 		Return(100.0, nil)
@@ -339,6 +316,8 @@ func (s *serviceSuite) TestCreateBooking_CapacityAllowsConcurrentUpToLimit() {
 }
 
 func (s *serviceSuite) TestCreateBooking_CapacityRejectsWhenAllPlacesConcurrentlyBooked() {
+	// The spot rents two identical places -- its own capacity, from parking-service.
+	s.spotRules.Capacity = 2
 	start := s.localDate(18).Add(10 * time.Hour)
 	end := s.localDate(18).Add(11 * time.Hour)
 	input := entity.CreateBookingInput{
@@ -349,9 +328,6 @@ func (s *serviceSuite) TestCreateBooking_CapacityRejectsWhenAllPlacesConcurrentl
 		Capacity:            2,
 	}
 
-	s.parkingClient.EXPECT().
-		IsSpotActive(gomock.Any(), s.parkingSpotID).
-		Return(true, nil)
 	s.parkingClient.EXPECT().
 		GetHourlyPrice(gomock.Any(), s.parkingSpotID, "").
 		Return(100.0, nil)
@@ -372,6 +348,8 @@ func (s *serviceSuite) TestCreateBooking_CapacityRejectsWhenAllPlacesConcurrentl
 }
 
 func (s *serviceSuite) TestCreateBooking_SequentialBookingsDoNotCountAsConcurrent() {
+	// The spot rents two identical places -- its own capacity, from parking-service.
+	s.spotRules.Capacity = 2
 	start := s.localDate(18).Add(8 * time.Hour)
 	end := s.localDate(18).Add(12 * time.Hour)
 	input := entity.CreateBookingInput{
@@ -384,9 +362,6 @@ func (s *serviceSuite) TestCreateBooking_SequentialBookingsDoNotCountAsConcurren
 		Capacity:            2,
 	}
 
-	s.parkingClient.EXPECT().
-		IsSpotActive(gomock.Any(), s.parkingSpotID).
-		Return(true, nil)
 	s.parkingClient.EXPECT().
 		GetHourlyPrice(gomock.Any(), s.parkingSpotID, "").
 		Return(100.0, nil)
@@ -497,7 +472,7 @@ func (s *serviceSuite) TestCreateBooking_Stay_PropagatesParkingServiceRejection(
 // moment on. See the comment in create_booking.go for the same reasoning
 // parking-service's StaysService.assertRangeFree applies when quoting.
 func (s *serviceSuite) TestCreateBooking_Stay_StartingTodayClampsToNow() {
-	now := time.Now().In(s.location)
+	now := s.clock.In(s.location)
 	// Check-in at today's midnight (hour 0) -- like the pre-hour-of-day version of this
 	// test, this guarantees the quoted start instant is already in the past by the time
 	// CreateBooking clamps it, without racing the clock at whatever hour the test happens
@@ -526,7 +501,7 @@ func (s *serviceSuite) TestCreateBooking_Stay_StartingTodayClampsToNow() {
 		GetCommissionRate(gomock.Any()).
 		Return(entity.PlatformSettings{CommissionRateBP: 500}, nil)
 
-	beforeCall := time.Now()
+	beforeCall := s.clock
 	s.bookingRepository.EXPECT().
 		GetActiveBookingsInRange(gomock.Any(), s.parkingSpotID, gomock.Any(), quotedEnd.UTC()).
 		DoAndReturn(func(_ any, _ string, start, _ time.Time) ([]entity.TimeWindow, error) {
@@ -558,9 +533,6 @@ func (s *serviceSuite) TestCreateBooking_RepositoryCreateErrorPropagates() {
 		End:                 end,
 	}
 
-	s.parkingClient.EXPECT().
-		IsSpotActive(gomock.Any(), s.parkingSpotID).
-		Return(true, nil)
 	s.parkingClient.EXPECT().
 		GetHourlyPrice(gomock.Any(), s.parkingSpotID, "").
 		Return(100.0, nil)
@@ -649,7 +621,6 @@ func (s *serviceSuite) TestCreateBooking_PricedPerVehicle_ChargesTheVehiclesType
 	s.vehicleRules = entity.SpotVehicleRules{HourlyPricedByVehicle: true, AcceptedTypes: []string{"car", "motorcycle"}}
 	input := s.hourlyVehicleInput("motorcycle", "A123BCD")
 
-	s.parkingClient.EXPECT().IsSpotActive(gomock.Any(), s.parkingSpotID).Return(true, nil)
 	s.parkingClient.EXPECT().GetHourlyPrice(gomock.Any(), s.parkingSpotID, "motorcycle").Return(40.0, nil)
 	s.commissionRates.EXPECT().GetCommissionRate(gomock.Any()).Return(entity.PlatformSettings{CommissionRateBP: 0}, nil)
 	s.bookingRepository.EXPECT().GetActiveBookingsInRange(gomock.Any(), s.parkingSpotID, gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -674,7 +645,6 @@ func (s *serviceSuite) TestCreateBooking_BicycleNeedsNoPlate() {
 	s.vehicleRules = entity.SpotVehicleRules{RequireVehicle: true, AcceptedTypes: []string{"bicycle"}}
 	input := s.hourlyVehicleInput("bicycle", "")
 
-	s.parkingClient.EXPECT().IsSpotActive(gomock.Any(), s.parkingSpotID).Return(true, nil)
 	s.parkingClient.EXPECT().GetHourlyPrice(gomock.Any(), s.parkingSpotID, "bicycle").Return(10.0, nil)
 	s.commissionRates.EXPECT().GetCommissionRate(gomock.Any()).Return(entity.PlatformSettings{}, nil)
 	s.bookingRepository.EXPECT().GetActiveBookingsInRange(gomock.Any(), s.parkingSpotID, gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -708,4 +678,140 @@ func (s *serviceSuite) TestCreateBooking_Stay_QuotedByTheVehiclesType() {
 	_, err := s.service.CreateBooking(s.context, input)
 
 	s.Equal("STAY_NOT_AVAILABLE", errors.InvalidInputCode(err))
+}
+
+// A half-day ("media estadía") is booked over exactly the 12 hours parking-service quotes from
+// the driver's chosen day and hour, at the quoted price plus the commission -- never the
+// client's own End or Amount -- and never checked against the hourly published hours: like a
+// stay, it lives by the stay's terms, which the quote already enforced.
+func (s *serviceSuite) TestCreateBooking_HalfDay_UsesParkingServiceQuoteNotClientInput() {
+	start := s.futureDate(30).Add(20 * time.Hour)
+	quotedEnd := start.Add(12 * time.Hour) // 08:00 the next day
+	input := entity.CreateBookingInput{
+		ParkingSpotID: s.parkingSpotID,
+		UserID:        "11111111-1111-1111-1111-111111111111",
+		Start:         start,
+		End:           start.Add(time.Hour),
+		Amount:        1,
+		Kind:          enum.BookingKindHalfDay,
+		// No schedule on purpose: a half-day isn't held to the hourly published hours.
+	}
+
+	s.parkingClient.EXPECT().
+		GetHalfDayQuote(gomock.Any(), s.parkingSpotID, s.dateStr(start), 20, "").
+		Return(parkingclient.HalfDayQuote{
+			StartDateTime: start.Format(time.RFC3339),
+			EndDateTime:   quotedEnd.Format(time.RFC3339),
+			Hours:         12,
+			Amount:        600000,
+		}, nil)
+	s.commissionRates.EXPECT().
+		GetCommissionRate(gomock.Any()).
+		Return(entity.PlatformSettings{CommissionRateBP: 500}, nil)
+	s.bookingRepository.EXPECT().
+		GetActiveBookingsInRange(gomock.Any(), s.parkingSpotID, start.UTC(), quotedEnd.UTC()).
+		Return(nil, nil)
+	s.bookingRepository.EXPECT().
+		CreateBooking(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ any, booking entity.Booking) (entity.Booking, error) {
+			s.True(booking.Start.Equal(start.UTC()))
+			s.True(booking.End.Equal(quotedEnd.UTC()))
+			s.Equal(630000, booking.Amount)
+			s.Require().NotNil(booking.OwnerAmount)
+			s.Equal(600000, *booking.OwnerAmount)
+			s.Equal(enum.BookingKindHalfDay, booking.Kind)
+			booking.ID = "created-id"
+			return booking, nil
+		})
+
+	got, err := s.service.CreateBooking(s.context, input)
+
+	s.Require().NoError(err)
+	s.Equal("created-id", got.ID)
+}
+
+func (s *serviceSuite) TestCreateBooking_HalfDay_PropagatesParkingServiceRejection() {
+	start := s.futureDate(30).Add(8 * time.Hour)
+	input := entity.CreateBookingInput{
+		ParkingSpotID: s.parkingSpotID,
+		Start:         start,
+		End:           start.Add(time.Hour),
+		Kind:          enum.BookingKindHalfDay,
+	}
+
+	s.parkingClient.EXPECT().
+		GetHalfDayQuote(gomock.Any(), s.parkingSpotID, s.dateStr(start), 8, "").
+		Return(parkingclient.HalfDayQuote{}, errors.NewConflict("Esa cochera ya tiene otra reserva en ese horario."))
+
+	got, err := s.service.CreateBooking(s.context, input)
+
+	s.Equal(entity.Booking{}, got)
+	s.True(errors.IsConflict(err))
+}
+
+// Another booking that took the spot between the quote and this request still loses the
+// half-day the slot: the overlap check after pricing applies to every kind.
+func (s *serviceSuite) TestCreateBooking_HalfDay_RefusedWhenTheSpotFilledUpMeanwhile() {
+	start := s.futureDate(30).Add(8 * time.Hour)
+	quotedEnd := start.Add(12 * time.Hour)
+	input := entity.CreateBookingInput{
+		ParkingSpotID: s.parkingSpotID,
+		Start:         start,
+		End:           start.Add(time.Hour),
+		Kind:          enum.BookingKindHalfDay,
+	}
+
+	s.parkingClient.EXPECT().
+		GetHalfDayQuote(gomock.Any(), s.parkingSpotID, s.dateStr(start), 8, "").
+		Return(parkingclient.HalfDayQuote{
+			StartDateTime: start.Format(time.RFC3339),
+			EndDateTime:   quotedEnd.Format(time.RFC3339),
+			Hours:         12,
+			Amount:        600000,
+		}, nil)
+	s.commissionRates.EXPECT().
+		GetCommissionRate(gomock.Any()).
+		Return(entity.PlatformSettings{CommissionRateBP: 500}, nil)
+	s.bookingRepository.EXPECT().
+		GetActiveBookingsInRange(gomock.Any(), s.parkingSpotID, start.UTC(), quotedEnd.UTC()).
+		Return([]entity.TimeWindow{{Start: start.Add(2 * time.Hour).UTC(), End: start.Add(4 * time.Hour).UTC()}}, nil)
+
+	_, err := s.service.CreateBooking(s.context, input)
+
+	s.True(errors.IsConflict(err))
+}
+
+// A half-day at a spot that prices its stays per vehicle is quoted by the vehicle's type, and
+// needs the vehicle like a stay would.
+func (s *serviceSuite) TestCreateBooking_HalfDay_QuotedByTheVehiclesType() {
+	s.vehicleRules = entity.SpotVehicleRules{StayPricedByVehicle: true, AcceptedTypes: []string{"car", "van"}}
+	input := s.hourlyVehicleInput("van", "AB123CD")
+	input.Kind = enum.BookingKindHalfDay
+	start := s.futureDate(20).Add(9 * time.Hour)
+	input.Start = start
+	input.End = start.Add(time.Hour)
+
+	s.parkingClient.EXPECT().
+		GetHalfDayQuote(gomock.Any(), s.parkingSpotID, s.dateStr(start), 9, "van").
+		Return(parkingclient.HalfDayQuote{}, errors.NewInvalidInput("HALF_DAY_NOT_AVAILABLE", "stop here"))
+
+	_, err := s.service.CreateBooking(s.context, input)
+
+	s.Equal("HALF_DAY_NOT_AVAILABLE", errors.InvalidInputCode(err))
+}
+
+func (s *serviceSuite) TestCreateBooking_HalfDay_NeedsTheVehicleWhenStaysArePricedByIt() {
+	s.vehicleRules = entity.SpotVehicleRules{StayPricedByVehicle: true, AcceptedTypes: []string{"car", "van"}}
+	start := s.futureDate(20).Add(9 * time.Hour)
+	input := entity.CreateBookingInput{
+		ParkingSpotID: s.parkingSpotID,
+		UserID:        "11111111-1111-1111-1111-111111111111",
+		Start:         start,
+		End:           start.Add(time.Hour),
+		Kind:          enum.BookingKindHalfDay,
+	}
+
+	_, err := s.service.CreateBooking(s.context, input)
+
+	s.True(errors.IsInvalidInput(err))
 }

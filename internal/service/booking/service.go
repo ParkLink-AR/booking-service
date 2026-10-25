@@ -32,6 +32,7 @@ type BookingRepository interface {
 type ParkingClient interface {
 	GetSpotOwnerID(ctx context.Context, spotID string) (string, error)
 	GetStayQuote(ctx context.Context, spotID, startDate, endDate string, startHour int, vehicleType string) (parkingclient.StayQuote, error)
+	GetHalfDayQuote(ctx context.Context, spotID, date string, startHour int, vehicleType string) (parkingclient.HalfDayQuote, error)
 	GetHourlyPrice(ctx context.Context, spotID, vehicleType string) (float64, error)
 	IsSpotActive(ctx context.Context, spotID string) (bool, error)
 	GetVehicleRules(ctx context.Context, spotID string) (entity.SpotVehicleRules, error)
@@ -57,6 +58,7 @@ type Service struct {
 	commissionRates   CommissionRateReader
 	location          *time.Location
 	holdDuration      time.Duration
+	now               func() time.Time
 }
 
 func NewService(
@@ -72,5 +74,13 @@ func NewService(
 		commissionRates:   commissionRates,
 		location:          location,
 		holdDuration:      holdDuration,
+		now:               time.Now,
 	}
+}
+
+// WithClock makes the service read the time from now instead of the system clock -- for
+// tests that check the rules about when a booking can be made.
+func (service *Service) WithClock(now func() time.Time) *Service {
+	service.now = now
+	return service
 }

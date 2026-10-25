@@ -27,10 +27,10 @@ func (repository *Repository) ListEligibleBookingsWithoutPayout(ctx context.Cont
 		FROM `+constants.BookingsTableName+` b
 		LEFT JOIN `+constants.PayoutsTableName+` p ON p.booking_id = b.id AND p.kind = 'BOOKING'
 		WHERE (b.status = 'COMPLETED'
-		       -- A verified hourly booking still waiting for its exit code (see BookingExitUseCase)
-		       -- pays the owner for the time that was booked regardless: not being able to record
-		       -- when the driver left is not the owner's doing.
-		       OR (b.status IN ('CONFIRMED', 'IN_PROGRESS') AND b.kind = 'HOURLY' AND b.verified_at IS NOT NULL)
+		       -- A verified hourly booking or half-day still waiting for its exit code (see
+		       -- BookingExitUseCase) pays the owner for the time that was booked regardless: not
+		       -- being able to record when the driver left is not the owner's doing.
+		       OR (b.status IN ('CONFIRMED', 'IN_PROGRESS') AND b.kind IN `+constants.ExitTrackedKindsSQL+` AND b.verified_at IS NOT NULL)
 		       OR (b.status = 'CANCELLED' AND b.cancellation_reason = '`+constants.CancellationReasonDriverLateCancelled+`'))
 		  AND b.paid_at IS NOT NULL
 		  AND upper(b.time_range) <= now() - interval '24 hours'

@@ -28,6 +28,18 @@ func (repository *Repository) ConfirmBooking(
 	}
 	defer func() { _ = transaction.Rollback() }()
 
+	// The same per-spot lock CreateBooking takes: a payment confirming a hold right as it runs
+	// out can't interleave with someone booking the slot that hold is releasing. Without it,
+	// both could win -- this UPDATE judging the hold still alive and that create judging it gone.
+	if _, err := transaction.ExecContext(ctx, `
+		SELECT pg_advisory_xact_lock(hashtext(parking_spot_id::text))
+		FROM `+constants.BookingsTableName+` WHERE id = $1
+	`, bookingID); err != nil {
+		return entity.Booking{}, errors.NewInternalError("booking.ConfirmBooking", err)
+	}
+
+	// clock_timestamp(), not now(): now() is when this transaction began -- before waiting for
+	// the lock -- and could still see a hold as alive that ran out while it waited.
 	row := transaction.QueryRowContext(ctx, `
 		UPDATE `+constants.BookingsTableName+`
 		SET
@@ -39,7 +51,7 @@ func (repository *Repository) ConfirmBooking(
 			updated_at              = now()
 		WHERE id            = $1
 		  AND status        = 'PENDING_PAYMENT'
-		  AND hold_expires_at > now()
+		  AND hold_expires_at > clock_timestamp()
 		RETURNING
 			id, parking_spot_id, user_id,
 			lower(time_range), upper(time_range),

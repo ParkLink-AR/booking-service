@@ -151,6 +151,22 @@ func (s *bookingChangesUseCaseSuite) TestExtend_AlreadyHasExtensionAwaitingPayme
 	s.Equal("EXTENSION_AWAITING_PAYMENT", errors.InvalidInputCode(err))
 }
 
+// A half-day extends like an hourly booking -- by the hour, at the spot's hourly rate
+// (Service.CreateExtension checks the spot takes hourly bookings and is open then).
+func (s *bookingChangesUseCaseSuite) TestExtend_HalfDay_CreatesExtension() {
+	b := s.confirmed(-30 * time.Minute)
+	b.Kind = enum.BookingKindHalfDay
+	b.Status = enum.BookingStatusInProgress
+	end := b.End.Add(time.Hour)
+	s.bookings.EXPECT().GetByID(gomock.Any(), changesBookingID).Return(b, nil)
+	s.extender.EXPECT().CreateExtension(gomock.Any(), b, end).Return(entity.Booking{ID: "ext-1"}, nil)
+
+	got, err := s.useCase.Extend(s.context, changesBookingID, changesDriverID, end)
+
+	s.Require().NoError(err)
+	s.Equal("ext-1", got.ID)
+}
+
 func (s *bookingChangesUseCaseSuite) TestExtensionOptions_StayBooking_Rejected() {
 	b := s.confirmed(time.Hour)
 	b.Kind = enum.BookingKindStay

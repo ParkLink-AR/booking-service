@@ -54,12 +54,30 @@ func (service *Service) CreateBooking(ctx context.Context, input entity.CreateBo
 	if err := service.checkVehicle(ctx, input); err != nil {
 		return entity.Booking{}, err
 	}
+	// What the spot really allows, straight from parking-service: whether it's taking bookings,
+	// its weekly hours, the days its owner closed and how many places it has. The request's own
+	// schedule and capacity are never trusted -- a modified client could invent them.
+	rules, err := service.parkingClient.GetSpotBookingRules(ctx, input.ParkingSpotID)
+	if err != nil {
+		return entity.Booking{}, err
+	}
+	if !rules.Active {
+		return entity.Booking{}, errors.NewInvalidInput("SPOT_NOT_ACTIVE", "esta cochera no está tomando reservas ahora")
+	}
+	// The start the driver chose, whatever the kind (a stay's check-in, a half-day's start).
+	if err := service.checkHorizon(input.Start); err != nil {
+		return entity.Booking{}, err
+	}
 
 	start, end := input.Start, input.End
 	var amount, ownerAmount int
 
-	if input.Kind == enum.BookingKindStay {
-		quote, err := service.priceStay(ctx, input)
+	if input.Kind.UsesStayPricing() {
+		price := service.priceStay
+		if input.Kind == enum.BookingKindHalfDay {
+			price = service.priceHalfDay
+		}
+		quote, err := price(ctx, input)
 		if err != nil {
 			return entity.Booking{}, err
 		}
@@ -72,40 +90,23 @@ func (service *Service) CreateBooking(ctx context.Context, input entity.CreateBo
 		// check below) from registering as a false conflict against a stay
 		// that only needs the spot from this moment on. Same boundary
 		// parking-service's StaysService.assertRangeFree checks against when
-		// quoting.
-		if now := time.Now(); start.Before(now) {
+		// quoting -- and a half-day started in the hour under way is booked the same way.
+		if now := service.now(); start.Before(now) {
 			start = now
 		}
 	} else {
-		active, err := service.parkingClient.IsSpotActive(ctx, input.ParkingSpotID)
-		if err != nil {
+		if err := service.checkHourlyRange(input.Start, input.End, rules); err != nil {
 			return entity.Booking{}, err
 		}
-		if !active {
-			return entity.Booking{}, errors.NewInvalidInput("SPOT_NOT_ACTIVE",
-				"this parking spot is not accepting new reservations")
-		}
-		blocked, err := service.parkingClient.GetBlockedDates(ctx, input.ParkingSpotID)
-		if err != nil {
-			return entity.Booking{}, err
-		}
-		if entity.OverlapsDateRanges(blocked, input.Start, input.End, service.location) {
-			return entity.Booking{}, errors.NewInvalidInput("SPOT_DAY_BLOCKED",
-				"el propietario cerró la cochera ese día")
-		}
-		if !isWithinPublishedHours(input.Start, input.End, input.ParkingSpotSchedule, service.location) {
-			return entity.Booking{}, errors.NewInvalidInput("OUTSIDE_PUBLISHED_HOURS",
-				"requested time is outside the parking spot's published hours")
-		}
-
 		priced, err := service.priceHourly(ctx, input)
 		if err != nil {
 			return entity.Booking{}, err
 		}
 		amount, ownerAmount = priced.TotalAmount, priced.OwnerAmount
 	}
-
-	capacity := input.Capacity
+	// The spot's own capacity, from parking-service -- never the request's, which a modified
+	// client could raise to book a spot that's already full.
+	capacity := rules.Capacity
 	if capacity < 1 {
 		capacity = 1
 	}
@@ -189,6 +190,32 @@ func (service *Service) priceStay(ctx context.Context, input entity.CreateBookin
 	return stayQuote{Start: start, End: end, Amount: amount, OwnerAmount: quote.Amount}, nil
 }
 
+// priceHalfDay resolves a HALF_DAY booking ("media estadía") like priceStay does a stay: its
+// 12 hours from the driver's chosen hour, and its price, come from parking-service's quote --
+// see parkingclient.Client.GetHalfDayQuote -- never from input. input.Start's date and hour
+// (in the service's location) are the day and hour the driver picked.
+func (service *Service) priceHalfDay(ctx context.Context, input entity.CreateBookingInput) (stayQuote, error) {
+	localStart := input.Start.In(service.location)
+	quote, err := service.parkingClient.GetHalfDayQuote(
+		ctx, input.ParkingSpotID, localStart.Format("2006-01-02"), localStart.Hour(), input.VehicleType)
+	if err != nil {
+		return stayQuote{}, err
+	}
+	start, err := time.Parse(time.RFC3339, quote.StartDateTime)
+	if err != nil {
+		return stayQuote{}, errors.NewUpstream("priceHalfDay", err)
+	}
+	end, err := time.Parse(time.RFC3339, quote.EndDateTime)
+	if err != nil {
+		return stayQuote{}, errors.NewUpstream("priceHalfDay", err)
+	}
+	amount, err := service.addCommission(ctx, quote.Amount)
+	if err != nil {
+		return stayQuote{}, err
+	}
+	return stayQuote{Start: start, End: end, Amount: amount, OwnerAmount: quote.Amount}, nil
+}
+
 // hourlyPricing is priceHourly's result: the owner's own rate alongside the amount the
 // driver actually pays once the platform's commission is added on top (see addCommission).
 type hourlyPricing struct {
@@ -238,7 +265,8 @@ func (service *Service) checkVehicle(ctx context.Context, input entity.CreateBoo
 	if err != nil {
 		return err
 	}
-	needsVehicle := rules.NeedsVehicle(input.Kind == enum.BookingKindStay)
+	// A half-day is priced from the stay rates, so it asks for a vehicle when they vary by one.
+	needsVehicle := rules.NeedsVehicle(input.Kind.UsesStayPricing())
 	if input.VehicleType == "" {
 		if needsVehicle {
 			return errors.NewInvalidInput("VEHICLE_REQUIRED", "this parking spot needs to know which vehicle you're coming with")

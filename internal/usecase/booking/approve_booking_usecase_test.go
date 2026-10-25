@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
@@ -53,11 +54,17 @@ func (s *approveBookingUseCaseSuite) TearDownTest() {
 }
 
 func (s *approveBookingUseCaseSuite) pendingBooking() entity.Booking {
+	// Starts in two days, with the owner's time to answer still running.
+	start := time.Now().Add(48 * time.Hour)
+	deadline := time.Now().Add(time.Hour)
 	return entity.Booking{
-		ID:            s.bookingID,
-		ParkingSpotID: s.spotID,
-		UserID:        s.driverID,
-		Status:        enum.BookingStatusPendingOwnerApproval,
+		ID:                    s.bookingID,
+		ParkingSpotID:         s.spotID,
+		UserID:                s.driverID,
+		Status:                enum.BookingStatusPendingOwnerApproval,
+		Start:                 start,
+		End:                   start.Add(2 * time.Hour),
+		OwnerResponseDeadline: &deadline,
 	}
 }
 
@@ -115,4 +122,30 @@ func (s *approveBookingUseCaseSuite) TestExecute_ApproveError_NoPublish() {
 
 	s.Equal(entity.Booking{}, got)
 	s.True(errors.IsNotFound(err))
+}
+
+func (s *approveBookingUseCaseSuite) TestExecute_AfterTheDeadline_Refused() {
+	late := s.pendingBooking()
+	gone := time.Now().Add(-time.Minute)
+	late.OwnerResponseDeadline = &gone
+	s.approver.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(late, nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), s.spotID).
+		Return(entity.SpotDetails{OwnerID: s.ownerID, Title: "Cochera en Palermo"}, nil)
+
+	_, err := s.useCase.Execute(s.context, s.bookingID, s.ownerID)
+
+	s.Equal("APPROVAL_EXPIRED", errors.InvalidInputCode(err))
+}
+
+func (s *approveBookingUseCaseSuite) TestExecute_ABookingAlreadyOver_Refused() {
+	over := s.pendingBooking()
+	over.Start, over.End = time.Now().Add(-3*time.Hour), time.Now().Add(-time.Hour)
+	over.OwnerResponseDeadline = nil
+	s.approver.EXPECT().GetByID(gomock.Any(), s.bookingID).Return(over, nil)
+	s.spots.EXPECT().GetSpotDetails(gomock.Any(), s.spotID).
+		Return(entity.SpotDetails{OwnerID: s.ownerID, Title: "Cochera en Palermo"}, nil)
+
+	_, err := s.useCase.Execute(s.context, s.bookingID, s.ownerID)
+
+	s.Equal("APPROVAL_EXPIRED", errors.InvalidInputCode(err))
 }

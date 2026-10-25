@@ -109,7 +109,7 @@ func (uc *BookingChangesUseCase) OwnerCancel(ctx context.Context, bookingID, own
 	return cancelled, nil
 }
 
-// extendable returns the booking driverID wants to extend, if it can be: an hourly booking
+// extendable returns the booking driverID wants to extend, if it can be: an hourly booking or half-day
 // of theirs that's accepted (or under way) and hasn't ended, not already extended.
 func (uc *BookingChangesUseCase) extendable(ctx context.Context, bookingID, driverID string) (entity.Booking, error) {
 	booking, err := uc.bookings.GetByID(ctx, bookingID)
@@ -119,8 +119,10 @@ func (uc *BookingChangesUseCase) extendable(ctx context.Context, bookingID, driv
 	if booking.UserID != driverID {
 		return entity.Booking{}, errors.NewForbidden("no sos el titular de esta reserva")
 	}
-	if booking.Kind != enum.BookingKindHourly {
-		return entity.Booking{}, errors.NewInvalidInput("NOT_EXTENDABLE", "solo se pueden extender las reservas por hora")
+	// A stay can't be extended; an hourly booking or a half-day can, by the hour, on spots that
+	// take hourly bookings (Service.ExtensionOptions checks that, and the hours they're open).
+	if booking.Kind == enum.BookingKindStay {
+		return entity.Booking{}, errors.NewInvalidInput("NOT_EXTENDABLE", "solo se pueden extender las reservas por hora o de media estadía")
 	}
 	if booking.Status != enum.BookingStatusConfirmed && booking.Status != enum.BookingStatusInProgress {
 		return entity.Booking{}, errors.NewInvalidInput("NOT_EXTENDABLE", "solo se puede extender una reserva confirmada")

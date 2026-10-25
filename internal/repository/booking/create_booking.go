@@ -30,7 +30,9 @@ func (repository *Repository) CreateBooking(ctx context.Context, booking entity.
 	defer func() { _ = tx.Rollback() }()
 
 	// Serialise booking creation for this spot so the recount below can't race another insert.
-	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, booking.ParkingSpotID); err != nil {
+	// Keyed on the id as Postgres writes it (::uuid::text), so ConfirmBooking -- which reads it from
+	// the row -- takes this very same lock whatever case the request spelled it in.
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1::uuid::text))`, booking.ParkingSpotID); err != nil {
 		return entity.Booking{}, errors.NewInternalError("booking.CreateBooking", err)
 	}
 
@@ -42,7 +44,7 @@ func (repository *Repository) CreateBooking(ctx context.Context, booking entity.
 		WHERE parking_spot_id = $1
 		  AND (
 		    status IN ('CONFIRMED', 'IN_PROGRESS', 'PENDING_OWNER_APPROVAL')
-		    OR (status = 'PENDING_PAYMENT' AND hold_expires_at > now())
+		    OR (status = 'PENDING_PAYMENT' AND hold_expires_at > clock_timestamp())
 		  )
 		  AND time_range && tstzrange($2, $3, '[)')
 		  AND ($4::uuid IS NULL OR id <> $4::uuid)

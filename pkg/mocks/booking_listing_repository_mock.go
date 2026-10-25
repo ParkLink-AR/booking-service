@@ -156,6 +156,21 @@ func (mr *MockParkingClientMockRecorder) GetBlockedDates(ctx, spotID any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockedDates", reflect.TypeOf((*MockParkingClient)(nil).GetBlockedDates), ctx, spotID)
 }
 
+// GetHalfDayQuote mocks base method.
+func (m *MockParkingClient) GetHalfDayQuote(ctx context.Context, spotID, date string, startHour int, vehicleType string) (parkingclient.HalfDayQuote, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetHalfDayQuote", ctx, spotID, date, startHour, vehicleType)
+	ret0, _ := ret[0].(parkingclient.HalfDayQuote)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetHalfDayQuote indicates an expected call of GetHalfDayQuote.
+func (mr *MockParkingClientMockRecorder) GetHalfDayQuote(ctx, spotID, date, startHour, vehicleType any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHalfDayQuote", reflect.TypeOf((*MockParkingClient)(nil).GetHalfDayQuote), ctx, spotID, date, startHour, vehicleType)
+}
+
 // GetHourlyPrice mocks base method.
 func (m *MockParkingClient) GetHourlyPrice(ctx context.Context, spotID, vehicleType string) (float64, error) {
 	m.ctrl.T.Helper()

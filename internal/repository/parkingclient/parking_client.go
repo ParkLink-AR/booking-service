@@ -303,6 +303,18 @@ type StayQuote struct {
 	Amount int `json:"amount"`
 }
 
+// HalfDayQuote mirrors parking-service's GET /parking-spots/{id}/half-days/quote response: the
+// exact instants and price of a "media estadía" (12 hours from the driver's chosen hour),
+// validated there against the spot's stay terms and its other bookings.
+type HalfDayQuote struct {
+	// RFC3339 with the Buenos Aires offset -- the authoritative Start/End for the booking.
+	StartDateTime string `json:"startDateTime"`
+	EndDateTime   string `json:"endDateTime"`
+	Hours         int    `json:"hours"`
+	// Amount is the owner's own price in centavos, same convention as StayQuote.Amount.
+	Amount int `json:"amount"`
+}
+
 // parkingServiceError is the shape of a NestJS exception response body
 // (BadRequestException/NotFoundException/ConflictException all render this way).
 type parkingServiceError struct {
@@ -366,4 +378,43 @@ func (client *Client) readErrorMessage(response *http.Response, fallback string)
 		return fallback
 	}
 	return body.Message
+}
+
+// GetHalfDayQuote asks parking-service to price and validate a half-day starting at startHour
+// (0-23, Buenos Aires time) on date (YYYY-MM-DD). As with GetStayQuote, CreateBooking books
+// exactly the returned instants and amount, never what the request carried. vehicleType ("" when
+// the driver named none) picks the rate when the spot prices its stays per vehicle.
+func (client *Client) GetHalfDayQuote(ctx context.Context, spotID, date string, startHour int, vehicleType string) (HalfDayQuote, error) {
+	query := url.Values{"date": {date}, "startHour": {strconv.Itoa(startHour)}}
+	if vehicleType != "" {
+		query.Set("vehicleType", vehicleType)
+	}
+	requestURL := fmt.Sprintf("%s/parking-spots/%s/half-days/quote?%s", client.baseURL, spotID, query.Encode())
+
+	request, err := client.newGetRequest(ctx, requestURL)
+	if err != nil {
+		return HalfDayQuote{}, errors.NewUpstream("parkingclient.GetHalfDayQuote", err)
+	}
+	response, err := client.httpClient.Do(request)
+	if err != nil {
+		return HalfDayQuote{}, errors.NewUpstream("parkingclient.GetHalfDayQuote", err)
+	}
+	defer response.Body.Close()
+
+	switch response.StatusCode {
+	case http.StatusOK:
+		var quote HalfDayQuote
+		if err := json.NewDecoder(response.Body).Decode(&quote); err != nil {
+			return HalfDayQuote{}, errors.NewUpstream("parkingclient.GetHalfDayQuote", err)
+		}
+		return quote, nil
+	case http.StatusNotFound:
+		return HalfDayQuote{}, errors.NewNotFound("parking_spot", spotID)
+	case http.StatusConflict:
+		return HalfDayQuote{}, errors.NewConflict(client.readErrorMessage(response, "requested half-day overlaps with an existing booking"))
+	case http.StatusBadRequest:
+		return HalfDayQuote{}, errors.NewInvalidInput("HALF_DAY_NOT_AVAILABLE", client.readErrorMessage(response, "this parking spot does not accept that half-day"))
+	default:
+		return HalfDayQuote{}, errors.NewUpstream("parkingclient.GetHalfDayQuote", fmt.Errorf("unexpected status %d", response.StatusCode))
+	}
 }

@@ -63,6 +63,8 @@ func (s *confirmBookingUseCaseSuite) pendingBooking() entity.Booking {
 	return entity.Booking{
 		ID: s.bookingID, ParkingSpotID: s.spotID, UserID: s.driverID,
 		Status: enum.BookingStatusPendingPayment, HoldExpiresAt: &holdExpiresAt, Amount: s.amount,
+		// Starts in three days: the owner gets the full approval window.
+		Start: time.Now().Add(72 * time.Hour), End: time.Now().Add(74 * time.Hour),
 	}
 }
 
@@ -282,4 +284,25 @@ func (s *confirmBookingUseCaseSuite) TestExecute_Extension_ConfirmsDirectlyAndPu
 	s.Equal(enum.BookingStatusConfirmed, got.Status)
 	s.Equal("booking.extended", gotKey)
 	s.Equal(parentID, gotPayload["parent_booking_id"])
+}
+
+type ownerDeadlineCase struct {
+	name     string
+	startsIn time.Duration
+	want     time.Duration
+}
+
+var ownerDeadlineCases = []ownerDeadlineCase{
+	{"a booking days away gets the whole window", 72 * time.Hour, 24 * time.Hour},
+	{"a booking in five hours: until it starts", 5 * time.Hour, 5 * time.Hour},
+	{"a last-minute booking still gets 15 minutes", 5 * time.Minute, 15 * time.Minute},
+	{"one already under way (a stay booked from now) gets 15 minutes", -time.Minute, 15 * time.Minute},
+}
+
+func (s *confirmBookingUseCaseSuite) TestOwnerResponseDeadline() {
+	now := time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)
+	for _, tc := range ownerDeadlineCases {
+		got := booking.OwnerResponseDeadline(now, now.Add(tc.startsIn))
+		s.Equal(now.Add(tc.want), got, tc.name)
+	}
 }

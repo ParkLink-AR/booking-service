@@ -22,7 +22,6 @@ func (s *serviceSuite) TestCreateBooking_DayBlockedByOwner_Rejected() {
 		Start:               start,
 		End:                 end,
 	}
-	s.parkingClient.EXPECT().IsSpotActive(gomock.Any(), s.parkingSpotID).Return(true, nil)
 
 	got, err := s.service.CreateBooking(s.context, input)
 
@@ -46,7 +45,7 @@ func (s *serviceSuite) extensionParent() entity.Booking {
 
 func (s *serviceSuite) expectExtensionRules(rules entity.SpotBookingRules, active []entity.TimeWindow) {
 	parent := s.extensionParent()
-	s.parkingClient.EXPECT().GetSpotBookingRules(gomock.Any(), s.parkingSpotID).Return(rules, nil)
+	s.spotRules = rules
 	s.parkingClient.EXPECT().GetHourlyPrice(gomock.Any(), s.parkingSpotID, "").Return(100.0, nil)
 	s.commissionRates.EXPECT().GetCommissionRate(gomock.Any()).Return(entity.PlatformSettings{CommissionRateBP: 1000}, nil)
 	s.bookingRepository.EXPECT().
@@ -82,8 +81,7 @@ func (s *serviceSuite) TestExtensionOptions_StopsAtNextBooking() {
 }
 
 func (s *serviceSuite) TestExtensionOptions_SpotPaused_Rejected() {
-	s.parkingClient.EXPECT().GetSpotBookingRules(gomock.Any(), s.parkingSpotID).
-		Return(entity.SpotBookingRules{Active: false, HourlyEnabled: true}, nil)
+	s.spotRules = entity.SpotBookingRules{Active: false, HourlyEnabled: true}
 
 	_, err := s.service.ExtensionOptions(s.context, s.extensionParent())
 
