@@ -133,6 +133,6 @@ See `docs/go-rules.md` for the full coding standards, and `spec.md` / `plan.md` 
 
 ## Datos de demostración
 
-Con `SEED_DEMO_DATA=true`, al arrancar, le pide a parking-service sus cocheras demo y les carga entre 20 y 50 reseñas a cada una
+Por defecto (se apaga con `SEED_DEMO_DATA=false`), al arrancar, le pide a parking-service sus cocheras demo y les carga entre 20 y 50 reseñas a cada una
 (`internal/usecase/booking/seed_demo_data_usecase.go`). Las reseñas cuelgan de una reserva terminada y sin pagar por cochera, así que nunca
 generan cobros. Detalles y cómo quitarlos en `parking-service/README.md`, sección "Datos de demostración".

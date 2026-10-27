@@ -211,8 +211,8 @@ func main() {
 	// booking starts and before a stay ends.
 	go runRemindersJob(ctx, sendBookingRemindersUseCase, logger)
 
-	// Demo data: reviews for the demo parking spots (only with SEED_DEMO_DATA=true).
-	if os.Getenv("SEED_DEMO_DATA") == "true" {
+	// Demo data: reviews for the demo parking spots. On unless SEED_DEMO_DATA=false.
+	if os.Getenv("SEED_DEMO_DATA") != "false" {
 		go runDemoSeedJob(ctx, seedDemoDataUseCase, logger)
 	}
 
