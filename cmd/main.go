@@ -132,6 +132,7 @@ func main() {
 	listTicketsByUserUseCase := ucbooking.NewListTicketsByUserUseCase(bookingRepository)
 	listPendingVerificationReviewsUseCase := ucbooking.NewListPendingVerificationReviewsUseCase(bookingRepository)
 	resolveVerificationReviewUseCase := ucbooking.NewResolveVerificationReviewUseCase(bookingRepository, paymentClient, parkingClient, eventPublisher)
+	seedDemoDataUseCase := ucbooking.NewSeedDemoDataUseCase(parkingClient, bookingRepository)
 	accountClosureUseCase := ucbooking.NewAccountClosureUseCase(bookingRepository, paymentClient, parkingClient, eventPublisher)
 	expirePendingApprovalsUseCase := ucbooking.NewExpirePendingApprovalsUseCase(bookingRepository, paymentClient, parkingClient, eventPublisher)
 	completeFinishedBookingsUseCase := ucbooking.NewCompleteFinishedBookingsUseCase(bookingRepository, parkingClient, eventPublisher)
@@ -209,6 +210,11 @@ func main() {
 	// Background job: reminders before a booking request expires unanswered, before a
 	// booking starts and before a stay ends.
 	go runRemindersJob(ctx, sendBookingRemindersUseCase, logger)
+
+	// Demo data: reviews for the demo parking spots (only with SEED_DEMO_DATA=true).
+	if os.Getenv("SEED_DEMO_DATA") == "true" {
+		go runDemoSeedJob(ctx, seedDemoDataUseCase, logger)
+	}
 
 	port := envOrDefault("HTTP_PORT", constants.DefaultHTTPPort)
 	server := &http.Server{Addr: ":" + port, Handler: router}
@@ -347,6 +353,39 @@ func runHoldExpiryJob(ctx context.Context, repo *bookingrepository.Repository, l
 			}
 		}
 	}
+}
+
+// runDemoSeedJob loads the demo spots' reviews (see SeedDemoDataUseCase). parking-service
+// fills its demo spots in right after it boots and can take a while, so this retries: it stops
+// after two runs in a row that find everything already loaded, or after DemoSeedMaxAttempts.
+func runDemoSeedJob(ctx context.Context, useCase *ucbooking.SeedDemoDataUseCase, logger *zap.Logger) {
+	wait := 10 * time.Second
+	idleRuns := 0
+	for attempt := 1; attempt <= constants.DemoSeedMaxAttempts; attempt++ {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(wait):
+		}
+		wait = constants.DemoSeedRetryInterval
+
+		result, err := useCase.Execute(ctx)
+		switch {
+		case err != nil:
+			logger.Warn("demo seed failed, will retry", zap.Int("attempt", attempt), zap.Error(err))
+			idleRuns = 0
+		case result.Reviews > 0:
+			logger.Info("demo seed added reviews", zap.Int("spots", result.Spots), zap.Int("reviews", result.Reviews))
+			idleRuns = 0
+		case result.Spots > 0:
+			idleRuns++
+			if idleRuns >= 2 {
+				logger.Info("demo seed complete", zap.Int("spots", result.Spots))
+				return
+			}
+		}
+	}
+	logger.Warn("demo seed gave up waiting for demo spots", zap.Int("attempts", constants.DemoSeedMaxAttempts))
 }
 
 // runOwnerApprovalExpiryJob ticks every minute and auto-cancels + refunds every

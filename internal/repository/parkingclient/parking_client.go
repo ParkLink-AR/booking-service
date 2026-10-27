@@ -418,3 +418,37 @@ func (client *Client) GetHalfDayQuote(ctx context.Context, spotID, date string, 
 		return HalfDayQuote{}, errors.NewUpstream("parkingclient.GetHalfDayQuote", fmt.Errorf("unexpected status %d", response.StatusCode))
 	}
 }
+
+type demoSpotResponse struct {
+	ID           string   `json:"id"`
+	OwnerID      string   `json:"ownerId"`
+	PricePerHour *float64 `json:"pricePerHour"`
+}
+
+// ListDemoSpots returns the demo parking spots parking-service has already filled in (internal
+// route the gateway never exposes). Used by the demo data load to give them reviews.
+func (client *Client) ListDemoSpots(ctx context.Context) ([]entity.DemoSpot, error) {
+	request, err := client.newGetRequest(ctx, client.baseURL+"/internal/demo-spots")
+	if err != nil {
+		return nil, errors.NewUpstream("parkingclient.ListDemoSpots", err)
+	}
+	response, err := client.httpClient.Do(request)
+	if err != nil {
+		return nil, errors.NewUpstream("parkingclient.ListDemoSpots", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return nil, errors.NewUpstream("parkingclient.ListDemoSpots", fmt.Errorf("unexpected status %d", response.StatusCode))
+	}
+
+	var decoded []demoSpotResponse
+	if err := json.NewDecoder(response.Body).Decode(&decoded); err != nil {
+		return nil, errors.NewUpstream("parkingclient.ListDemoSpots", err)
+	}
+	spots := make([]entity.DemoSpot, len(decoded))
+	for index, spot := range decoded {
+		spots[index] = entity.DemoSpot{ID: spot.ID, OwnerID: spot.OwnerID, PricePerHour: spot.PricePerHour}
+	}
+	return spots, nil
+}

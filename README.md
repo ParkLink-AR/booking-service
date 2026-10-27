@@ -130,3 +130,9 @@ BOOKING_TEST_DSN="postgres://appuser:apppassword@localhost:5432/cleanapi?sslmode
 The last command runs the repository integration suite against a real PostgreSQL instance (skipped by default) — it's what actually exercises the `TSTZRANGE` overlap logic and the advisory-lock + capacity recount in `CreateBooking`, which a mocked `*sql.DB` can't verify.
 
 See `docs/go-rules.md` for the full coding standards, and `spec.md` / `plan.md` for the original availability-endpoint design.
+
+## Datos de demostración
+
+Con `SEED_DEMO_DATA=true`, al arrancar, le pide a parking-service sus cocheras demo y les carga entre 20 y 50 reseñas a cada una
+(`internal/usecase/booking/seed_demo_data_usecase.go`). Las reseñas cuelgan de una reserva terminada y sin pagar por cochera, así que nunca
+generan cobros. Detalles y cómo quitarlos en `parking-service/README.md`, sección "Datos de demostración".
