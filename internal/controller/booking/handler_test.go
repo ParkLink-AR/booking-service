@@ -469,6 +469,55 @@ func (s *handlerSuite) TestListBookingsByUserEndpoint_ForbidsOtherUsers() {
 	s.Equal(http.StatusForbidden, recorder.Code)
 }
 
+var listBookingsByUserOrderCases = []struct {
+	name  string
+	query string
+	order enum.UserBookingsOrder
+}{
+	{name: "no sort defaults to recent", query: "", order: enum.UserBookingsOrderRecent},
+	{name: "sort=recent", query: "?sort=recent", order: enum.UserBookingsOrderRecent},
+	{name: "sort=upcoming", query: "?sort=upcoming", order: enum.UserBookingsOrderUpcoming},
+}
+
+func (s *handlerSuite) TestListBookingsByUserEndpoint_PassesOrder() {
+	for _, testCase := range listBookingsByUserOrderCases {
+		s.listBookingsByUserUseCase.EXPECT().Execute(gomock.Any(), validUserID, testCase.order, nil).Return(nil, nil)
+
+		recorder := s.doWithHeaders(http.MethodGet, "/users/"+validUserID+"/bookings/history"+testCase.query, "",
+			map[string]string{"X-User-Id": validUserID})
+
+		s.Equal(http.StatusOK, recorder.Code, testCase.name)
+	}
+}
+
+func (s *handlerSuite) TestListBookingsByUserEndpoint_RejectsUnknownSort() {
+	recorder := s.doWithHeaders(http.MethodGet, "/users/"+validUserID+"/bookings/history?sort=oldest", "",
+		map[string]string{"X-User-Id": validUserID})
+
+	s.Equal(http.StatusBadRequest, recorder.Code)
+	s.Contains(recorder.Body.String(), "INVALID_SORT")
+}
+
+func (s *handlerSuite) TestListBookingsByUserEndpoint_PassesStatus() {
+	confirmed := enum.BookingStatusConfirmed
+	s.listBookingsByUserUseCase.EXPECT().
+		Execute(gomock.Any(), validUserID, enum.UserBookingsOrderUpcoming, &confirmed).
+		Return(nil, nil)
+
+	recorder := s.doWithHeaders(http.MethodGet, "/users/"+validUserID+"/bookings/history?sort=upcoming&status=CONFIRMED", "",
+		map[string]string{"X-User-Id": validUserID})
+
+	s.Equal(http.StatusOK, recorder.Code)
+}
+
+func (s *handlerSuite) TestListBookingsByUserEndpoint_RejectsUnknownStatus() {
+	recorder := s.doWithHeaders(http.MethodGet, "/users/"+validUserID+"/bookings/history?status=LOST", "",
+		map[string]string{"X-User-Id": validUserID})
+
+	s.Equal(http.StatusBadRequest, recorder.Code)
+	s.Contains(recorder.Body.String(), "INVALID_STATUS")
+}
+
 func (s *handlerSuite) TestListSettlementsByUserEndpoint_ForbidsOtherUsers() {
 	recorder := s.doWithHeaders(http.MethodGet, "/users/"+validParkingSpotID+"/settlements", "",
 		map[string]string{"X-User-Id": validUserID})

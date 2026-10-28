@@ -32,7 +32,12 @@ type ListBookingsUseCase interface {
 
 // ListBookingsByUserUseCase is the interface consumed by GET /users/{id}/bookings/history.
 type ListBookingsByUserUseCase interface {
-	Execute(ctx context.Context, userID string) ([]entity.Booking, error)
+	Execute(
+		ctx context.Context,
+		userID string,
+		order enum.UserBookingsOrder,
+		status *enum.BookingStatus,
+	) ([]entity.Booking, error)
 }
 
 // Handler handles HTTP requests for listing and creating a parking spot's bookings, and
@@ -246,8 +251,19 @@ func (handler *Handler) ListBookingsByUserEndpoint(responseWriter http.ResponseW
 	if !requireSelfOrAdmin(responseWriter, request, userID) {
 		return
 	}
+	order, ok := enum.ParseUserBookingsOrder(request.URL.Query().Get("sort"))
+	if !ok {
+		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_SORT", "sort must be recent or upcoming")
+		return
+	}
+	status, ok := parseOptionalStatus(request.URL.Query().Get("status"))
+	if !ok {
+		writeErrorCode(responseWriter, http.StatusBadRequest, "INVALID_STATUS",
+			"status must be one of PENDING_PAYMENT, PENDING_OWNER_APPROVAL, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED")
+		return
+	}
 
-	bookings, err := handler.listBookingsByUserUseCase.Execute(request.Context(), userID)
+	bookings, err := handler.listBookingsByUserUseCase.Execute(request.Context(), userID, order, status)
 	if err != nil {
 		writeDomainError(responseWriter, err)
 		return
