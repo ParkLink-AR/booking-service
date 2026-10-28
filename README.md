@@ -10,7 +10,7 @@
 
 ### `GET /parking-spots/{id}/availability?from=YYYY-MM-DD&to=YYYY-MM-DD`
 
-Effective free time windows per day, combining the published base (parking-service, mocked in this iteration) with active bookings. `from`/`to` are required, half-open range, max 14 days (`BOOKING_AVAILABILITY_MAX_DAYS`).
+Effective free time windows per day, combining the published base (parking-service, mocked in this iteration) with active bookings. `from`/`to` are required, half-open range.
 
 ```json
 {
@@ -116,7 +116,6 @@ Config (`.env.example`):
 | `HTTP_PORT` | `8080` | |
 | `DB_DSN` | — | PostgreSQL connection string |
 | `RABBITMQ_URL` | — | Kept wired per project requirements; no feature publishes to it yet |
-| `BOOKING_AVAILABILITY_MAX_DAYS` | `14` | Max range for the availability endpoint |
 | `BOOKING_HOLD_MINUTES` | `5` | How long a `PENDING_PAYMENT` hold lasts |
 
 ## Testing

@@ -16,3 +16,5 @@ coverage.html
 # pprof
 cpu.prof
 mem.prof
+
+.env
